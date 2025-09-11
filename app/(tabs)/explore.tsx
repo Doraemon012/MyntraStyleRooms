@@ -1,112 +1,418 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
-
-import { Collapsible } from '@/components/ui/collapsible';
-import { ExternalLink } from '@/components/external-link';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Fonts } from '@/constants/theme';
+import React, { useState } from 'react';
+import {
+  FlatList,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
-export default function TabTwoScreen() {
+interface Product {
+  id: string;
+  name: string;
+  price: string;
+  category: string;
+  brand: string;
+  rating: number;
+  isAiRecommended?: boolean;
+}
+
+interface Category {
+  id: string;
+  name: string;
+  emoji: string;
+  count: number;
+}
+
+const mockCategories: Category[] = [
+  { id: '1', name: 'Ethnic', emoji: '👗', count: 1250 },
+  { id: '2', name: 'Western', emoji: '👔', count: 980 },
+  { id: '3', name: 'Footwear', emoji: '👠', count: 750 },
+  { id: '4', name: 'Accessories', emoji: '💍', count: 540 },
+  { id: '5', name: 'Beauty', emoji: '💄', count: 320 },
+];
+
+const mockProducts: Product[] = [
+  {
+    id: '1',
+    name: 'Floral Print Maxi Dress',
+    price: '₹2,499',
+    category: 'Dresses',
+    brand: 'Libas',
+    rating: 4.3,
+    isAiRecommended: true,
+  },
+  {
+    id: '2',
+    name: 'Silk Blend Saree',
+    price: '₹4,999',
+    category: 'Sarees',
+    brand: 'Soch',
+    rating: 4.6,
+  },
+  {
+    id: '3',
+    name: 'Block Heels Sandals',
+    price: '₹1,899',
+    category: 'Footwear',
+    brand: 'Metro',
+    rating: 4.1,
+    isAiRecommended: true,
+  },
+  {
+    id: '4',
+    name: 'Statement Earrings',
+    price: '₹899',
+    category: 'Jewelry',
+    brand: 'Accessorize',
+    rating: 4.4,
+  },
+];
+
+export default function ExploreScreen() {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+
+  const filteredProducts = mockProducts.filter(product => {
+    const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesCategory = !selectedCategory || product.category === selectedCategory;
+    return matchesSearch && matchesCategory;
+  });
+
+  const renderCategory = ({ item }: { item: Category }) => (
+    <TouchableOpacity
+      style={[
+        styles.categoryCard,
+        selectedCategory === item.name && styles.selectedCategory,
+      ]}
+      onPress={() => setSelectedCategory(selectedCategory === item.name ? null : item.name)}
+    >
+      <Text style={styles.categoryEmoji}>{item.emoji}</Text>
+      <ThemedText style={styles.categoryName}>{item.name}</ThemedText>
+      <Text style={styles.categoryCount}>{item.count}+</Text>
+    </TouchableOpacity>
+  );
+
+  const renderProduct = ({ item }: { item: Product }) => (
+    <TouchableOpacity style={styles.productCard}>
+      {item.isAiRecommended && (
+        <View style={styles.aiRecommendedBadge}>
+          <Text style={styles.aiRecommendedText}>AI Pick</Text>
+        </View>
+      )}
+      
+      <View style={styles.productImagePlaceholder}>
+        <Text style={styles.productEmoji}>
+          {item.category === 'Dresses' ? '👗' : 
+           item.category === 'Sarees' ? '🥻' : 
+           item.category === 'Footwear' ? '👠' : '💍'}
+        </Text>
+      </View>
+      
+      <View style={styles.productInfo}>
+        <ThemedText style={styles.productName} numberOfLines={2}>
+          {item.name}
+        </ThemedText>
+        <Text style={styles.productBrand}>{item.brand}</Text>
+        <View style={styles.productMeta}>
+          <Text style={styles.productPrice}>{item.price}</Text>
+          <View style={styles.rating}>
+            <Text style={styles.ratingText}>⭐ {item.rating}</Text>
+          </View>
+        </View>
+      </View>
+      
+      <TouchableOpacity style={styles.addToWardrobeButton}>
+        <Text style={styles.addToWardrobeText}>+</Text>
+      </TouchableOpacity>
+    </TouchableOpacity>
+  );
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#D0D0D0', dark: '#353636' }}
-      headerImage={
-        <IconSymbol
-          size={310}
-          color="#808080"
-          name="chevron.left.forwardslash.chevron.right"
-          style={styles.headerImage}
+    <ThemedView style={styles.container}>
+      <SafeAreaView>
+        <View style={styles.header}>
+          <ThemedText style={styles.title}>Discover Fashion</ThemedText>
+        </View>
+
+        <View style={styles.searchContainer}>
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search products, brands, styles..."
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholderTextColor="#999"
+          />
+        </View>
+
+        <View style={styles.categoriesSection}>
+          <ThemedText style={styles.sectionTitle}>Categories</ThemedText>
+          <FlatList
+            data={mockCategories}
+            renderItem={renderCategory}
+            keyExtractor={item => item.id}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.categoriesList}
+          />
+        </View>
+
+        <View style={styles.aiSection}>
+          <View style={styles.aiHeader}>
+            <ThemedText style={styles.sectionTitle}>AI Recommendations</ThemedText>
+            <TouchableOpacity>
+              <Text style={styles.seeAllText}>See All</Text>
+            </TouchableOpacity>
+          </View>
+          <Text style={styles.aiSubtitle}>
+            Based on your style preferences and recent activity
+          </Text>
+        </View>
+
+        <View style={styles.trendsSection}>
+          <View style={styles.trendsHeader}>
+            <ThemedText style={styles.sectionTitle}>Trending Now</ThemedText>
+            <View style={styles.trendTags}>
+              <View style={styles.trendTag}>
+                <Text style={styles.trendTagText}>#WeddingSeason</Text>
+              </View>
+              <View style={styles.trendTag}>
+                <Text style={styles.trendTagText}>#Festive</Text>
+              </View>
+            </View>
+          </View>
+        </View>
+
+        <FlatList
+          data={filteredProducts}
+          renderItem={renderProduct}
+          keyExtractor={item => item.id}
+          numColumns={2}
+          columnWrapperStyle={styles.productRow}
+          contentContainerStyle={styles.productsList}
+          showsVerticalScrollIndicator={false}
         />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText
-          type="title"
-          style={{
-            fontFamily: Fonts.rounded,
-          }}>
-          Explore
-        </ThemedText>
-      </ThemedView>
-      <ThemedText>This app includes example code to help you get started.</ThemedText>
-      <Collapsible title="File-based routing">
-        <ThemedText>
-          This app has two screens:{' '}
-          <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> and{' '}
-          <ThemedText type="defaultSemiBold">app/(tabs)/explore.tsx</ThemedText>
-        </ThemedText>
-        <ThemedText>
-          The layout file in <ThemedText type="defaultSemiBold">app/(tabs)/_layout.tsx</ThemedText>{' '}
-          sets up the tab navigator.
-        </ThemedText>
-        <ExternalLink href="https://docs.expo.dev/router/introduction">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Android, iOS, and web support">
-        <ThemedText>
-          You can open this project on Android, iOS, and the web. To open the web version, press{' '}
-          <ThemedText type="defaultSemiBold">w</ThemedText> in the terminal running this project.
-        </ThemedText>
-      </Collapsible>
-      <Collapsible title="Images">
-        <ThemedText>
-          For static images, you can use the <ThemedText type="defaultSemiBold">@2x</ThemedText> and{' '}
-          <ThemedText type="defaultSemiBold">@3x</ThemedText> suffixes to provide files for
-          different screen densities
-        </ThemedText>
-        <Image
-          source={require('@/assets/images/react-logo.png')}
-          style={{ width: 100, height: 100, alignSelf: 'center' }}
-        />
-        <ExternalLink href="https://reactnative.dev/docs/images">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Light and dark mode components">
-        <ThemedText>
-          This template has light and dark mode support. The{' '}
-          <ThemedText type="defaultSemiBold">useColorScheme()</ThemedText> hook lets you inspect
-          what the user&apos;s current color scheme is, and so you can adjust UI colors accordingly.
-        </ThemedText>
-        <ExternalLink href="https://docs.expo.dev/develop/user-interface/color-themes/">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Animations">
-        <ThemedText>
-          This template includes an example of an animated component. The{' '}
-          <ThemedText type="defaultSemiBold">components/HelloWave.tsx</ThemedText> component uses
-          the powerful{' '}
-          <ThemedText type="defaultSemiBold" style={{ fontFamily: Fonts.mono }}>
-            react-native-reanimated
-          </ThemedText>{' '}
-          library to create a waving hand animation.
-        </ThemedText>
-        {Platform.select({
-          ios: (
-            <ThemedText>
-              The <ThemedText type="defaultSemiBold">components/ParallaxScrollView.tsx</ThemedText>{' '}
-              component provides a parallax effect for the header image.
-            </ThemedText>
-          ),
-        })}
-      </Collapsible>
-    </ParallaxScrollView>
+      </SafeAreaView>
+    </ThemedView>
   );
 }
 
 const styles = StyleSheet.create({
-  headerImage: {
-    color: '#808080',
-    bottom: -90,
-    left: -35,
-    position: 'absolute',
+  container: {
+    flex: 1,
+    backgroundColor: '#f8f9fa',
   },
-  titleContainer: {
+  header: {
+    paddingHorizontal: 20,
+    paddingVertical: 15,
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#1a1a1a',
+  },
+  searchContainer: {
+    paddingHorizontal: 20,
+    marginBottom: 20,
+  },
+  searchInput: {
+    backgroundColor: 'white',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 12,
+    fontSize: 16,
+    borderWidth: 1,
+    borderColor: '#e1e5e9',
+  },
+  categoriesSection: {
+    marginBottom: 20,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#1a1a1a',
+    paddingHorizontal: 20,
+    marginBottom: 12,
+  },
+  categoriesList: {
+    paddingHorizontal: 16,
+  },
+  categoryCard: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
+    marginHorizontal: 4,
+    minWidth: 80,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  selectedCategory: {
+    backgroundColor: '#ff6b6b',
+  },
+  categoryEmoji: {
+    fontSize: 24,
+    marginBottom: 8,
+  },
+  categoryName: {
+    fontSize: 14,
+    fontWeight: '600',
+    textAlign: 'center',
+    marginBottom: 4,
+  },
+  categoryCount: {
+    fontSize: 12,
+    color: '#666',
+  },
+  aiSection: {
+    paddingHorizontal: 20,
+    marginBottom: 16,
+  },
+  aiHeader: {
     flexDirection: 'row',
-    gap: 8,
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  seeAllText: {
+    color: '#ff6b6b',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  aiSubtitle: {
+    fontSize: 14,
+    color: '#666',
+    fontStyle: 'italic',
+  },
+  trendsSection: {
+    paddingHorizontal: 20,
+    marginBottom: 16,
+  },
+  trendsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  trendTags: {
+    flexDirection: 'row',
+  },
+  trendTag: {
+    backgroundColor: '#e3f2fd',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginLeft: 6,
+  },
+  trendTagText: {
+    fontSize: 12,
+    color: '#1976d2',
+    fontWeight: '600',
+  },
+  productsList: {
+    paddingHorizontal: 16,
+  },
+  productRow: {
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  productCard: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 12,
+    width: '48%',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3.84,
+    elevation: 5,
+    position: 'relative',
+  },
+  aiRecommendedBadge: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: '#4CAF50',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+    zIndex: 1,
+  },
+  aiRecommendedText: {
+    color: 'white',
+    fontSize: 10,
+    fontWeight: 'bold',
+  },
+  productImagePlaceholder: {
+    width: '100%',
+    height: 120,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  productEmoji: {
+    fontSize: 32,
+  },
+  productInfo: {
+    marginBottom: 8,
+  },
+  productName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1a1a1a',
+    marginBottom: 4,
+  },
+  productBrand: {
+    fontSize: 12,
+    color: '#666',
+    marginBottom: 6,
+  },
+  productMeta: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  productPrice: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#ff6b6b',
+  },
+  rating: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  ratingText: {
+    fontSize: 12,
+    color: '#666',
+  },
+  addToWardrobeButton: {
+    position: 'absolute',
+    bottom: 8,
+    right: 8,
+    width: 28,
+    height: 28,
+    backgroundColor: '#ff6b6b',
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  addToWardrobeText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
 });
