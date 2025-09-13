@@ -10,6 +10,7 @@ import {
   View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSession } from '@/contexts/session-context';
 
 interface Product {
   id: string;
@@ -73,6 +74,57 @@ const mockProducts: Product[] = [
   },
 ];
 
+
+
+// Session Overlay Component
+const SessionOverlay = ({ 
+  participants, 
+  onProductClick 
+}: { 
+  participants: any[], 
+  onProductClick: (productId: string) => void 
+}) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  if (participants.length === 0) return null;
+
+  return (
+    <View style={sessionStyles.overlay}>
+      <TouchableOpacity 
+        style={sessionStyles.sessionIndicator}
+        onPress={() => setIsExpanded(!isExpanded)}
+      >
+        <Text style={sessionStyles.sessionIcon}>👥</Text>
+        <Text style={sessionStyles.sessionText}>{participants.length} viewing</Text>
+      </TouchableOpacity>
+
+      {isExpanded && (
+        <View style={sessionStyles.expandedView}>
+          <Text style={sessionStyles.expandedTitle}>Session Members</Text>
+          {participants.map(participant => (
+            <TouchableOpacity
+              key={participant.id}
+              style={sessionStyles.participantItem}
+              onPress={() => participant.currentProduct && onProductClick(participant.currentProduct.id)}
+            >
+              <Text style={sessionStyles.participantName}>{participant.name}</Text>
+              {participant.currentProduct ? (
+                <View style={sessionStyles.productInfo}>
+                  <Text style={sessionStyles.productIcon}>{participant.currentProduct.image}</Text>
+                  <Text style={sessionStyles.productName}>{participant.currentProduct.name}</Text>
+                </View>
+              ) : (
+                <Text style={sessionStyles.browsingText}>Browsing...</Text>
+              )}
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
+    </View>
+  );
+};
+
+
 export default function ExploreScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
@@ -82,6 +134,18 @@ export default function ExploreScreen() {
     const matchesCategory = !selectedCategory || product.category === selectedCategory;
     return matchesSearch && matchesCategory;
   });
+
+  const { isInSession, isInLiveView, sessionParticipants } = useSession();
+
+  const handleProductClick = (productId: string) => {
+    console.log('Navigate to product:', productId);
+    // Add navigation logic here
+  };
+
+  // Only show session overlay if user is in session AND in live view
+  const shouldShowSessionOverlay = isInSession && isInLiveView;
+
+
 
   const renderCategory = ({ item }: { item: Category }) => (
     <TouchableOpacity
@@ -135,6 +199,15 @@ export default function ExploreScreen() {
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView>
+
+        {shouldShowSessionOverlay && (
+          <SessionOverlay 
+            participants={sessionParticipants}
+            onProductClick={handleProductClick}
+          />
+        )}
+
+
         <View style={styles.header}>
           <ThemedText style={styles.title}>Discover Fashion</ThemedText>
         </View>
@@ -200,6 +273,7 @@ export default function ExploreScreen() {
     </ThemedView>
   );
 }
+
 
 const styles = StyleSheet.create({
   container: {
@@ -414,5 +488,83 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 16,
     fontWeight: 'bold',
+  },
+});
+
+const sessionStyles = StyleSheet.create({
+  overlay: {
+    position: 'absolute',
+    top: 100,
+    right: 16,
+    zIndex: 1000,
+  },
+  sessionIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 107, 107, 0.9)',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  sessionIcon: {
+    fontSize: 14,
+    marginRight: 6,
+  },
+  sessionText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  expandedView: {
+    marginTop: 8,
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 12,
+    minWidth: 200,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  expandedTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1a1a1a',
+    marginBottom: 8,
+  },
+  participantItem: {
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  participantName: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#666',
+    marginBottom: 4,
+  },
+  productInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  productIcon: {
+    fontSize: 16,
+    marginRight: 6,
+  },
+  productName: {
+    fontSize: 12,
+    color: '#1a1a1a',
+    flex: 1,
+  },
+  browsingText: {
+    fontSize: 12,
+    color: '#999',
+    fontStyle: 'italic',
   },
 });

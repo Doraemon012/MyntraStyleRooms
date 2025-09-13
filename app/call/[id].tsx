@@ -1,409 +1,450 @@
+
+
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { router, useLocalSearchParams } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import { StatusBar } from 'expo-status-bar';
+import React, { useState, useEffect } from 'react';
 import {
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+  ScrollView,
+  Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSession } from '@/contexts/session-context';
+
+const { width } = Dimensions.get('window');
 
 interface Participant {
   id: string;
   name: string;
+  avatar: string;
   isMuted: boolean;
+  isDeafened: boolean;
   isSpeaking: boolean;
+  isConnected: boolean;
 }
 
-interface WardrobeItem {
+interface Room {
   id: string;
   name: string;
-  price: string;
-  addedBy: string;
-  category: string;
+  emoji: string;
+  description: string;
+  memberCount: number;
 }
 
+const mockRooms: { [key: string]: Room } = {
+  '1': { id: '1', name: 'Family Wedding', emoji: '👰', description: 'Planning outfits for the family wedding ceremony', memberCount: 5 },
+  '2': { id: '2', name: 'College Freshers', emoji: '🎉', description: 'Fresh looks for college parties and events', memberCount: 3 },
+  '3': { id: '3', name: 'Saturday Party', emoji: '🔥', description: 'Weekend party vibes and styling', memberCount: 4 },
+};
+
 const mockParticipants: Participant[] = [
-  { id: '1', name: 'You', isMuted: false, isSpeaking: true },
-  { id: '2', name: 'Priya', isMuted: false, isSpeaking: false },
-  { id: '3', name: 'Arjun', isMuted: true, isSpeaking: false },
+  { id: '1', name: 'You', avatar: '👤', isMuted: false, isDeafened: false, isSpeaking: true, isConnected: true },
+  { id: '2', name: 'Priya', avatar: '👩', isMuted: false, isDeafened: false, isSpeaking: false, isConnected: true },
+  { id: '3', name: 'Rahul', avatar: '👨', isMuted: true, isDeafened: false, isSpeaking: false, isConnected: true },
+  { id: '4', name: 'Sarah', avatar: '👩‍🦱', isMuted: false, isDeafened: true, isSpeaking: false, isConnected: true },
+  { id: '5', name: 'Alex', avatar: '👱', isMuted: false, isDeafened: false, isSpeaking: false, isConnected: false },
 ];
 
-const mockWardrobeItems: WardrobeItem[] = [
-  {
-    id: '1',
-    name: 'Red Wrap Dress',
-    price: '₹2,499',
-    addedBy: 'Priya',
-    category: 'Dress',
-  },
+const mockSessionParticipants = [
   {
     id: '2',
-    name: 'Silver Heels',
-    price: '₹1,899',
-    addedBy: 'AI Stylist',
-    category: 'Footwear',
+    name: 'Priya',
+    currentProduct: {
+      id: '1',
+      name: 'Red Silk Saree',
+      image: '👗'
+    }
   },
   {
     id: '3',
-    name: 'Gold Chain Necklace',
-    price: '₹3,200',
-    addedBy: 'You',
-    category: 'Accessories',
+    name: 'Rahul',
+    currentProduct: {
+      id: '2',
+      name: 'Blue Kurta',
+      image: '👔'
+    }
   },
 ];
 
-export default function LiveCallScreen() {
+export default function CallScreen() {
   const { id } = useLocalSearchParams();
-  const [isCallActive, setIsCallActive] = useState(true);
+  const roomData = mockRooms[id as string] || mockRooms['1'];
+  const { startSession, enterLiveView, endSession } = useSession();
+  
+  const [participants, setParticipants] = useState<Participant[]>(mockParticipants);
   const [isMuted, setIsMuted] = useState(false);
-  const [wardrobeItems, setWardrobeItems] = useState<WardrobeItem[]>(mockWardrobeItems);
-  const [callDuration, setCallDuration] = useState(0);
+  const [isDeafened, setIsDeafened] = useState(false);
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      setCallDuration(prev => prev + 1);
-    }, 1000);
+    // Start session when call screen loads
+    startSession(id as string, mockSessionParticipants);
+    
+    return () => {
+      // Clean up session when leaving call
+      endSession();
+    };
+  }, [id, startSession, endSession]);
 
-    return () => clearInterval(interval);
-  }, []);
-
-  const formatDuration = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-  };
-
-  const endCall = () => {
-    setIsCallActive(false);
-    router.back();
-  };
+  const connectedParticipants = participants.filter(p => p.isConnected);
+  const disconnectedParticipants = participants.filter(p => !p.isConnected);
 
   const toggleMute = () => {
     setIsMuted(!isMuted);
+    setParticipants(prev => prev.map(p => 
+      p.id === '1' ? { ...p, isMuted: !isMuted } : p
+    ));
+  };
+
+  const toggleDeafen = () => {
+    const newDeafened = !isDeafened;
+    setIsDeafened(newDeafened);
+    if (newDeafened) setIsMuted(true);
+    
+    setParticipants(prev => prev.map(p => 
+      p.id === '1' ? { ...p, isDeafened: newDeafened, isMuted: newDeafened || isMuted } : p
+    ));
+  };
+
+  const leaveCall = () => {
+    endSession();
+    router.back();
+  };
+
+  const goToLiveView = () => {
+    enterLiveView();
+    router.push('/(tabs)/explore');
   };
 
   const renderParticipant = (participant: Participant) => (
-    <View
-      key={participant.id}
-      style={[
-        styles.participantCard,
-        participant.isSpeaking && styles.speakingParticipant,
-      ]}
-    >
-      <View style={styles.participantAvatar}>
-        <Text style={styles.participantInitial}>
-          {participant.name.charAt(0)}
-        </Text>
+    <View key={participant.id} style={styles.participantContainer}>
+      <View style={[
+        styles.avatarContainer,
+        participant.isSpeaking && styles.speakingBorder,
+        !participant.isConnected && styles.disconnectedBorder
+      ]}>
+        <Text style={styles.avatar}>{participant.avatar}</Text>
+        
+        <View style={styles.statusIndicators}>
+          {participant.isMuted && (
+            <View style={styles.statusIcon}>
+              <Text style={styles.statusIconText}>🔇</Text>
+            </View>
+          )}
+          {participant.isDeafened && (
+            <View style={styles.statusIcon}>
+              <Text style={styles.statusIconText}>🔇</Text>
+            </View>
+          )}
+          {!participant.isConnected && (
+            <View style={[styles.statusIcon, styles.disconnectedIcon]}>
+              <Text style={styles.statusIconText}>📵</Text>
+            </View>
+          )}
+        </View>
       </View>
-      <Text style={styles.participantName}>{participant.name}</Text>
-      {participant.isMuted && (
-        <Text style={styles.mutedIndicator}>🔇</Text>
-      )}
-    </View>
-  );
-
-  const renderWardrobeItem = (item: WardrobeItem) => (
-    <View key={item.id} style={styles.wardrobeItem}>
-      <View style={styles.itemImagePlaceholder}>
-        <Text style={styles.itemEmoji}>
-          {item.category === 'Dress' ? '👗' : 
-           item.category === 'Footwear' ? '👠' : '💍'}
-        </Text>
-      </View>
-      <View style={styles.itemInfo}>
-        <Text style={styles.itemName}>{item.name}</Text>
-        <Text style={styles.itemPrice}>{item.price}</Text>
-        <Text style={styles.itemAddedBy}>Added by {item.addedBy}</Text>
-      </View>
-      <TouchableOpacity style={styles.removeButton}>
-        <Text style={styles.removeButtonText}>×</Text>
-      </TouchableOpacity>
+      
+      <Text style={[
+        styles.participantName,
+        !participant.isConnected && styles.disconnectedName
+      ]}>
+        {participant.name}
+      </Text>
     </View>
   );
 
   return (
-    <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
+      <StatusBar style="light" />
+      <SafeAreaView style={styles.container} edges={['top']}>
+        
         <View style={styles.header}>
-          <View style={styles.callInfo}>
-            <ThemedText style={styles.roomName}>Saturday Party Look</ThemedText>
-            <Text style={styles.callDuration}>{formatDuration(callDuration)}</Text>
-          </View>
-          <TouchableOpacity style={styles.endCallButton} onPress={endCall}>
-            <Text style={styles.endCallText}>End Call</Text>
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.participantsSection}>
-          <ThemedText style={styles.sectionTitle}>Participants</ThemedText>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            <View style={styles.participantsList}>
-              {mockParticipants.map(renderParticipant)}
-            </View>
-          </ScrollView>
-        </View>
-
-        <View style={styles.mainContent}>
-          <View style={styles.catalogSection}>
-            <ThemedText style={styles.sectionTitle}>Browsing Catalog</ThemedText>
-            <View style={styles.catalogPlaceholder}>
-              <Text style={styles.catalogEmoji}>👗</Text>
-              <Text style={styles.catalogText}>Myntra Catalog View</Text>
-              <Text style={styles.catalogSubtext}>Scroll through products live</Text>
+          <View style={styles.roomInfo}>
+            <Text style={styles.roomEmoji}>{roomData.emoji}</Text>
+            <View>
+              <ThemedText style={styles.roomName}>{roomData.name}</ThemedText>
+              <Text style={styles.participantCount}>
+                {connectedParticipants.length} connected
+              </Text>
             </View>
           </View>
+          
+          <TouchableOpacity style={styles.liveViewButton} onPress={goToLiveView}>
+            <Text style={styles.liveViewIcon}>🛍️</Text>
+            <Text style={styles.liveViewText}>Live View</Text>
+          </TouchableOpacity>
+        </View>
 
-          <View style={styles.wardrobeSection}>
-            <View style={styles.wardrobeHeader}>
-              <ThemedText style={styles.sectionTitle}>Shared Wardrobe</ThemedText>
-              <Text style={styles.itemCount}>{wardrobeItems.length} items</Text>
+        <ScrollView style={styles.mainContent} showsVerticalScrollIndicator={false}>
+          
+          {connectedParticipants.length > 0 && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>
+                VOICE — {connectedParticipants.length}
+              </Text>
+              <View style={styles.participantsGrid}>
+                {connectedParticipants.map(renderParticipant)}
+              </View>
             </View>
-            <ScrollView style={styles.wardrobeList}>
-              {wardrobeItems.map(renderWardrobeItem)}
-            </ScrollView>
+          )}
+
+          {disconnectedParticipants.length > 0 && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>
+                OFFLINE — {disconnectedParticipants.length}
+              </Text>
+              <View style={styles.participantsGrid}>
+                {disconnectedParticipants.map(renderParticipant)}
+              </View>
+            </View>
+          )}
+
+        </ScrollView>
+
+        <View style={styles.bottomControls}>
+          <View style={styles.userInfo}>
+            <View style={[styles.userAvatar, isMuted && styles.mutedAvatar]}>
+              <Text style={styles.userAvatarText}>👤</Text>
+            </View>
+            <View style={styles.userDetails}>
+              <Text style={styles.userName}>You</Text>
+              <Text style={styles.userStatus}>
+                {isDeafened ? 'Deafened' : isMuted ? 'Muted' : 'Connected'}
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.controlButtons}>
+            <TouchableOpacity 
+              style={[styles.controlButton, isMuted && styles.activeControlButton]} 
+              onPress={toggleMute}
+            >
+              <Text style={styles.controlIcon}>{isMuted ? '🔇' : '🎤'}</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={[styles.controlButton, isDeafened && styles.activeControlButton]} 
+              onPress={toggleDeafen}
+            >
+              <Text style={styles.controlIcon}>{isDeafened ? '🔇' : '🔊'}</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.leaveButton} onPress={leaveCall}>
+              <Text style={styles.leaveIcon}>📞</Text>
+            </TouchableOpacity>
           </View>
         </View>
 
-        <View style={styles.controls}>
-          <TouchableOpacity
-            style={[styles.controlButton, isMuted && styles.mutedButton]}
-            onPress={toggleMute}
-          >
-            <Text style={styles.controlIcon}>{isMuted ? '🔇' : '🔊'}</Text>
-            <Text style={styles.controlText}>{isMuted ? 'Unmute' : 'Mute'}</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.controlButton}>
-            <Text style={styles.controlIcon}>📱</Text>
-            <Text style={styles.controlText}>Share Screen</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.controlButton}>
-            <Text style={styles.controlIcon}>➕</Text>
-            <Text style={styles.controlText}>Add Item</Text>
-          </TouchableOpacity>
-        </View>
       </SafeAreaView>
-    </ThemedView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#1a1a1a',
+    backgroundColor: '#36393f',
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 15,
-    backgroundColor: '#2a2a2a',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#2f3136',
   },
-  callInfo: {
+  roomInfo: {
+    flexDirection: 'row',
     alignItems: 'center',
+  },
+  roomEmoji: {
+    fontSize: 24,
+    marginRight: 12,
   },
   roomName: {
     fontSize: 18,
     fontWeight: '600',
     color: 'white',
   },
-  callDuration: {
+  participantCount: {
     fontSize: 12,
-    color: '#aaa',
-    marginTop: 2,
+    color: '#b9bbbe',
   },
-  endCallButton: {
-    backgroundColor: '#ff4444',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-  },
-  endCallText: {
-    color: 'white',
-    fontWeight: '600',
-  },
-  participantsSection: {
-    backgroundColor: '#2a2a2a',
-    paddingVertical: 15,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: 'white',
-    paddingHorizontal: 20,
-    marginBottom: 10,
-  },
-  participantsList: {
+  liveViewButton: {
     flexDirection: 'row',
-    paddingHorizontal: 20,
-  },
-  participantCard: {
     alignItems: 'center',
-    marginRight: 15,
-    padding: 8,
-    borderRadius: 12,
-    backgroundColor: '#3a3a3a',
+    backgroundColor: '#5865f2',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
   },
-  speakingParticipant: {
-    backgroundColor: '#ff6b6b',
+  liveViewIcon: {
+    fontSize: 16,
+    marginRight: 6,
   },
-  participantAvatar: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: '#555',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 5,
-  },
-  participantInitial: {
+  liveViewText: {
     color: 'white',
-    fontSize: 18,
+    fontSize: 14,
     fontWeight: '600',
-  },
-  participantName: {
-    color: 'white',
-    fontSize: 12,
-    textAlign: 'center',
-  },
-  mutedIndicator: {
-    fontSize: 10,
-    marginTop: 2,
   },
   mainContent: {
     flex: 1,
+    paddingHorizontal: 16,
+  },
+  section: {
+    marginTop: 24,
+  },
+  sectionTitle: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#8e9297',
+    letterSpacing: 0.5,
+    marginBottom: 12,
+  },
+  participantsGrid: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
   },
-  catalogSection: {
-    flex: 2,
-    backgroundColor: '#f8f9fa',
-    margin: 10,
-    borderRadius: 12,
-    padding: 15,
+  participantContainer: {
+    alignItems: 'center',
+    marginBottom: 20,
+    marginHorizontal: 8,
+    width: (width - 64) / 3,
   },
-  catalogPlaceholder: {
-    flex: 1,
+  avatarContainer: {
+    position: 'relative',
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#40444b',
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#e9ecef',
-    borderRadius: 8,
+    borderWidth: 3,
+    borderColor: 'transparent',
+    marginBottom: 8,
   },
-  catalogEmoji: {
-    fontSize: 48,
-    marginBottom: 10,
+  speakingBorder: {
+    borderColor: '#00d26a',
+    shadowColor: '#00d26a',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: 8,
+    elevation: 8,
   },
-  catalogText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1a1a1a',
-    marginBottom: 5,
+  disconnectedBorder: {
+    borderColor: '#747f8d',
+    opacity: 0.5,
   },
-  catalogSubtext: {
-    fontSize: 14,
-    color: '#666',
+  avatar: {
+    fontSize: 28,
   },
-  wardrobeSection: {
-    flex: 1,
-    backgroundColor: '#f8f9fa',
-    margin: 10,
-    marginLeft: 0,
-    borderRadius: 12,
-    padding: 15,
+  statusIndicators: {
+    position: 'absolute',
+    bottom: -4,
+    right: -4,
+    flexDirection: 'row',
   },
-  wardrobeHeader: {
+  statusIcon: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#f04747',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 2,
+  },
+  disconnectedIcon: {
+    backgroundColor: '#747f8d',
+  },
+  statusIconText: {
+    fontSize: 10,
+  },
+  participantName: {
+    fontSize: 12,
+    color: '#dcddde',
+    textAlign: 'center',
+    fontWeight: '500',
+  },
+  disconnectedName: {
+    color: '#747f8d',
+  },
+  bottomControls: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 15,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#2f3136',
+    borderTopWidth: 1,
+    borderTopColor: '#202225',
   },
-  itemCount: {
-    fontSize: 12,
-    color: '#666',
-  },
-  wardrobeList: {
-    flex: 1,
-  },
-  wardrobeItem: {
+  userInfo: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'white',
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 8,
-  },
-  itemImagePlaceholder: {
-    width: 40,
-    height: 40,
-    borderRadius: 6,
-    backgroundColor: '#e9ecef',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 10,
-  },
-  itemEmoji: {
-    fontSize: 20,
-  },
-  itemInfo: {
     flex: 1,
   },
-  itemName: {
+  userAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#40444b',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 8,
+  },
+  mutedAvatar: {
+    borderWidth: 2,
+    borderColor: '#f04747',
+  },
+  userAvatarText: {
+    fontSize: 16,
+  },
+  userDetails: {
+    flex: 1,
+  },
+  userName: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#1a1a1a',
-  },
-  itemPrice: {
-    fontSize: 12,
-    color: '#ff6b6b',
-    fontWeight: '600',
-  },
-  itemAddedBy: {
-    fontSize: 10,
-    color: '#666',
-  },
-  removeButton: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: '#ff4444',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  removeButtonText: {
     color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
   },
-  controls: {
+  userStatus: {
+    fontSize: 12,
+    color: '#b9bbbe',
+  },
+  controlButtons: {
     flexDirection: 'row',
-    justifyContent: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 20,
-    backgroundColor: '#2a2a2a',
+    alignItems: 'center',
   },
   controlButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#40444b',
+    justifyContent: 'center',
     alignItems: 'center',
-    marginHorizontal: 15,
-    paddingVertical: 10,
-    paddingHorizontal: 15,
-    borderRadius: 12,
-    backgroundColor: '#3a3a3a',
+    marginLeft: 8,
   },
-  mutedButton: {
-    backgroundColor: '#ff6b6b',
+  activeControlButton: {
+    backgroundColor: '#f04747',
   },
   controlIcon: {
-    fontSize: 20,
-    marginBottom: 5,
+    fontSize: 18,
   },
-  controlText: {
-    color: 'white',
-    fontSize: 12,
-    fontWeight: '600',
+  leaveButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#f04747',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 8,
+  },
+  leaveIcon: {
+    fontSize: 18,
   },
 });

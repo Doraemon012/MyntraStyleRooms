@@ -11,6 +11,7 @@
     - add to wardrobe popup
     - reactions on outfits
     - @bot for ai else chat
+    
 - start a session
     - popup to add users (display all users from room, multi select)
     - link a wardrobe (new, select existing) [compulsary]
