@@ -2,18 +2,17 @@ import { ThemedView } from '@/components/themed-view';
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
 import {
-    ActivityIndicator,
-    FlatList,
-    Image,
-    KeyboardAvoidingView,
-    Modal,
-    Platform,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
-
+  ActivityIndicator,
+  FlatList,
+  Image,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -35,7 +34,6 @@ interface Message {
     thumbsUp: number;
     thumbsDown: number;
   };
-  reactions?: { userId: string; type: string; emoji: string }[];
 }
 
 interface Room {
@@ -73,7 +71,6 @@ const mockMessages: Message[] = [
     senderName: 'Jasmine',
     senderAvatar: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face',
     timestamp: '10:30 AM',
-    reactions: [],
   },
   {
     id: '2',
@@ -111,10 +108,6 @@ const mockMessages: Message[] = [
       thumbsUp: 2,
       thumbsDown: 2,
     },
-    reactions: [
-      { userId: 'user1', type: 'love', emoji: '❤️' },
-      { userId: 'user2', type: 'like', emoji: '👍' },
-    ],
   },
   {
     id: '5',
@@ -266,7 +259,6 @@ export default function RoomChatScreen() {
         senderName: 'Jasmine',
         senderAvatar: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face',
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        reactions: [],
       };
       
       setMessages([...messages, newMessage]);
@@ -427,12 +419,8 @@ export default function RoomChatScreen() {
           </Text>
           <TouchableOpacity onPress={() => setShowMenu(true)}>
             <Text style={styles.menuButton}>⋮</Text>
-
           </TouchableOpacity>
         </View>
-      </View>
-    </Modal>
-  );
 
         {/* Chat Area */}
         <View style={styles.chatArea}>
@@ -527,6 +515,7 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 12,
     backgroundColor: 'white',
@@ -554,6 +543,8 @@ const styles = StyleSheet.create({
   },
   messagesList: {
     flex: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
   },
   messagesContent: {
     paddingHorizontal: 16,
@@ -610,9 +601,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     lineHeight: 22,
   },
-  userMessageText: {
-    color: 'white',
-  },
   timestamp: {
     fontSize: 12,
     color: '#666',
@@ -621,13 +609,11 @@ const styles = StyleSheet.create({
   userTimestamp: {
     alignSelf: 'flex-end',
     marginRight: '15%',
+    color: 'rgba(255, 255, 255, 0.8)',
   },
   otherTimestamp: {
     alignSelf: 'flex-start',
     marginLeft: 8,
-  },
-  userTimestamp: {
-    color: 'rgba(255, 255, 255, 0.8)',
   },
   productCard: {
     backgroundColor: 'white',
@@ -815,39 +801,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#8B5CF6',
     fontWeight: '600',
-    fontSize: 16,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  menuModal: {
-    backgroundColor: 'white',
-    borderRadius: 16,
-    padding: 8,
-    minWidth: 200,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  menuItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-  },
-  menuIcon: {
-    fontSize: 20,
-    marginRight: 12,
-  },
-  menuText: {
-    fontSize: 16,
-    color: '#1a1a1a',
   },
   wardrobeModal: {
     backgroundColor: 'white',
