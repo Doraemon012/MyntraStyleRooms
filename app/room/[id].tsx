@@ -13,6 +13,7 @@ import {
     TextInput,
     TouchableOpacity,
     View
+
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -34,6 +35,7 @@ interface Message {
     thumbsUp: number;
     thumbsDown: number;
   };
+  reactions?: { userId: string; type: string; emoji: string }[];
 }
 
 interface Room {
@@ -62,6 +64,7 @@ interface Room {
   updatedAt: string;
 }
 
+
 const mockMessages: Message[] = [
   {
     id: '1',
@@ -70,6 +73,7 @@ const mockMessages: Message[] = [
     senderName: 'Jasmine',
     senderAvatar: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face',
     timestamp: '10:30 AM',
+    reactions: [],
   },
   {
     id: '2',
@@ -78,6 +82,7 @@ const mockMessages: Message[] = [
     senderName: 'Maya(AI)',
     senderAvatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face',
     timestamp: '11:25',
+
   },
   {
     id: '3',
@@ -86,6 +91,7 @@ const mockMessages: Message[] = [
     senderName: 'Jasmine',
     senderAvatar: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face',
     timestamp: '10:30 AM',
+
   },
   {
     id: '4',
@@ -105,6 +111,10 @@ const mockMessages: Message[] = [
       thumbsUp: 2,
       thumbsDown: 2,
     },
+    reactions: [
+      { userId: 'user1', type: 'love', emoji: '❤️' },
+      { userId: 'user2', type: 'like', emoji: '👍' },
+    ],
   },
   {
     id: '5',
@@ -133,13 +143,17 @@ const mockRooms: Record<string, { name: string; memberCount: number }> = {
   '5': { name: 'Work Conference', memberCount: 7 },
 };
 
+
 export default function RoomChatScreen() {
   const { id } = useLocalSearchParams();
+  const roomData = mockRooms[id as string] || mockRooms['1'];
+  
   const [messages, setMessages] = useState<Message[]>(mockMessages);
   const [inputText, setInputText] = useState('');
   const [room, setRoom] = useState<Room | null>(null);
   const [loading, setLoading] = useState(true);
   const [showMenu, setShowMenu] = useState(false);
+
   const flatListRef = useRef<FlatList>(null);
   
   // Fetch room data from API with better error handling
@@ -252,6 +266,7 @@ export default function RoomChatScreen() {
         senderName: 'Jasmine',
         senderAvatar: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face',
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        reactions: [],
       };
       
       setMessages([...messages, newMessage]);
@@ -312,6 +327,7 @@ export default function RoomChatScreen() {
         {!isUserMessage && (
           <View style={styles.messageHeader}>
             <Image source={{ uri: item.senderAvatar }} style={styles.avatar} />
+
         <Text style={styles.senderName}>{item.senderName}</Text>
           </View>
       )}
@@ -329,6 +345,7 @@ export default function RoomChatScreen() {
           </View>
               <View style={styles.productActions}>
           <TouchableOpacity style={styles.addToWardrobeBtn}>
+
             <Text style={styles.addToWardrobeText}>Add to Wardrobe</Text>
           </TouchableOpacity>
                 <TouchableOpacity style={styles.showMoreBtn}>
@@ -365,6 +382,7 @@ export default function RoomChatScreen() {
           {item.timestamp}
         </Text>
     </View>
+
   );
   };
 
@@ -409,8 +427,12 @@ export default function RoomChatScreen() {
           </Text>
           <TouchableOpacity onPress={() => setShowMenu(true)}>
             <Text style={styles.menuButton}>⋮</Text>
+
           </TouchableOpacity>
         </View>
+      </View>
+    </Modal>
+  );
 
         {/* Chat Area */}
         <View style={styles.chatArea}>
@@ -493,6 +515,7 @@ export default function RoomChatScreen() {
         </Modal>
       </SafeAreaView>
     </View>
+
   );
 }
 
@@ -504,7 +527,6 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 12,
     backgroundColor: 'white',
@@ -513,6 +535,7 @@ const styles = StyleSheet.create({
     fontSize: 20,
     color: '#000',
     fontWeight: '600',
+
   },
   roomTitle: {
     fontSize: 18,
@@ -523,6 +546,7 @@ const styles = StyleSheet.create({
     fontSize: 20,
     color: '#000',
     fontWeight: '600',
+
   },
   chatArea: {
     flex: 1,
@@ -530,8 +554,11 @@ const styles = StyleSheet.create({
   },
   messagesList: {
     flex: 1,
+  },
+  messagesContent: {
     paddingHorizontal: 16,
     paddingVertical: 8,
+    paddingBottom: 20,
   },
   messageWrapper: {
     marginVertical: 8,
@@ -567,6 +594,7 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
     backgroundColor: 'white',
     marginRight: '15%',
+
   },
   userMessageText: {
     fontSize: 16,
@@ -582,6 +610,9 @@ const styles = StyleSheet.create({
     fontSize: 16,
     lineHeight: 22,
   },
+  userMessageText: {
+    color: 'white',
+  },
   timestamp: {
     fontSize: 12,
     color: '#666',
@@ -594,6 +625,9 @@ const styles = StyleSheet.create({
   otherTimestamp: {
     alignSelf: 'flex-start',
     marginLeft: 8,
+  },
+  userTimestamp: {
+    color: 'rgba(255, 255, 255, 0.8)',
   },
   productCard: {
     backgroundColor: 'white',
@@ -672,6 +706,7 @@ const styles = StyleSheet.create({
   },
   reactionCount: {
     fontSize: 12,
+
     color: '#666',
   },
   inputContainer: {
@@ -694,6 +729,7 @@ const styles = StyleSheet.create({
     fontSize: 20,
     color: '#666',
     fontWeight: '600',
+
   },
   textInput: {
     flex: 1,
@@ -712,6 +748,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#e0e0e0',
     justifyContent: 'center',
     alignItems: 'center',
+
   },
   sendButtonText: {
     fontSize: 16,
@@ -778,6 +815,155 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#8B5CF6',
     fontWeight: '600',
+    fontSize: 16,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  menuModal: {
+    backgroundColor: 'white',
+    borderRadius: 16,
+    padding: 8,
+    minWidth: 200,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+  },
+  menuIcon: {
+    fontSize: 20,
+    marginRight: 12,
+  },
+  menuText: {
+    fontSize: 16,
+    color: '#1a1a1a',
+  },
+  wardrobeModal: {
+    backgroundColor: 'white',
+    borderRadius: 16,
+    padding: 20,
+    width: '90%',
+    maxHeight: '80%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1a1a1a',
+  },
+  closeButton: {
+    fontSize: 24,
+    color: '#666',
+  },
+  selectedProductInfo: {
+    backgroundColor: '#f8f9fa',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 16,
+  },
+  selectedProductName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1a1a1a',
+  },
+  selectedProductPrice: {
+    fontSize: 14,
+    color: '#ff6b6b',
+    fontWeight: '600',
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1a1a1a',
+    marginBottom: 12,
+  },
+  wardrobeOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    backgroundColor: '#f8f9fa',
+    marginBottom: 8,
+  },
+  wardrobeEmoji: {
+    fontSize: 24,
+    marginRight: 12,
+  },
+  wardrobeInfo: {
+    flex: 1,
+  },
+  wardrobeName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1a1a1a',
+  },
+  wardrobeCount: {
+    fontSize: 12,
+    color: '#666',
+  },
+  addIcon: {
+    fontSize: 20,
+    color: '#ff6b6b',
+    fontWeight: 'bold',
+  },
+  createNewWardrobe: {
+    paddingVertical: 16,
+    alignItems: 'center',
+    borderTopWidth: 1,
+    borderTopColor: '#e1e5e9',
+    marginTop: 8,
+  },
+  createNewText: {
+    fontSize: 16,
+    color: '#ff6b6b',
+    fontWeight: '600',
+  },
+  reactionModal: {
+    backgroundColor: 'white',
+    borderRadius: 16,
+    padding: 20,
+    minWidth: 280,
+  },
+  reactionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1a1a1a',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  reactionGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+  },
+  reactionOption: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: '#f0f0f0',
+    justifyContent: 'center',
+    alignItems: 'center',
+    margin: 4,
+  },
+  reactionEmojiLarge: {
+    fontSize: 24,
   },
   backButtonStyle: {
     backgroundColor: 'transparent',
