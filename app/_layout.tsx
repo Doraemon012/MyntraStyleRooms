@@ -14,19 +14,14 @@ export default function RootLayout() {
   const colorScheme = useColorScheme();
 
   return (
-    <SessionProvider>
-      <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-        <Stack>
-          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen name="room/[id]" options={{ headerShown: false }} />
-          <Stack.Screen name="room/create" options={{ headerShown: false }} />
-          <Stack.Screen name="wardrobe/[id]" options={{ headerShown: false }} />
-          <Stack.Screen name="wardrobe/create" options={{ headerShown: false }} />
-          <Stack.Screen name="call/[id]" options={{ headerShown: false }} />
-          <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
-        </Stack>
-        <StatusBar style="dark" backgroundColor="white" />
-      </ThemeProvider>
-    </SessionProvider>
+    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+      <Stack>
+      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+      <Stack.Screen name="room/[id]" options={{ headerShown: false }} />
+      <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
+      </Stack>
+      <StatusBar style="auto" />
+    </ThemeProvider>
+
   );
 }

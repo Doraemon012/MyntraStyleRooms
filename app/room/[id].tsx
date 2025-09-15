@@ -1,19 +1,19 @@
-import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { router, useLocalSearchParams } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
-  Alert,
-  FlatList,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    FlatList,
+    Image,
+    KeyboardAvoidingView,
+    Modal,
+    Platform,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
+
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -22,88 +22,127 @@ interface Message {
   text: string;
   sender: 'user' | 'friend' | 'ai';
   senderName: string;
+  senderAvatar?: string;
   timestamp: string;
   isProduct?: boolean;
   productData?: {
     name: string;
     price: string;
     image: string;
+    description?: string;
+  };
+  reactions?: {
+    thumbsUp: number;
+    thumbsDown: number;
   };
   reactions?: { userId: string; type: string; emoji: string }[];
 }
 
-interface Wardrobe {
-  id: string;
-  name: string;
-  emoji: string;
-  itemCount: number;
-}
-
 interface Room {
-  id: string;
+  _id: string;
   name: string;
-  emoji: string;
-  description: string;
-  memberCount: number;
+  description?: string;
+  emoji?: string;
+  isPrivate: boolean;
+  owner: {
+    _id: string;
+    name: string;
+    email: string;
+    profileImage?: string;
+  };
+  members: Array<{
+    userId: {
+      _id: string;
+      name: string;
+      email: string;
+      profileImage?: string;
+    };
+    role: 'Owner' | 'Editor' | 'Contributor' | 'Viewer';
+    joinedAt: string;
+  }>;
+  createdAt: string;
+  updatedAt: string;
 }
 
-const mockRooms: { [key: string]: Room } = {
-  '1': { id: '1', name: 'Family Wedding', emoji: '👰', description: 'Planning outfits for the family wedding ceremony', memberCount: 5 },
-  '2': { id: '2', name: 'College Freshers', emoji: '🎉', description: 'Fresh looks for college parties and events', memberCount: 3 },
-  '3': { id: '3', name: 'Saturday Party', emoji: '🔥', description: 'Weekend party vibes and styling', memberCount: 4 },
-};
 
 const mockMessages: Message[] = [
   {
     id: '1',
-    text: 'Hey! Looking for some ethnic wear for the wedding',
+    text: '@Maya Looking for some ethnic wear for the wedding',
     sender: 'user',
-    senderName: 'You',
+    senderName: 'Jasmine',
+    senderAvatar: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face',
     timestamp: '10:30 AM',
     reactions: [],
   },
   {
     id: '2',
-    text: 'What\'s your budget range?',
-    sender: 'friend',
-    senderName: 'Priya',
-    timestamp: '10:31 AM',
-    reactions: [],
+    text: 'What\'s your Budget range?',
+    sender: 'ai',
+    senderName: 'Maya(AI)',
+    senderAvatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face',
+    timestamp: '11:25',
+
   },
   {
     id: '3',
-    text: 'Around ₹5000 would be perfect',
+    text: 'Around ₹5,000 would be perfect!',
     sender: 'user',
-    senderName: 'You',
-    timestamp: '10:32 AM',
-    reactions: [],
+    senderName: 'Jasmine',
+    senderAvatar: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face',
+    timestamp: '10:30 AM',
+
   },
   {
     id: '4',
     text: 'I found some beautiful sarees in your budget! Here\'s a stunning red silk saree that would be perfect for the wedding.',
     sender: 'ai',
-    senderName: 'AI Stylist',
-    timestamp: '10:33 AM',
+    senderName: 'Maya(AI)',
+    senderAvatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face',
+    timestamp: '11:25',
     isProduct: true,
     productData: {
       name: 'Red Silk Saree with Golden Border',
       price: '₹4,999',
-      image: 'https://via.placeholder.com/150x200/ff6b6b/ffffff?text=Saree',
+      image: 'https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=300&h=400&fit=crop&crop=face',
+      description: 'Elegant red silk saree with intricate golden border work',
+    },
+    reactions: {
+      thumbsUp: 2,
+      thumbsDown: 2,
     },
     reactions: [
       { userId: 'user1', type: 'love', emoji: '❤️' },
       { userId: 'user2', type: 'like', emoji: '👍' },
     ],
   },
+  {
+    id: '5',
+    text: 'I think it would look good on you',
+    sender: 'friend',
+    senderName: 'Richa',
+    senderAvatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150&h=150&fit=crop&crop=face',
+    timestamp: '11:25',
+  },
+  {
+    id: '6',
+    text: '++',
+    sender: 'friend',
+    senderName: 'Neyati',
+    senderAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&h=150&fit=crop&crop=face',
+    timestamp: '11:25',
+  },
 ];
 
-const mockWardrobes: Wardrobe[] = [
-  { id: '1', name: 'Family Wedding', emoji: '👰', itemCount: 12 },
-  { id: '2', name: 'Office Formals', emoji: '💼', itemCount: 8 },
-  { id: '3', name: 'Weekend Casuals', emoji: '🌟', itemCount: 15 },
-];
+// Mock room data that matches the rooms from index page
+const mockRooms: Record<string, { name: string; memberCount: number }> = {
+  '1': { name: 'College Freshers Party', memberCount: 12 },
+  '2': { name: 'Wedding Shopping', memberCount: 8 },
+  '3': { name: 'Family Wedding', memberCount: 25 },
+  '4': { name: 'Friends Reunion', memberCount: 18 },
+  '5': { name: 'Work Conference', memberCount: 7 },
+};
 
-const reactionEmojis = ['👍', '❤️', '😍', '🔥', '👎', '😊'];
 
 export default function RoomChatScreen() {
   const { id } = useLocalSearchParams();
@@ -111,12 +150,112 @@ export default function RoomChatScreen() {
   
   const [messages, setMessages] = useState<Message[]>(mockMessages);
   const [inputText, setInputText] = useState('');
+  const [room, setRoom] = useState<Room | null>(null);
+  const [loading, setLoading] = useState(true);
   const [showMenu, setShowMenu] = useState(false);
-  const [showWardrobeModal, setShowWardrobeModal] = useState(false);
-  const [showReactionModal, setShowReactionModal] = useState(false);
-  const [selectedMessageId, setSelectedMessageId] = useState<string>('');
-  const [selectedProduct, setSelectedProduct] = useState<any>(null);
+
   const flatListRef = useRef<FlatList>(null);
+  
+  // Fetch room data from API with better error handling
+  const fetchRoomData = async () => {
+    try {
+      setLoading(true);
+      
+      // For development, we'll use mock data directly to avoid network errors
+      // In production, you would uncomment the API call below
+      
+      // Simulate API delay
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Use mock data directly for now
+      const mockRoomData = mockRooms[id as string];
+      if (mockRoomData) {
+        setRoom({
+          _id: id as string,
+          name: mockRoomData.name,
+          emoji: getRoomEmoji(id as string),
+          members: generateMockMembers(mockRoomData.memberCount - 1),
+          owner: { _id: '1', name: 'Room Owner', email: 'owner@example.com' },
+          isPrivate: false,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        });
+      } else {
+        setRoom(null);
+      }
+      
+      /* 
+      // Uncomment this section when your backend is running
+      const API_BASE_URL = 'http://localhost:5000/api';
+      const response = await fetch(`${API_BASE_URL}/rooms/${id}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          // 'Authorization': `Bearer ${authToken}` // Add when auth is implemented
+        },
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setRoom(data.data.room);
+      } else {
+        throw new Error(`API Error: ${response.status}`);
+      }
+      */
+      
+    } catch (error) {
+      console.log('Using mock data for room:', id);
+      // Fallback to mock data
+      const mockRoomData = mockRooms[id as string];
+      if (mockRoomData) {
+        setRoom({
+          _id: id as string,
+          name: mockRoomData.name,
+          emoji: getRoomEmoji(id as string),
+          members: generateMockMembers(mockRoomData.memberCount - 1),
+          owner: { _id: '1', name: 'Room Owner', email: 'owner@example.com' },
+          isPrivate: false,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        });
+      } else {
+        setRoom(null);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  // Helper function to get room emoji based on ID
+  const getRoomEmoji = (roomId: string): string => {
+    const emojiMap: Record<string, string> = {
+      '1': '🎉',
+      '2': '👰',
+      '3': '👗',
+      '4': '🌟',
+      '5': '💼',
+    };
+    return emojiMap[roomId] || '👗';
+  };
+  
+  // Helper function to generate mock members
+  const generateMockMembers = (count: number) => {
+    const mockNames = ['Alice', 'Bob', 'Charlie', 'Diana', 'Eve', 'Frank', 'Grace', 'Henry'];
+    return Array.from({ length: Math.min(count, mockNames.length) }, (_, index) => ({
+      userId: {
+        _id: `member_${index + 1}`,
+        name: mockNames[index] || `Member ${index + 1}`,
+        email: `${mockNames[index]?.toLowerCase() || `member${index + 1}`}@example.com`,
+        profileImage: undefined,
+      },
+      role: 'Contributor' as const,
+      joinedAt: new Date().toISOString(),
+    }));
+  };
+  
+  useEffect(() => {
+    fetchRoomData();
+  }, [id]);
 
   const sendMessage = () => {
     if (inputText.trim()) {
@@ -124,7 +263,8 @@ export default function RoomChatScreen() {
         id: Date.now().toString(),
         text: inputText.trim(),
         sender: 'user',
-        senderName: 'You',
+        senderName: 'Jasmine',
+        senderAvatar: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face',
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         reactions: [],
       };
@@ -132,313 +272,257 @@ export default function RoomChatScreen() {
       setMessages([...messages, newMessage]);
       setInputText('');
       
-      // Check if message mentions bot
-      if (inputText.toLowerCase().includes('@bot')) {
-        setTimeout(() => {
-          const aiResponse: Message = {
-            id: (Date.now() + 1).toString(),
-            text: 'Hi! I\'m here to help you with fashion recommendations. What are you looking for?',
-            sender: 'ai',
-            senderName: 'AI Stylist',
-            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-            reactions: [],
-          };
-          setMessages(prev => [...prev, aiResponse]);
-        }, 1000);
+      // Check if message mentions Maya AI
+      if (inputText.toLowerCase().includes('@maya') || inputText.toLowerCase().includes('@mayaai')) {
+      setTimeout(() => {
+        const aiResponse: Message = {
+          id: (Date.now() + 1).toString(),
+            text: 'I found some beautiful options for you! Here\'s a stunning piece from Myntra\'s collection.',
+          sender: 'ai',
+            senderName: 'Maya(AI)',
+            senderAvatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face',
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            isProduct: true,
+            productData: {
+              name: 'Designer Ethnic Wear',
+              price: '₹3,999',
+              image: 'https://images.unsplash.com/photo-1594736797933-d0401ba2fe65?w=300&h=400&fit=crop&crop=face',
+              description: 'Beautiful ethnic wear perfect for special occasions',
+            },
+            reactions: {
+              thumbsUp: 0,
+              thumbsDown: 0,
+            },
+        };
+        setMessages(prev => [...prev, aiResponse]);
+        }, 1500);
       }
     }
   };
 
-  const addReaction = (messageId: string, emoji: string) => {
-    setMessages(prev => prev.map(message => {
-      if (message.id === messageId) {
-        const existingReaction = message.reactions?.find(r => r.userId === 'currentUser');
-        let newReactions = message.reactions?.filter(r => r.userId !== 'currentUser') || [];
-        
-        if (!existingReaction || existingReaction.emoji !== emoji) {
-          newReactions.push({ userId: 'currentUser', type: 'reaction', emoji });
-        }
-        
-        return { ...message, reactions: newReactions };
-      }
-      return message;
-    }));
-    setShowReactionModal(false);
-  };
-
-  const addToWardrobe = (wardrobeId: string) => {
-    if (selectedProduct) {
-      Alert.alert('Success', `Added "${selectedProduct.name}" to wardrobe!`);
-      setShowWardrobeModal(false);
-      setSelectedProduct(null);
+  const handleMenuAction = (action: string) => {
+    setShowMenu(false);
+    switch (action) {
+      case 'addMembers':
+        // Navigate to add members screen
+        break;
+      case 'startSession':
+        // Start a styling session
+        break;
+      case 'wardrobe':
+        // Navigate to wardrobe
+        router.push('/wardrobes');
+        break;
+      case 'roomSettings':
+        // Navigate to room settings
+        break;
     }
   };
 
-  const openAddToWardrobeModal = (productData: any) => {
-    setSelectedProduct(productData);
-    setShowWardrobeModal(true);
-  };
+  const renderMessage = ({ item }: { item: Message }) => {
+    const isUserMessage = item.sender === 'user';
+    
+    return (
+      <View style={styles.messageWrapper}>
+        {!isUserMessage && (
+          <View style={styles.messageHeader}>
+            <Image source={{ uri: item.senderAvatar }} style={styles.avatar} />
 
-  const openReactionModal = (messageId: string) => {
-    setSelectedMessageId(messageId);
-    setShowReactionModal(true);
-  };
-
-  const renderMessage = ({ item }: { item: Message }) => (
-    <TouchableOpacity
-      style={[
-        styles.messageContainer,
-        item.sender === 'user' ? styles.userMessage : styles.otherMessage,
-      ]}
-      onLongPress={() => item.isProduct && openReactionModal(item.id)}
-    >
-      {item.sender !== 'user' && (
         <Text style={styles.senderName}>{item.senderName}</Text>
+          </View>
       )}
       
+        <View style={[
+          styles.messageContainer,
+          isUserMessage ? styles.userMessage : styles.otherMessage,
+        ]}>
       {item.isProduct && item.productData ? (
         <View style={styles.productCard}>
-          <View style={styles.productImagePlaceholder}>
-            <Text style={styles.productImageText}>👗</Text>
-          </View>
+              <Image source={{ uri: item.productData.image }} style={styles.productImage} />
           <View style={styles.productInfo}>
             <Text style={styles.productName}>{item.productData.name}</Text>
             <Text style={styles.productPrice}>{item.productData.price}</Text>
           </View>
-          <TouchableOpacity 
-            style={styles.addToWardrobeBtn}
-            onPress={() => openAddToWardrobeModal(item.productData)}
-          >
+              <View style={styles.productActions}>
+          <TouchableOpacity style={styles.addToWardrobeBtn}>
+
             <Text style={styles.addToWardrobeText}>Add to Wardrobe</Text>
           </TouchableOpacity>
+                <TouchableOpacity style={styles.showMoreBtn}>
+                  <Text style={styles.showMoreText}>Show more options</Text>
+                </TouchableOpacity>
+              </View>
+              {item.reactions && (
+                <View style={styles.reactions}>
+                  <TouchableOpacity style={styles.reactionButton}>
+                    <Text style={styles.reactionIcon}>👍</Text>
+                    <Text style={styles.reactionCount}>{item.reactions.thumbsUp}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.reactionButton}>
+                    <Text style={styles.reactionIcon}>👎</Text>
+                    <Text style={styles.reactionCount}>{item.reactions.thumbsDown}</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
         </View>
       ) : (
+            <Text style={[
+              styles.messageText,
+              isUserMessage ? styles.userMessageText : styles.otherMessageText
+            ]}>
+              {item.text}
+            </Text>
+          )}
+        </View>
+        
         <Text style={[
-          styles.messageText,
-          item.sender === 'user' && styles.userMessageText
-        ]}>{item.text}</Text>
-      )}
-      
-      {item.reactions && item.reactions.length > 0 && (
-        <View style={styles.reactionsContainer}>
-          {item.reactions.map((reaction, index) => (
-            <View key={index} style={styles.reactionBubble}>
-              <Text style={styles.reactionEmoji}>{reaction.emoji}</Text>
-              <Text style={styles.reactionCount}>1</Text>
-            </View>
-          ))}
-        </View>
-      )}
-      
-      <Text style={[
-        styles.timestamp,
-        item.sender === 'user' && styles.userTimestamp
-      ]}>{item.timestamp}</Text>
-    </TouchableOpacity>
-  );
+          styles.timestamp,
+          isUserMessage ? styles.userTimestamp : styles.otherTimestamp
+        ]}>
+          {item.timestamp}
+        </Text>
+    </View>
 
-  const MenuModal = () => (
-    <Modal
-      visible={showMenu}
-      transparent
-      animationType="fade"
-      onRequestClose={() => setShowMenu(false)}
-    >
-      <TouchableOpacity 
-        style={styles.modalOverlay} 
-        onPress={() => setShowMenu(false)}
-      >
-        <View style={styles.menuModal}>
-          <TouchableOpacity style={styles.menuItem} onPress={() => {
-            setShowMenu(false);
-            // Navigate to add members
-          }}>
-            <Text style={styles.menuIcon}>👥</Text>
-            <Text style={styles.menuText}>Add Members</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity style={styles.menuItem} onPress={() => {
-            setShowMenu(false);
-            router.push(`/call/${id}`);
-          }}>
-            <Text style={styles.menuIcon}>📞</Text>
-            <Text style={styles.menuText}>Start Session</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity style={styles.menuItem} onPress={() => {
-            setShowMenu(false);
-            router.push(`/wardrobe/${id}`);
-          }}>
-            <Text style={styles.menuIcon}>👗</Text>
-            <Text style={styles.menuText}>Wardrobe</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity style={styles.menuItem} onPress={() => {
-            setShowMenu(false);
-            // Navigate to room settings
-          }}>
-            <Text style={styles.menuIcon}>⚙️</Text>
-            <Text style={styles.menuText}>Room Settings</Text>
-          </TouchableOpacity>
-        </View>
-      </TouchableOpacity>
-    </Modal>
   );
+  };
 
-  const WardrobeModal = () => (
-    <Modal
-      visible={showWardrobeModal}
-      transparent
-      animationType="slide"
-      onRequestClose={() => setShowWardrobeModal(false)}
-    >
-      <View style={styles.modalOverlay}>
-        <View style={styles.wardrobeModal}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Add to Wardrobe</Text>
-            <TouchableOpacity onPress={() => setShowWardrobeModal(false)}>
-              <Text style={styles.closeButton}>×</Text>
+  if (loading) {
+    return (
+      <ThemedView style={styles.container}>
+        <SafeAreaView style={styles.container}>
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#ff6b6b" />
+            <Text style={styles.loadingText}>Loading room...</Text>
+          </View>
+        </SafeAreaView>
+      </ThemedView>
+    );
+  }
+
+  if (!room) {
+    return (
+      <ThemedView style={styles.container}>
+        <SafeAreaView style={styles.container}>
+          <View style={styles.errorContainer}>
+            <Text style={styles.errorText}>Room not found</Text>
+            <TouchableOpacity style={styles.backButtonStyle} onPress={() => router.back()}>
+              <Text style={styles.backButtonText}>Go Back</Text>
             </TouchableOpacity>
           </View>
-          
-          {selectedProduct && (
-            <View style={styles.selectedProductInfo}>
-              <Text style={styles.selectedProductName}>{selectedProduct.name}</Text>
-              <Text style={styles.selectedProductPrice}>{selectedProduct.price}</Text>
-            </View>
-          )}
-          
-          <Text style={styles.sectionTitle}>Select Wardrobe:</Text>
-          
-          {mockWardrobes.map((wardrobe) => (
-            <TouchableOpacity
-              key={wardrobe.id}
-              style={styles.wardrobeOption}
-              onPress={() => addToWardrobe(wardrobe.id)}
-            >
-              <Text style={styles.wardrobeEmoji}>{wardrobe.emoji}</Text>
-              <View style={styles.wardrobeInfo}>
-                <Text style={styles.wardrobeName}>{wardrobe.name}</Text>
-                <Text style={styles.wardrobeCount}>{wardrobe.itemCount} items</Text>
-              </View>
-              <Text style={styles.addIcon}>+</Text>
-            </TouchableOpacity>
-          ))}
-          
-          <TouchableOpacity style={styles.createNewWardrobe}>
-            <Text style={styles.createNewText}>+ Create New Wardrobe</Text>
+        </SafeAreaView>
+      </ThemedView>
+    );
+  }
+
+  return (
+    <View style={styles.container}>
+      <SafeAreaView style={styles.container}>
+        {/* Header */}
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()}>
+            <Text style={styles.backButton}>←</Text>
+          </TouchableOpacity>
+          <Text style={styles.roomTitle}>
+            {room ? (room.emoji ? `${room.emoji} ${room.name}` : room.name) : 'Room'}
+          </Text>
+          <TouchableOpacity onPress={() => setShowMenu(true)}>
+            <Text style={styles.menuButton}>⋮</Text>
+
           </TouchableOpacity>
         </View>
       </View>
     </Modal>
   );
 
-  const ReactionModal = () => (
-    <Modal
-      visible={showReactionModal}
-      transparent
-      animationType="fade"
-      onRequestClose={() => setShowReactionModal(false)}
-    >
-      <TouchableOpacity 
-        style={styles.modalOverlay} 
-        onPress={() => setShowReactionModal(false)}
-      >
-        <View style={styles.reactionModal}>
-          <Text style={styles.reactionTitle}>React to this outfit</Text>
-          <View style={styles.reactionGrid}>
-            {reactionEmojis.map((emoji, index) => (
-              <TouchableOpacity
-                key={index}
-                style={styles.reactionOption}
-                onPress={() => addReaction(selectedMessageId, emoji)}
-              >
-                <Text style={styles.reactionEmojiLarge}>{emoji}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+        {/* Chat Area */}
+        <View style={styles.chatArea}>
+        <FlatList
+          ref={flatListRef}
+          data={messages}
+          renderItem={renderMessage}
+          keyExtractor={item => item.id}
+          style={styles.messagesList}
+          showsVerticalScrollIndicator={false}
+          onContentSizeChange={() => flatListRef.current?.scrollToEnd()}
+        />
         </View>
-      </TouchableOpacity>
-    </Modal>
-  );
 
-  return (
-    <KeyboardAvoidingView 
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
-    >
-      <StatusBar style="dark" backgroundColor="white" />
-      <ThemedView style={styles.container}>
-        <SafeAreaView style={styles.container} edges={['top']}>
-          {/* Custom Header with Room Info and Menu */}
-          <View style={styles.header}>
-            <TouchableOpacity onPress={() => router.back()} style={styles.backButtonContainer}>
-              <Text style={styles.backButton}>←</Text>
-            </TouchableOpacity>
-            
-            <View style={styles.roomInfoContainer}>
-              <View style={styles.roomMainInfo}>
-                <Text style={styles.roomEmoji}>{roomData.emoji}</Text>
-                <View style={styles.roomTextInfo}>
-                  <ThemedText style={styles.roomName}>{roomData.name}</ThemedText>
-                  <Text style={styles.roomDescription}>{roomData.description}</Text>
-                  <Text style={styles.memberCount}>{roomData.memberCount} members</Text>
-                </View>
-              </View>
-            </View>
-            
-            <TouchableOpacity
-              style={styles.menuButton}
-              onPress={() => setShowMenu(true)}
-            >
-              <Text style={styles.menuButtonText}>⋯</Text>
-            </TouchableOpacity>
-          </View>
-
-          <FlatList
-            ref={flatListRef}
-            data={messages}
-            renderItem={renderMessage}
-            keyExtractor={item => item.id}
-            style={styles.messagesList}
-            contentContainerStyle={styles.messagesContent}
-            showsVerticalScrollIndicator={false}
-            onContentSizeChange={() => flatListRef.current?.scrollToEnd()}
-            keyboardShouldPersistTaps="handled"
+        {/* Input Area */}
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.inputContainer}
+        >
+          <TouchableOpacity style={styles.addButton}>
+            <Text style={styles.addButtonText}>+</Text>
+          </TouchableOpacity>
+          <TextInput
+            style={styles.textInput}
+            value={inputText}
+            onChangeText={setInputText}
+            placeholder="Type your message here..."
+            placeholderTextColor="#999"
+            multiline
+            maxLength={500}
           />
+          <TouchableOpacity style={styles.sendButton} onPress={sendMessage}>
+            <Text style={styles.sendButtonText}>✈️</Text>
+          </TouchableOpacity>
+        </KeyboardAvoidingView>
 
-          <View style={styles.inputContainer}>
-            <TextInput
-              style={styles.textInput}
-              value={inputText}
-              onChangeText={setInputText}
-              placeholder="Type your message... (mention @bot for AI help)"
-              placeholderTextColor="#999"
-              multiline
-              maxLength={500}
-              returnKeyType="send"
-              onSubmitEditing={sendMessage}
-              blurOnSubmit={false}
-            />
-            <TouchableOpacity style={styles.sendButton} onPress={sendMessage}>
-              <Text style={styles.sendButtonText}>Send</Text>
-            </TouchableOpacity>
-          </View>
+        {/* Menu Modal */}
+        <Modal
+          visible={showMenu}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setShowMenu(false)}
+        >
+          <TouchableOpacity 
+            style={styles.modalOverlay} 
+            activeOpacity={1} 
+            onPress={() => setShowMenu(false)}
+          >
+            <View style={styles.menuContainer}>
+              <TouchableOpacity 
+                style={styles.menuItem}
+                onPress={() => handleMenuAction('addMembers')}
+              >
+                <Text style={styles.menuIcon}>👥</Text>
+                <Text style={styles.menuText}>Add Members</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.menuItem}
+                onPress={() => handleMenuAction('startSession')}
+              >
+                <Text style={styles.menuIcon}>⏱️</Text>
+                <Text style={styles.menuText}>Start Session</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.menuItem}
+                onPress={() => handleMenuAction('wardrobe')}
+              >
+                <Text style={styles.menuIcon}>🗄️</Text>
+                <Text style={styles.menuText}>Wardrobe</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.menuItem}
+                onPress={() => handleMenuAction('roomSettings')}
+              >
+                <Text style={styles.menuIcon}>⚙️</Text>
+                <Text style={styles.menuText}>Room Settings</Text>
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        </Modal>
+      </SafeAreaView>
+    </View>
 
-          <MenuModal />
-          <WardrobeModal />
-          <ReactionModal />
-        </SafeAreaView>
-      </ThemedView>
-    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: '#f5f5f5',
   },
   header: {
     flexDirection: 'row',
@@ -446,56 +530,27 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     backgroundColor: 'white',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e1e5e9',
-    minHeight: 80,
-  },
-  backButtonContainer: {
-    padding: 4,
   },
   backButton: {
-    fontSize: 24,
-    color: '#ff6b6b',
+    fontSize: 20,
+    color: '#000',
+    fontWeight: '600',
+
   },
-  roomInfoContainer: {
-    flex: 1,
-    marginHorizontal: 12,
-  },
-  roomMainInfo: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-  },
-  roomEmoji: {
-    fontSize: 40,
-    marginRight: 12,
-  },
-  roomTextInfo: {
-    flex: 1,
-  },
-  roomName: {
+  roomTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#1a1a1a',
-    marginBottom: 2,
-  },
-  roomDescription: {
-    fontSize: 13,
-    color: '#666',
-    lineHeight: 16,
-    marginBottom: 4,
-  },
-  memberCount: {
-    fontSize: 12,
-    color: '#999',
+    color: '#000',
   },
   menuButton: {
-    padding: 8,
-    borderRadius: 8,
-    backgroundColor: '#f0f0f0',
-  },
-  menuButtonText: {
     fontSize: 20,
-    color: '#666',
+    color: '#000',
+    fontWeight: '600',
+
+  },
+  chatArea: {
+    flex: 1,
+    backgroundColor: '#f5f5f5',
   },
   messagesList: {
     flex: 1,
@@ -505,149 +560,260 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingBottom: 20,
   },
+  messageWrapper: {
+    marginVertical: 8,
+  },
+  messageHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+    marginLeft: 8,
+  },
+  avatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    marginRight: 8,
+  },
+  senderName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#000',
+  },
   messageContainer: {
-    marginVertical: 4,
     padding: 12,
     borderRadius: 16,
-    maxWidth: '80%',
+    maxWidth: '85%',
   },
   userMessage: {
     alignSelf: 'flex-end',
-    backgroundColor: '#ff6b6b',
+    backgroundColor: '#8B5CF6',
+    marginLeft: '15%',
   },
   otherMessage: {
     alignSelf: 'flex-start',
     backgroundColor: 'white',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
+    marginRight: '15%',
+
   },
-  senderName: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#666',
-    marginBottom: 4,
+  userMessageText: {
+    fontSize: 16,
+    color: 'white',
+    lineHeight: 22,
+  },
+  otherMessageText: {
+    fontSize: 16,
+    color: '#000',
+    lineHeight: 22,
   },
   messageText: {
     fontSize: 16,
-    color: '#1a1a1a',
     lineHeight: 22,
   },
   userMessageText: {
     color: 'white',
   },
   timestamp: {
-    fontSize: 10,
-    color: '#999',
+    fontSize: 12,
+    color: '#666',
     marginTop: 4,
+  },
+  userTimestamp: {
     alignSelf: 'flex-end',
+    marginRight: '15%',
+  },
+  otherTimestamp: {
+    alignSelf: 'flex-start',
+    marginLeft: 8,
   },
   userTimestamp: {
     color: 'rgba(255, 255, 255, 0.8)',
   },
   productCard: {
-    backgroundColor: '#f8f9fa',
+    backgroundColor: 'white',
     borderRadius: 12,
-    padding: 12,
-    marginVertical: 4,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
-  productImagePlaceholder: {
-    width: 60,
-    height: 80,
-    backgroundColor: '#e1e5e9',
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  productImageText: {
-    fontSize: 24,
+  productImage: {
+    width: '100%',
+    height: 200,
+    resizeMode: 'cover',
   },
   productInfo: {
-    marginBottom: 8,
+    padding: 12,
   },
   productName: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '600',
-    color: '#1a1a1a',
+    color: '#000',
+    marginBottom: 4,
   },
   productPrice: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: 'bold',
-    color: '#ff6b6b',
+    color: '#8B5CF6',
+  },
+  productActions: {
+    flexDirection: 'row',
+    paddingHorizontal: 12,
+    paddingBottom: 12,
+    gap: 8,
   },
   addToWardrobeBtn: {
-    backgroundColor: '#ff6b6b',
-    paddingVertical: 8,
-    paddingHorizontal: 12,
+    flex: 1,
+    backgroundColor: '#8B5CF6',
+    paddingVertical: 10,
     borderRadius: 8,
-    alignSelf: 'flex-start',
+    alignItems: 'center',
   },
   addToWardrobeText: {
     color: 'white',
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: '600',
   },
-  reactionsContainer: {
-    flexDirection: 'row',
-    marginTop: 8,
-    flexWrap: 'wrap',
+  showMoreBtn: {
+    flex: 1,
+    backgroundColor: 'white',
+    borderWidth: 1,
+    borderColor: '#8B5CF6',
+    paddingVertical: 10,
+    borderRadius: 8,
+    alignItems: 'center',
   },
-  reactionBubble: {
+  showMoreText: {
+    color: '#8B5CF6',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  reactions: {
+    flexDirection: 'row',
+    paddingHorizontal: 12,
+    paddingBottom: 8,
+    gap: 16,
+  },
+  reactionButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f0f0f0',
-    borderRadius: 12,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    marginRight: 4,
-    marginBottom: 4,
+    gap: 4,
   },
-  reactionEmoji: {
-    fontSize: 12,
-    marginRight: 2,
+  reactionIcon: {
+    fontSize: 16,
   },
   reactionCount: {
-    fontSize: 10,
+    fontSize: 12,
+
     color: '#666',
   },
   inputContainer: {
     flexDirection: 'row',
-    alignItems: 'flex-end',
+    alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    paddingBottom: Platform.OS === 'ios' ? 12 : 12,
-    backgroundColor: 'white',
-    borderTopWidth: 1,
-    borderTopColor: '#e1e5e9',
+    backgroundColor: '#f0f0f0',
+    gap: 12,
+  },
+  addButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#e0e0e0',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  addButtonText: {
+    fontSize: 20,
+    color: '#666',
+    fontWeight: '600',
+
   },
   textInput: {
     flex: 1,
-    borderWidth: 1,
-    borderColor: '#e1e5e9',
+    backgroundColor: 'white',
     borderRadius: 20,
     paddingHorizontal: 16,
     paddingVertical: 12,
-    paddingTop: 12,
-    maxHeight: 120,
-    minHeight: 44,
     fontSize: 16,
-    color: '#1a1a1a',
-    textAlignVertical: 'top',
+    color: '#000',
+    maxHeight: 100,
   },
   sendButton: {
-    backgroundColor: '#ff6b6b',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
+    width: 40,
+    height: 40,
     borderRadius: 20,
-    marginLeft: 8,
-    minHeight: 44,
+    backgroundColor: '#e0e0e0',
     justifyContent: 'center',
+    alignItems: 'center',
+
   },
   sendButtonText: {
-    color: 'white',
+    fontSize: 16,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    justifyContent: 'flex-start',
+    alignItems: 'flex-end',
+    paddingTop: 80,
+    paddingRight: 20,
+  },
+  menuContainer: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    paddingVertical: 8,
+    minWidth: 200,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 12,
+  },
+  menuIcon: {
+    fontSize: 20,
+  },
+  menuText: {
+    fontSize: 16,
+    color: '#000',
+    fontWeight: '500',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f5f5f5',
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#666',
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    backgroundColor: '#f5f5f5',
+  },
+  errorText: {
+    fontSize: 18,
+    color: '#666',
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  backButtonText: {
+    fontSize: 16,
+    color: '#8B5CF6',
     fontWeight: '600',
     fontSize: 16,
   },
@@ -798,5 +964,13 @@ const styles = StyleSheet.create({
   },
   reactionEmojiLarge: {
     fontSize: 24,
+  },
+  backButtonStyle: {
+    backgroundColor: 'transparent',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#8B5CF6',
   },
 });
