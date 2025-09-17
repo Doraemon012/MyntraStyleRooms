@@ -299,9 +299,6 @@ export default function RoomChatScreen() {
   const handleMenuAction = (action: string) => {
     setShowMenu(false);
     switch (action) {
-      case 'addMembers':
-        // Navigate to add members screen
-        break;
       case 'startSession':
         // Start a styling session
         break;
@@ -311,6 +308,7 @@ export default function RoomChatScreen() {
         break;
       case 'roomSettings':
         // Navigate to room settings
+        router.push(`/room/settings?id=${id}`);
         break;
     }
   };
@@ -423,12 +421,14 @@ export default function RoomChatScreen() {
                       ]}
                       onPress={() => handleReaction(item.id, 'thumbsUp')}
                     >
-                      <Text style={[
-                        styles.reactionIcon,
-                        item.reactions.userThumbsUp && styles.reactionIconActive
-                      ]}>
-                        👍
-                      </Text>
+                      <Image 
+                        source={require('@/assets/images/thumbs_up_icon.png')} 
+                        style={[
+                          styles.reactionIcon,
+                          item.reactions.userThumbsUp && styles.reactionIconActive
+                        ]}
+                        resizeMode="contain"
+                      />
                       <Text style={styles.reactionCount}>{item.reactions.thumbsUp}</Text>
                     </TouchableOpacity>
                     <TouchableOpacity 
@@ -438,12 +438,14 @@ export default function RoomChatScreen() {
                       ]}
                       onPress={() => handleReaction(item.id, 'thumbsDown')}
                     >
-                      <Text style={[
-                        styles.reactionIcon,
-                        item.reactions.userThumbsDown && styles.reactionIconActive
-                      ]}>
-                        👎
-                      </Text>
+                      <Image 
+                        source={require('@/assets/images/thumbs_down_icon.png')} 
+                        style={[
+                          styles.reactionIcon,
+                          item.reactions.userThumbsDown && styles.reactionIconActive
+                        ]}
+                        resizeMode="contain"
+                      />
                       <Text style={styles.reactionCount}>{item.reactions.thumbsDown}</Text>
                     </TouchableOpacity>
                   </View>
@@ -488,12 +490,14 @@ export default function RoomChatScreen() {
                       ]}
                       onPress={() => handleReaction(item.id, 'thumbsUp')}
                     >
-                      <Text style={[
-                        styles.reactionIcon,
-                        item.reactions.userThumbsUp && styles.reactionIconActive
-                      ]}>
-                        👍
-                      </Text>
+                      <Image 
+                        source={require('@/assets/images/thumbs_up_icon.png')} 
+                        style={[
+                          styles.reactionIcon,
+                          item.reactions.userThumbsUp && styles.reactionIconActive
+                        ]}
+                        resizeMode="contain"
+                      />
                       <Text style={styles.reactionCount}>{item.reactions.thumbsUp}</Text>
                     </TouchableOpacity>
                     <TouchableOpacity 
@@ -503,12 +507,14 @@ export default function RoomChatScreen() {
                       ]}
                       onPress={() => handleReaction(item.id, 'thumbsDown')}
                     >
-                      <Text style={[
-                        styles.reactionIcon,
-                        item.reactions.userThumbsDown && styles.reactionIconActive
-                      ]}>
-                        👎
-                      </Text>
+                      <Image 
+                        source={require('@/assets/images/thumbs_down_icon.png')} 
+                        style={[
+                          styles.reactionIcon,
+                          item.reactions.userThumbsDown && styles.reactionIconActive
+                        ]}
+                        resizeMode="contain"
+                      />
                       <Text style={styles.reactionCount}>{item.reactions.thumbsDown}</Text>
                     </TouchableOpacity>
                   </View>
@@ -566,8 +572,8 @@ export default function RoomChatScreen() {
       <SafeAreaView style={styles.container}>
         {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()}>
-            <Text style={styles.backButton}>←</Text>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backButtonContainer}>
+            <Text style={styles.backButton}>‹</Text>
           </TouchableOpacity>
            <Text style={styles.roomTitle}>
              {room ? room.name : 'Room'}
@@ -593,6 +599,7 @@ export default function RoomChatScreen() {
         {/* Input Area */}
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
           style={styles.inputContainer}
         >
           <TouchableOpacity style={styles.addButton}>
@@ -608,7 +615,11 @@ export default function RoomChatScreen() {
             maxLength={500}
           />
           <TouchableOpacity style={styles.sendButton} onPress={sendMessage}>
-            <Text style={styles.sendButtonText}>✈️</Text>
+            <Image 
+              source={require('@/assets/images/send_icon.png')} 
+              style={styles.sendIcon}
+              resizeMode="contain"
+            />
           </TouchableOpacity>
         </KeyboardAvoidingView>
 
@@ -627,31 +638,42 @@ export default function RoomChatScreen() {
             <View style={styles.menuContainer}>
               <TouchableOpacity 
                 style={styles.menuItem}
-                onPress={() => handleMenuAction('addMembers')}
-              >
-                <Text style={styles.menuIcon}>👥</Text>
-                <Text style={styles.menuText}>Add Members</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={styles.menuItem}
                 onPress={() => handleMenuAction('startSession')}
               >
-                <Text style={styles.menuIcon}>⏱️</Text>
+                <View style={styles.menuIconContainer}>
+                  <Image 
+                    source={require('@/assets/images/start_session_icon.png')} 
+                    style={styles.menuIconImage}
+                    resizeMode="contain"
+                  />
+                </View>
                 <Text style={styles.menuText}>Start Session</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={styles.menuItem}
-                onPress={() => handleMenuAction('wardrobe')}
-              >
-                <Text style={styles.menuIcon}>🗄️</Text>
-                <Text style={styles.menuText}>Wardrobe</Text>
               </TouchableOpacity>
               <TouchableOpacity 
                 style={styles.menuItem}
                 onPress={() => handleMenuAction('roomSettings')}
               >
-                <Text style={styles.menuIcon}>⚙️</Text>
+                <View style={styles.menuIconContainer}>
+                  <Image 
+                    source={require('@/assets/images/room_settings.png')} 
+                    style={styles.menuIconImage}
+                    resizeMode="contain"
+                  />
+                </View>
                 <Text style={styles.menuText}>Room Settings</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.menuItem}
+                onPress={() => handleMenuAction('wardrobe')}
+              >
+                <View style={styles.menuIconContainer}>
+                  <Image 
+                    source={require('@/assets/images/wardrobe_icon.png')} 
+                    style={styles.menuIconImage}
+                    resizeMode="contain"
+                  />
+                </View>
+                <Text style={styles.menuText}>Wardrobe</Text>
               </TouchableOpacity>
             </View>
           </TouchableOpacity>
@@ -671,25 +693,27 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
     backgroundColor: 'white',
-    minHeight: 60,
+    minHeight: 44,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  backButtonContainer: {
+    padding: 8,
+    marginLeft: -8,
   },
   backButton: {
-    fontSize: 18,
-    color: '#000',
-    fontWeight: '600',
-    paddingVertical: 8,
-    paddingHorizontal: 4,
+    fontSize: 28,
+    color: '#1a1a1a',
+    fontWeight: '300',
   },
   roomTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '700',
     color: '#000',
   },
@@ -706,7 +730,7 @@ const styles = StyleSheet.create({
   },
   messagesList: {
     flex: 1,
-    paddingHorizontal: 12,
+    paddingHorizontal: 16,
     paddingVertical: 4,
   },
   messagesContent: {
@@ -737,16 +761,18 @@ const styles = StyleSheet.create({
   messageContainer: {
     padding: 8,
     borderRadius: 12,
-    maxWidth: '85%',
+    maxWidth: '80%',
+    position: 'relative',
   },
   userMessage: {
     alignSelf: 'flex-end',
-    marginLeft: '15%',
+    marginLeft: '20%',
+    backgroundColor: '#E91E63',
   },
   otherMessage: {
     alignSelf: 'flex-start',
-    backgroundColor: 'white',
-    marginRight: '15%',
+    backgroundColor: '#F0F0F0',
+    marginRight: '20%',
   },
   userMessageText: {
     fontSize: 13,
@@ -769,7 +795,7 @@ const styles = StyleSheet.create({
   },
   userTimestamp: {
     alignSelf: 'flex-end',
-    marginRight: '15%',
+    marginRight: '20%',
     color: 'rgba(255, 255, 255, 0.8)',
   },
   otherTimestamp: {
@@ -841,110 +867,140 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   reactions: {
+    position: 'absolute',
+    bottom: -12,
+    right: 8,
     flexDirection: 'row',
+    backgroundColor: '#EAE8FE',
     paddingHorizontal: 8,
-    paddingBottom: 6,
-    gap: 12,
+    paddingVertical: 4,
+    borderRadius: 16,
+    borderWidth: 0,
+    gap: 8,
+    zIndex: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 5,
   },
   reactionButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 2,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#000',
+    gap: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+    borderWidth: 0,
     backgroundColor: 'transparent',
   },
   reactionButtonActive: {
-    backgroundColor: '#E91E63',
-    borderColor: '#E91E63',
+    backgroundColor: 'transparent',
+    borderWidth: 0,
   },
   reactionIcon: {
-    fontSize: 12,
+    width: 18,
+    height: 18,
+    opacity: 0.6,
+    tintColor: '#1a1a1a',
   },
   reactionIconActive: {
-    fontSize: 12,
+    width: 18,
+    height: 18,
+    opacity: 1,
+    tintColor: '#E91E63',
   },
   reactionCount: {
-    fontSize: 10,
-    color: '#666',
-    fontWeight: '600',
+    fontSize: 12,
+    color: '#1a1a1a',
+    fontWeight: '500',
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    backgroundColor: '#f0f0f0',
-    gap: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: 'white',
+    borderTopWidth: 1,
+    borderTopColor: '#E0E0E0',
+    gap: 12,
   },
   addButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#e0e0e0',
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#EAE8FE',
     justifyContent: 'center',
     alignItems: 'center',
   },
   addButtonText: {
-    fontSize: 16,
-    color: '#666',
-    fontWeight: '600',
+    fontSize: 20,
+    color: '#4A4A4A',
+    fontWeight: '300',
   },
   textInput: {
     flex: 1,
-    backgroundColor: 'white',
-    borderRadius: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    fontSize: 13,
-    color: '#000',
-    maxHeight: 80,
+    backgroundColor: '#EAE8FE',
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    fontSize: 14,
+    color: '#4A4A4A',
+    maxHeight: 100,
+    borderWidth: 0,
   },
   sendButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#e0e0e0',
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'white',
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#B19CD9',
   },
-  sendButtonText: {
-    fontSize: 14,
+  sendIcon: {
+    width: 16,
+    height: 16,
   },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.3)',
     justifyContent: 'flex-start',
     alignItems: 'flex-end',
-    paddingTop: 80,
-    paddingRight: 20,
+    paddingTop: 45,
+    paddingRight: 25,
   },
   menuContainer: {
     backgroundColor: 'white',
-    borderRadius: 12,
-    paddingVertical: 8,
-    minWidth: 200,
+    borderRadius: 8,
+    paddingVertical: 4,
+    minWidth: 180,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 5,
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 3,
   },
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    gap: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    gap: 10,
   },
-  menuIcon: {
-    fontSize: 20,
+  menuIconContainer: {
+    width: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  menuIconImage: {
+    width: 16,
+    height: 16,
   },
   menuText: {
-    fontSize: 16,
+    fontSize: 14,
     color: '#000',
     fontWeight: '500',
   },
