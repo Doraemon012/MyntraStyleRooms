@@ -198,6 +198,7 @@ export default function HomeScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState<'all' | 'joined' | 'invited'>('all');
   const [rooms, setRooms] = useState<Room[]>(mockRooms);
+  const [invitationLink, setInvitationLink] = useState('');
   
   let [fontsLoaded] = useFonts({
     DancingScript_400Regular,
@@ -284,19 +285,22 @@ export default function HomeScreen() {
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="white" />
-      <SafeAreaView style={styles.safeArea}>
+      <SafeAreaView style={styles.safeArea} edges={['top']}>
         {/* Header */}
         <View style={styles.header}>
           <View style={styles.logoSection}>
             <Image 
-              source={require('@/assets/images/icon.png')} 
+              source={require('@/assets/images/icon.webp')} 
               style={styles.logo}
               contentFit="contain"
             />
             <Text style={styles.title}>Fashion Rooms</Text>
           </View>
           <View style={styles.headerActions}>
-            <TouchableOpacity style={styles.createButton}>
+            <TouchableOpacity 
+              style={styles.createButton}
+              onPress={() => router.push('/room/create')}
+            >
               <Ionicons name="add" size={14} color="#E91E63" />
               <Text style={styles.createButtonText}>Create</Text>
             </TouchableOpacity>
@@ -356,8 +360,21 @@ export default function HomeScreen() {
               style={styles.joinRoomTextInput}
               placeholder="Paste Invitation Link"
               placeholderTextColor="rgba(255,255,255,0.7)"
+              value={invitationLink}
+              onChangeText={setInvitationLink}
             />
-            <TouchableOpacity style={styles.joinRoomButton}>
+            <TouchableOpacity 
+              style={styles.joinRoomButton}
+              onPress={() => {
+                if (invitationLink.trim()) {
+                  // Handle join room functionality
+                  console.log('Joining room with link:', invitationLink);
+                  // You can add logic here to process invitation links
+                  // For now, just clear the input
+                  setInvitationLink('');
+                }
+              }}
+            >
               <Ionicons name="arrow-forward" size={12} color="white" />
             </TouchableOpacity>
           </View>
@@ -579,7 +596,6 @@ const styles = StyleSheet.create({
   scrollView: {
     flex: 1,
     paddingHorizontal: 16,
-    paddingBottom: 20,
   },
   roomCard: {
     backgroundColor: 'white',

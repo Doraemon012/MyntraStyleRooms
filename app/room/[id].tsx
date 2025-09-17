@@ -1,4 +1,5 @@
 import { ThemedView } from '@/components/themed-view';
+import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
 import {
@@ -33,6 +34,8 @@ interface Message {
   reactions?: {
     thumbsUp: number;
     thumbsDown: number;
+    userThumbsUp?: boolean;
+    userThumbsDown?: boolean;
   };
 }
 
@@ -68,8 +71,8 @@ const mockMessages: Message[] = [
     id: '1',
     text: '@Maya Looking for some ethnic wear for the wedding',
     sender: 'user',
-    senderName: 'Jasmine',
-    senderAvatar: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face',
+    senderName: 'You',
+    senderAvatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face',
     timestamp: '10:30 AM',
   },
   {
@@ -85,10 +88,9 @@ const mockMessages: Message[] = [
     id: '3',
     text: 'Around ₹5,000 would be perfect!',
     sender: 'user',
-    senderName: 'Jasmine',
-    senderAvatar: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face',
+    senderName: 'You',
+    senderAvatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face',
     timestamp: '10:30 AM',
-
   },
   {
     id: '4',
@@ -107,6 +109,8 @@ const mockMessages: Message[] = [
     reactions: {
       thumbsUp: 2,
       thumbsDown: 2,
+      userThumbsUp: false,
+      userThumbsDown: false,
     },
   },
   {
@@ -256,8 +260,8 @@ export default function RoomChatScreen() {
         id: Date.now().toString(),
         text: inputText.trim(),
         sender: 'user',
-        senderName: 'Jasmine',
-        senderAvatar: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face',
+        senderName: 'You',
+        senderAvatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face',
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       };
       
@@ -295,9 +299,6 @@ export default function RoomChatScreen() {
   const handleMenuAction = (action: string) => {
     setShowMenu(false);
     switch (action) {
-      case 'addMembers':
-        // Navigate to add members screen
-        break;
       case 'startSession':
         // Start a styling session
         break;
@@ -307,8 +308,66 @@ export default function RoomChatScreen() {
         break;
       case 'roomSettings':
         // Navigate to room settings
+        router.push(`/room/settings?id=${id}`);
         break;
     }
+  };
+
+  const handleReaction = (messageId: string, reactionType: 'thumbsUp' | 'thumbsDown') => {
+    setMessages(prevMessages => 
+      prevMessages.map(message => {
+        if (message.id === messageId && message.reactions) {
+          const currentReactions = message.reactions;
+          let newThumbsUp = currentReactions.thumbsUp;
+          let newThumbsDown = currentReactions.thumbsDown;
+          let newUserThumbsUp = currentReactions.userThumbsUp || false;
+          let newUserThumbsDown = currentReactions.userThumbsDown || false;
+
+          if (reactionType === 'thumbsUp') {
+            if (newUserThumbsUp) {
+              // User is unliking
+              newThumbsUp = Math.max(0, newThumbsUp - 1);
+              newUserThumbsUp = false;
+            } else {
+              // User is liking
+              newThumbsUp += 1;
+              newUserThumbsUp = true;
+              // If user was disliking, remove dislike
+              if (newUserThumbsDown) {
+                newThumbsDown = Math.max(0, newThumbsDown - 1);
+                newUserThumbsDown = false;
+              }
+            }
+          } else if (reactionType === 'thumbsDown') {
+            if (newUserThumbsDown) {
+              // User is undisliking
+              newThumbsDown = Math.max(0, newThumbsDown - 1);
+              newUserThumbsDown = false;
+            } else {
+              // User is disliking
+              newThumbsDown += 1;
+              newUserThumbsDown = true;
+              // If user was liking, remove like
+              if (newUserThumbsUp) {
+                newThumbsUp = Math.max(0, newThumbsUp - 1);
+                newUserThumbsUp = false;
+              }
+            }
+          }
+
+          return {
+            ...message,
+            reactions: {
+              thumbsUp: newThumbsUp,
+              thumbsDown: newThumbsDown,
+              userThumbsUp: newUserThumbsUp,
+              userThumbsDown: newUserThumbsDown,
+            }
+          };
+        }
+        return message;
+      })
+    );
   };
 
   const renderMessage = ({ item }: { item: Message }) => {
@@ -324,48 +383,150 @@ export default function RoomChatScreen() {
           </View>
       )}
       
-        <View style={[
-          styles.messageContainer,
-          isUserMessage ? styles.userMessage : styles.otherMessage,
-        ]}>
+        {isUserMessage ? (
+          <LinearGradient
+            colors={['#E91E63', '#FF6B9D', '#FF8A9B']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={[styles.messageContainer, styles.userMessage]}
+          >
       {item.isProduct && item.productData ? (
         <View style={styles.productCard}>
-              <Image source={{ uri: item.productData.image }} style={styles.productImage} />
+                <Image source={{ uri: item.productData.image }} style={styles.productImage} />
+                <View style={styles.productInfo}>
+                  <Text style={styles.productName}>{item.productData.name}</Text>
+                  <Text style={styles.productPrice}>{item.productData.price}</Text>
+                </View>
+                <View style={styles.productActions}>
+                  <LinearGradient
+                    colors={['#E91E63', '#FF6B9D']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={styles.addToWardrobeBtn}
+                  >
+                    <TouchableOpacity style={styles.addToWardrobeBtnInner}>
+                      <Text style={styles.addToWardrobeText}>Add to Wardrobe</Text>
+                    </TouchableOpacity>
+                  </LinearGradient>
+                  <TouchableOpacity style={styles.showMoreBtn}>
+                    <Text style={styles.showMoreText}>Show more options</Text>
+                  </TouchableOpacity>
+                </View>
+                {item.reactions && (
+                  <View style={styles.reactions}>
+                    <TouchableOpacity 
+                      style={[
+                        styles.reactionButton,
+                        item.reactions.userThumbsUp && styles.reactionButtonActive
+                      ]}
+                      onPress={() => handleReaction(item.id, 'thumbsUp')}
+                    >
+                      <Image 
+                        source={require('@/assets/images/thumbs_up_icon.png')} 
+                        style={[
+                          styles.reactionIcon,
+                          item.reactions.userThumbsUp && styles.reactionIconActive
+                        ]}
+                        resizeMode="contain"
+                      />
+                      <Text style={styles.reactionCount}>{item.reactions.thumbsUp}</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity 
+                      style={[
+                        styles.reactionButton,
+                        item.reactions.userThumbsDown && styles.reactionButtonActive
+                      ]}
+                      onPress={() => handleReaction(item.id, 'thumbsDown')}
+                    >
+                      <Image 
+                        source={require('@/assets/images/thumbs_down_icon.png')} 
+                        style={[
+                          styles.reactionIcon,
+                          item.reactions.userThumbsDown && styles.reactionIconActive
+                        ]}
+                        resizeMode="contain"
+                      />
+                      <Text style={styles.reactionCount}>{item.reactions.thumbsDown}</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+          </View>
+            ) : (
+              <Text style={styles.userMessageText}>
+                {item.text}
+              </Text>
+            )}
+          </LinearGradient>
+        ) : (
+          <View style={[styles.messageContainer, styles.otherMessage]}>
+            {item.isProduct && item.productData ? (
+              <View style={styles.productCard}>
+                <Image source={{ uri: item.productData.image }} style={styles.productImage} />
           <View style={styles.productInfo}>
             <Text style={styles.productName}>{item.productData.name}</Text>
             <Text style={styles.productPrice}>{item.productData.price}</Text>
           </View>
-              <View style={styles.productActions}>
-          <TouchableOpacity style={styles.addToWardrobeBtn}>
-
+                <View style={styles.productActions}>
+                  <LinearGradient
+                    colors={['#E91E63', '#FF6B9D']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={styles.addToWardrobeBtn}
+                  >
+                    <TouchableOpacity style={styles.addToWardrobeBtnInner}>
             <Text style={styles.addToWardrobeText}>Add to Wardrobe</Text>
           </TouchableOpacity>
-                <TouchableOpacity style={styles.showMoreBtn}>
-                  <Text style={styles.showMoreText}>Show more options</Text>
-                </TouchableOpacity>
-              </View>
-              {item.reactions && (
-                <View style={styles.reactions}>
-                  <TouchableOpacity style={styles.reactionButton}>
-                    <Text style={styles.reactionIcon}>👍</Text>
-                    <Text style={styles.reactionCount}>{item.reactions.thumbsUp}</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.reactionButton}>
-                    <Text style={styles.reactionIcon}>👎</Text>
-                    <Text style={styles.reactionCount}>{item.reactions.thumbsDown}</Text>
+                  </LinearGradient>
+                  <TouchableOpacity style={styles.showMoreBtn}>
+                    <Text style={styles.showMoreText}>Show more options</Text>
                   </TouchableOpacity>
                 </View>
-              )}
+                {item.reactions && (
+                  <View style={styles.reactions}>
+                    <TouchableOpacity 
+                      style={[
+                        styles.reactionButton,
+                        item.reactions.userThumbsUp && styles.reactionButtonActive
+                      ]}
+                      onPress={() => handleReaction(item.id, 'thumbsUp')}
+                    >
+                      <Image 
+                        source={require('@/assets/images/thumbs_up_icon.png')} 
+                        style={[
+                          styles.reactionIcon,
+                          item.reactions.userThumbsUp && styles.reactionIconActive
+                        ]}
+                        resizeMode="contain"
+                      />
+                      <Text style={styles.reactionCount}>{item.reactions.thumbsUp}</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity 
+                      style={[
+                        styles.reactionButton,
+                        item.reactions.userThumbsDown && styles.reactionButtonActive
+                      ]}
+                      onPress={() => handleReaction(item.id, 'thumbsDown')}
+                    >
+                      <Image 
+                        source={require('@/assets/images/thumbs_down_icon.png')} 
+                        style={[
+                          styles.reactionIcon,
+                          item.reactions.userThumbsDown && styles.reactionIconActive
+                        ]}
+                        resizeMode="contain"
+                      />
+                      <Text style={styles.reactionCount}>{item.reactions.thumbsDown}</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
         </View>
       ) : (
-            <Text style={[
-              styles.messageText,
-              isUserMessage ? styles.userMessageText : styles.otherMessageText
-            ]}>
-              {item.text}
-            </Text>
-          )}
-        </View>
+              <Text style={styles.otherMessageText}>
+                {item.text}
+              </Text>
+            )}
+          </View>
+        )}
         
         <Text style={[
           styles.timestamp,
@@ -411,12 +572,12 @@ export default function RoomChatScreen() {
       <SafeAreaView style={styles.container}>
         {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()}>
-            <Text style={styles.backButton}>←</Text>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backButtonContainer}>
+            <Text style={styles.backButton}>‹</Text>
           </TouchableOpacity>
-          <Text style={styles.roomTitle}>
-            {room ? (room.emoji ? `${room.emoji} ${room.name}` : room.name) : 'Room'}
-          </Text>
+           <Text style={styles.roomTitle}>
+             {room ? room.name : 'Room'}
+           </Text>
           <TouchableOpacity onPress={() => setShowMenu(true)}>
             <Text style={styles.menuButton}>⋮</Text>
           </TouchableOpacity>
@@ -438,6 +599,7 @@ export default function RoomChatScreen() {
         {/* Input Area */}
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
           style={styles.inputContainer}
         >
           <TouchableOpacity style={styles.addButton}>
@@ -453,7 +615,11 @@ export default function RoomChatScreen() {
             maxLength={500}
           />
           <TouchableOpacity style={styles.sendButton} onPress={sendMessage}>
-            <Text style={styles.sendButtonText}>✈️</Text>
+            <Image 
+              source={require('@/assets/images/send_icon.png')} 
+              style={styles.sendIcon}
+              resizeMode="contain"
+            />
           </TouchableOpacity>
         </KeyboardAvoidingView>
 
@@ -472,31 +638,42 @@ export default function RoomChatScreen() {
             <View style={styles.menuContainer}>
               <TouchableOpacity 
                 style={styles.menuItem}
-                onPress={() => handleMenuAction('addMembers')}
-              >
-                <Text style={styles.menuIcon}>👥</Text>
-                <Text style={styles.menuText}>Add Members</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={styles.menuItem}
                 onPress={() => handleMenuAction('startSession')}
               >
-                <Text style={styles.menuIcon}>⏱️</Text>
+                <View style={styles.menuIconContainer}>
+                  <Image 
+                    source={require('@/assets/images/start_session_icon.png')} 
+                    style={styles.menuIconImage}
+                    resizeMode="contain"
+                  />
+                </View>
                 <Text style={styles.menuText}>Start Session</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={styles.menuItem}
-                onPress={() => handleMenuAction('wardrobe')}
-              >
-                <Text style={styles.menuIcon}>🗄️</Text>
-                <Text style={styles.menuText}>Wardrobe</Text>
               </TouchableOpacity>
               <TouchableOpacity 
                 style={styles.menuItem}
                 onPress={() => handleMenuAction('roomSettings')}
               >
-                <Text style={styles.menuIcon}>⚙️</Text>
+                <View style={styles.menuIconContainer}>
+                  <Image 
+                    source={require('@/assets/images/room_settings.png')} 
+                    style={styles.menuIconImage}
+                    resizeMode="contain"
+                  />
+                </View>
                 <Text style={styles.menuText}>Room Settings</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.menuItem}
+                onPress={() => handleMenuAction('wardrobe')}
+              >
+                <View style={styles.menuIconContainer}>
+                  <Image 
+                    source={require('@/assets/images/wardrobe_icon.png')} 
+                    style={styles.menuIconImage}
+                    resizeMode="contain"
+                  />
+                </View>
+                <Text style={styles.menuText}>Wardrobe</Text>
               </TouchableOpacity>
             </View>
           </TouchableOpacity>
@@ -517,25 +694,35 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 8,
     backgroundColor: 'white',
+    minHeight: 44,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  backButtonContainer: {
+    padding: 8,
+    marginLeft: -8,
   },
   backButton: {
-    fontSize: 20,
-    color: '#000',
-    fontWeight: '600',
-
+    fontSize: 28,
+    color: '#1a1a1a',
+    fontWeight: '300',
   },
   roomTitle: {
-    fontSize: 18,
-    fontWeight: '600',
+    fontSize: 16,
+    fontWeight: '700',
     color: '#000',
   },
   menuButton: {
-    fontSize: 20,
+    fontSize: 18,
     color: '#000',
     fontWeight: '600',
-
+    paddingVertical: 8,
+    paddingHorizontal: 4,
   },
   chatArea: {
     flex: 1,
@@ -544,232 +731,276 @@ const styles = StyleSheet.create({
   messagesList: {
     flex: 1,
     paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingVertical: 4,
   },
   messagesContent: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    paddingBottom: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    paddingBottom: 16,
   },
   messageWrapper: {
-    marginVertical: 8,
+    marginVertical: 4,
   },
   messageHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 4,
-    marginLeft: 8,
+    marginBottom: 2,
+    marginLeft: 6,
   },
   avatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    marginRight: 8,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    marginRight: 6,
   },
   senderName: {
-    fontSize: 14,
+    fontSize: 11,
     fontWeight: '600',
     color: '#000',
   },
   messageContainer: {
-    padding: 12,
-    borderRadius: 16,
-    maxWidth: '85%',
+    padding: 8,
+    borderRadius: 12,
+    maxWidth: '80%',
+    position: 'relative',
   },
   userMessage: {
     alignSelf: 'flex-end',
-    backgroundColor: '#8B5CF6',
-    marginLeft: '15%',
+    marginLeft: '20%',
+    backgroundColor: '#E91E63',
   },
   otherMessage: {
     alignSelf: 'flex-start',
-    backgroundColor: 'white',
-    marginRight: '15%',
-
+    backgroundColor: '#F0F0F0',
+    marginRight: '20%',
   },
   userMessageText: {
-    fontSize: 16,
+    fontSize: 13,
     color: 'white',
-    lineHeight: 22,
+    lineHeight: 18,
   },
   otherMessageText: {
-    fontSize: 16,
+    fontSize: 13,
     color: '#000',
-    lineHeight: 22,
+    lineHeight: 18,
   },
   messageText: {
-    fontSize: 16,
-    lineHeight: 22,
+    fontSize: 13,
+    lineHeight: 18,
   },
   timestamp: {
-    fontSize: 12,
+    fontSize: 9,
     color: '#666',
-    marginTop: 4,
+    marginTop: 2,
   },
   userTimestamp: {
     alignSelf: 'flex-end',
-    marginRight: '15%',
+    marginRight: '20%',
     color: 'rgba(255, 255, 255, 0.8)',
   },
   otherTimestamp: {
     alignSelf: 'flex-start',
-    marginLeft: 8,
+    marginLeft: 6,
   },
   productCard: {
     backgroundColor: 'white',
-    borderRadius: 12,
+    borderRadius: 8,
     overflow: 'hidden',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowRadius: 2,
+    elevation: 2,
   },
   productImage: {
     width: '100%',
-    height: 200,
+    height: 160,
     resizeMode: 'cover',
   },
   productInfo: {
-    padding: 12,
+    padding: 8,
   },
   productName: {
-    fontSize: 16,
+    fontSize: 13,
     fontWeight: '600',
     color: '#000',
-    marginBottom: 4,
+    marginBottom: 2,
   },
   productPrice: {
-    fontSize: 18,
+    fontSize: 14,
     fontWeight: 'bold',
-    color: '#8B5CF6',
+    color: '#E91E63',
   },
   productActions: {
     flexDirection: 'row',
-    paddingHorizontal: 12,
-    paddingBottom: 12,
-    gap: 8,
+    paddingHorizontal: 8,
+    paddingBottom: 8,
+    gap: 6,
   },
   addToWardrobeBtn: {
     flex: 1,
-    backgroundColor: '#8B5CF6',
-    paddingVertical: 10,
-    borderRadius: 8,
+    borderRadius: 6,
+    overflow: 'hidden',
+  },
+  addToWardrobeBtnInner: {
+    paddingVertical: 6,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   addToWardrobeText: {
     color: 'white',
-    fontSize: 14,
+    fontSize: 11,
     fontWeight: '600',
   },
   showMoreBtn: {
     flex: 1,
     backgroundColor: 'white',
     borderWidth: 1,
-    borderColor: '#8B5CF6',
-    paddingVertical: 10,
-    borderRadius: 8,
+    borderColor: '#E91E63',
+    paddingVertical: 6,
+    borderRadius: 6,
     alignItems: 'center',
   },
   showMoreText: {
-    color: '#8B5CF6',
-    fontSize: 14,
+    color: '#E91E63',
+    fontSize: 11,
     fontWeight: '600',
   },
   reactions: {
+    position: 'absolute',
+    bottom: -12,
+    right: 8,
     flexDirection: 'row',
-    paddingHorizontal: 12,
-    paddingBottom: 8,
-    gap: 16,
+    backgroundColor: '#EAE8FE',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 16,
+    borderWidth: 0,
+    gap: 8,
+    zIndex: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 5,
   },
   reactionButton: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+    borderWidth: 0,
+    backgroundColor: 'transparent',
+  },
+  reactionButtonActive: {
+    backgroundColor: 'transparent',
+    borderWidth: 0,
   },
   reactionIcon: {
-    fontSize: 16,
+    width: 18,
+    height: 18,
+    opacity: 0.6,
+    tintColor: '#1a1a1a',
+  },
+  reactionIconActive: {
+    width: 18,
+    height: 18,
+    opacity: 1,
+    tintColor: '#E91E63',
   },
   reactionCount: {
     fontSize: 12,
-
-    color: '#666',
+    color: '#1a1a1a',
+    fontWeight: '500',
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: '#f0f0f0',
+    backgroundColor: 'white',
+    borderTopWidth: 1,
+    borderTopColor: '#E0E0E0',
     gap: 12,
   },
   addButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#e0e0e0',
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#EAE8FE',
     justifyContent: 'center',
     alignItems: 'center',
   },
   addButtonText: {
     fontSize: 20,
-    color: '#666',
-    fontWeight: '600',
-
+    color: '#4A4A4A',
+    fontWeight: '300',
   },
   textInput: {
     flex: 1,
-    backgroundColor: 'white',
+    backgroundColor: '#EAE8FE',
     borderRadius: 20,
     paddingHorizontal: 16,
     paddingVertical: 12,
-    fontSize: 16,
-    color: '#000',
+    fontSize: 14,
+    color: '#4A4A4A',
     maxHeight: 100,
+    borderWidth: 0,
   },
   sendButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#e0e0e0',
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'white',
     justifyContent: 'center',
     alignItems: 'center',
-
+    borderWidth: 1,
+    borderColor: '#B19CD9',
   },
-  sendButtonText: {
-    fontSize: 16,
+  sendIcon: {
+    width: 16,
+    height: 16,
   },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.3)',
     justifyContent: 'flex-start',
     alignItems: 'flex-end',
-    paddingTop: 80,
-    paddingRight: 20,
+    paddingTop: 45,
+    paddingRight: 25,
   },
   menuContainer: {
     backgroundColor: 'white',
-    borderRadius: 12,
-    paddingVertical: 8,
-    minWidth: 200,
+    borderRadius: 8,
+    paddingVertical: 4,
+    minWidth: 180,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 5,
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 3,
   },
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    gap: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    gap: 10,
   },
-  menuIcon: {
-    fontSize: 20,
+  menuIconContainer: {
+    width: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  menuIconImage: {
+    width: 16,
+    height: 16,
   },
   menuText: {
-    fontSize: 16,
+    fontSize: 14,
     color: '#000',
     fontWeight: '500',
   },

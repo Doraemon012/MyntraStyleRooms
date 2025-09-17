@@ -1,16 +1,18 @@
-import { LinearGradient } from 'expo-linear-gradient';
-import { router } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+import { router, useLocalSearchParams } from 'expo-router';
 import React, { useState } from 'react';
 import {
-  Alert,
-  FlatList,
-  Modal,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View
+    Alert,
+    Clipboard,
+    FlatList,
+    Image,
+    Modal,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -40,14 +42,16 @@ const mockUsers: User[] = [
   { id: '8', name: 'Zara Ahmed', email: 'zara@email.com', avatar: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=150&h=150&fit=crop&crop=face' },
 ];
 
-export default function CreateRoomScreen() {
-  const [roomName, setRoomName] = useState('');
-  const [description, setDescription] = useState('');
+export default function RoomSettingsScreen() {
+  const { id } = useLocalSearchParams();
+  
+  const [roomName, setRoomName] = useState('Family Wedding Outfits');
+  const [description, setDescription] = useState('Planning outfits for the upcoming family wedding celebration');
   const [isPrivate, setIsPrivate] = useState(false);
   const [aiEnabled, setAiEnabled] = useState(true);
   const [members, setMembers] = useState<RoomMember[]>([]);
   const [showUserModal, setShowUserModal] = useState(false);
-  const [invitationLink, setInvitationLink] = useState('');
+  const [invitationLink, setInvitationLink] = useState('XXXX-XXX-XXXX');
   const [searchQuery, setSearchQuery] = useState('');
 
   const addMember = (user: User) => {
@@ -70,31 +74,21 @@ export default function CreateRoomScreen() {
     ));
   };
 
-  const generateInvitationLink = () => {
-    const roomId = Date.now().toString();
-    const token = Math.random().toString(36).substring(2, 15);
-    const link = `https://myntra.com/join-room?roomId=${roomId}&token=${token}`;
-    setInvitationLink(link);
-    return link;
+  const copyInvitationLink = async () => {
+    try {
+      await Clipboard.setString(invitationLink);
+      Alert.alert('Success', 'Invitation link copied to clipboard');
+    } catch (error) {
+      Alert.alert('Error', 'Failed to copy link');
+    }
   };
 
-  const createRoom = () => {
-    if (!roomName.trim()) {
-      Alert.alert('Error', 'Please enter a room name');
-      return;
-    }
-
-    // Generate invitation link
-    const link = generateInvitationLink();
-
-    // Here you would typically make an API call to create the room
-    console.log('Room created:', roomName);
-    console.log('Invitation link:', link);
-    
-    // Navigate back directly
+  const saveSettings = () => {
+    // Here you would typically make an API call to save the room settings
+    console.log('Room settings saved:', { roomName, description, isPrivate, aiEnabled, members });
+    Alert.alert('Success', 'Room settings saved successfully');
     router.back();
   };
-
 
   const filteredUsers = mockUsers.filter(user => 
     !members.some(member => member.id === user.id) &&
@@ -128,11 +122,34 @@ export default function CreateRoomScreen() {
           <TouchableOpacity onPress={() => router.back()} style={styles.backButtonContainer}>
             <Text style={styles.backButton}>‹</Text>
           </TouchableOpacity>
-          <Text style={styles.title}>Create Room</Text>
-          <View style={styles.placeholder} />
+          <Text style={styles.title}>Room Settings</Text>
+           <TouchableOpacity onPress={saveSettings} style={styles.editButtonContainer}>
+             <Image 
+               source={require('@/assets/images/okay_icon.png')} 
+               style={styles.editButtonIcon}
+               resizeMode="contain"
+             />
+           </TouchableOpacity>
         </View>
 
         <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+          {/* Copy Invitation Link Section */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Copy invitation link</Text>
+            <View style={styles.copyLinkContainer}>
+              <TextInput
+                style={styles.copyLinkInput}
+                value={invitationLink}
+                editable={false}
+                placeholder="XXXX-XXX-XXXX"
+                placeholderTextColor="#999"
+              />
+               <TouchableOpacity onPress={copyInvitationLink} style={styles.copyButton}>
+                 <Ionicons name="link" size={16} color="#666" />
+               </TouchableOpacity>
+            </View>
+          </View>
+
           {/* Room Details Section */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Room Details</Text>
@@ -233,20 +250,6 @@ export default function CreateRoomScreen() {
           </View>
         </ScrollView>
 
-        {/* Bottom Actions */}
-        <View style={styles.bottomActions}>
-          <TouchableOpacity onPress={createRoom}>
-            <LinearGradient
-              colors={['#E91E63', '#FF6B35']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.createButton}
-            >
-              <Text style={styles.createButtonText}>Create</Text>
-            </LinearGradient>
-          </TouchableOpacity>
-        </View>
-
         {/* User Selection Modal */}
         <Modal
           visible={showUserModal}
@@ -334,8 +337,13 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: '#1a1a1a',
   },
-  placeholder: {
-    width: 44,
+  editButtonContainer: {
+    padding: 8,
+    marginRight: -8,
+  },
+  editButtonIcon: {
+    width: 16,
+    height: 16,
   },
   content: {
     flex: 1,
@@ -350,6 +358,26 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: '#1a1a1a',
     marginBottom: 8,
+  },
+  copyLinkContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    borderRadius: 6,
+    backgroundColor: '#f8f9fa',
+    marginBottom: 12,
+  },
+  copyLinkInput: {
+    flex: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    fontSize: 12,
+    color: '#1a1a1a',
+  },
+  copyButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
   },
   inputGroup: {
     marginBottom: 12,
@@ -403,12 +431,6 @@ const styles = StyleSheet.create({
   },
   settingInfo: {
     flex: 1,
-  },
-  settingLabel: {
-    fontSize: 14,
-    fontWeight: '400',
-    color: '#1a1a1a',
-    marginBottom: 2,
   },
   settingDescription: {
     fontSize: 12,
@@ -492,14 +514,6 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: '#666',
   },
-  memberDivider: {
-    position: 'absolute',
-    bottom: 0,
-    left: 56,
-    right: 0,
-    height: 1,
-    backgroundColor: '#f0f0f0',
-  },
   removeMemberButton: {
     width: 18,
     height: 18,
@@ -522,28 +536,6 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     marginTop: 16,
     marginBottom: 16,
-  },
-  bottomActions: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: 'white',
-    borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
-  },
-  createButton: {
-    paddingVertical: 12,
-    borderRadius: 6,
-    alignItems: 'center',
-    shadowColor: '#E91E63',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 4,
-  },
-  createButtonText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: 'white',
   },
   // Modal styles
   modalOverlay: {
