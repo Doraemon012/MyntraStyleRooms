@@ -22,6 +22,7 @@ export default function RootLayout() {
       <Stack.Screen name="room/[id]" options={{ headerShown: false }} />
       <Stack.Screen name="wardrobe/items" options={{ headerShown: false }} />
       <Stack.Screen name="room/settings" options={{ headerShown: false }} />
+      <Stack.Screen name="wardrobe/create" options={{ headerShown: false}} />
       <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
       </Stack>
       <StatusBar style="auto" />
