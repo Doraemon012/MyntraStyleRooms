@@ -63,11 +63,12 @@ const authenticateToken = async (req, res, next) => {
 const checkRoomPermission = (requiredRole = 'Viewer') => {
   return async (req, res, next) => {
     try {
-      const { roomId } = req.params;
+      const { id, roomId } = req.params;
+      const roomIdToUse = id || roomId; // Support both parameter names
       const userId = req.user._id;
 
       const Room = require('../models/Room');
-      const room = await Room.findById(roomId);
+      const room = await Room.findById(roomIdToUse);
 
       if (!room) {
         return res.status(404).json({

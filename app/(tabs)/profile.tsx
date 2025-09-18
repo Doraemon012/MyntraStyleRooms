@@ -1,8 +1,10 @@
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { useAuth } from '@/contexts/auth-context';
 import { router } from 'expo-router';
 import React, { useState } from 'react';
 import {
+  Alert,
   ScrollView,
   StyleSheet,
   Switch,
@@ -36,6 +38,55 @@ const profileStats: ProfileStat[] = [
 export default function ProfileScreen() {
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [aiRecommendationsEnabled, setAiRecommendationsEnabled] = useState(true);
+  const { user, logout } = useAuth();
+
+  const handleLogout = () => {
+    Alert.alert(
+      'Sign Out',
+      'Are you sure you want to sign out?',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Sign Out',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await logout();
+            } catch (error) {
+              Alert.alert('Error', 'Failed to sign out. Please try again.');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleSwitchAccount = () => {
+    Alert.alert(
+      'Switch Account',
+      'Do you want to logout and login with a different account?',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Switch Account',
+          style: 'default',
+          onPress: async () => {
+            try {
+              await logout();
+            } catch (error) {
+              Alert.alert('Error', 'Failed to switch account. Please try again.');
+            }
+          },
+        },
+      ]
+    );
+  };
 
   const menuItems: MenuItem[] = [
     { 
@@ -81,6 +132,18 @@ export default function ProfileScreen() {
       title: 'About', 
       icon: 'ℹ️',
       onPress: () => router.push('/(tabs)/profile/about')
+    },
+    { 
+      id: '8', 
+      title: 'Switch Account', 
+      icon: '🔄',
+      onPress: handleSwitchAccount
+    },
+    { 
+      id: '9', 
+      title: 'Logout', 
+      icon: '🚪',
+      onPress: handleLogout
     },
   ];
 
@@ -135,9 +198,9 @@ export default function ProfileScreen() {
                 <Text style={styles.editImageIcon}>📷</Text>
               </TouchableOpacity>
             </View>
-            <ThemedText style={styles.userName}>Destiny</ThemedText>
-            <Text style={styles.userEmail}>destiny@email.com</Text>
-            <Text style={styles.userLocation}>📍 Delhi</Text>
+            <ThemedText style={styles.userName}>{user?.name || 'User'}</ThemedText>
+            <Text style={styles.userEmail}>{user?.email || 'user@email.com'}</Text>
+            <Text style={styles.userLocation}>📍 {user?.location || 'Location not set'}</Text>
           </View>
 
           <View style={styles.statsContainer}>
@@ -169,7 +232,7 @@ export default function ProfileScreen() {
             {menuItems.map(renderMenuItem)}
           </View>
 
-          <TouchableOpacity style={styles.signOutButton}>
+          <TouchableOpacity style={styles.signOutButton} onPress={handleLogout}>
             <Text style={styles.signOutText}>Sign Out</Text>
           </TouchableOpacity>
 

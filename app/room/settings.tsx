@@ -1,9 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
+import * as Clipboard from 'expo-clipboard';
 import { router, useLocalSearchParams } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
+    ActivityIndicator,
     Alert,
-    Clipboard,
     FlatList,
     Image,
     Modal,
@@ -15,13 +16,13 @@ import {
     View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import Toast from 'react-native-toast-message';
+import { useAuth } from '../../contexts/auth-context';
+import { useRoom } from '../../contexts/room-context';
+import { Room, roomApi } from '../../services/roomApi';
+import { User, userApi } from '../../services/userApi';
 
-interface User {
-  id: string;
-  name: string;
-  email: string;
-  avatar?: string;
-}
+// Updated Room interface now includes invitation fields
 
 interface RoomMember {
   id: string;
@@ -30,42 +31,184 @@ interface RoomMember {
   role: 'Owner' | 'Editor' | 'Contributor' | 'Viewer';
 }
 
-// Mock users data
-const mockUsers: User[] = [
-  { id: '1', name: 'Richa Sharma', email: 'richa@email.com', avatar: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face' },
-  { id: '2', name: 'Priya Patel', email: 'priya@email.com', avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face' },
-  { id: '3', name: 'Sarah Johnson', email: 'sarah@email.com', avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150&h=150&fit=crop&crop=face' },
-  { id: '4', name: 'Aisha Khan', email: 'aisha@email.com', avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&h=150&fit=crop&crop=face' },
-  { id: '5', name: 'Emma Wilson', email: 'emma@email.com', avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&h=150&fit=crop&crop=face' },
-  { id: '6', name: 'Sofia Rodriguez', email: 'sofia@email.com', avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop&crop=face' },
-  { id: '7', name: 'Maya Chen', email: 'maya@email.com', avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&h=150&fit=crop&crop=face' },
-  { id: '8', name: 'Zara Ahmed', email: 'zara@email.com', avatar: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=150&h=150&fit=crop&crop=face' },
-];
-
 export default function RoomSettingsScreen() {
   const { id } = useLocalSearchParams();
   
-  const [roomName, setRoomName] = useState('Family Wedding Outfits');
-  const [description, setDescription] = useState('Planning outfits for the upcoming family wedding celebration');
+  // Get real data from contexts
+  const { user, token } = useAuth();
+  const { rooms: allRooms, updateRoom, addMember, removeMember: removeMemberFromRoom } = useRoom();
+  
+  const [room, setRoom] = useState<Room | null>(null);
+  const [roomName, setRoomName] = useState('');
+  const [emoji, setEmoji] = useState('👗');
+  const [description, setDescription] = useState('');
   const [isPrivate, setIsPrivate] = useState(false);
   const [aiEnabled, setAiEnabled] = useState(true);
   const [members, setMembers] = useState<RoomMember[]>([]);
   const [showUserModal, setShowUserModal] = useState(false);
-  const [invitationLink, setInvitationLink] = useState('XXXX-XXX-XXXX');
+  const [invitationLink, setInvitationLink] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [availableUsers, setAvailableUsers] = useState<User[]>([]);
+  const [isSearchingUsers, setIsSearchingUsers] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
 
-  const addMember = (user: User) => {
+  // Load room data from database
+  const loadRoomData = async () => {
+    try {
+      setIsLoading(true);
+      console.log('🏠 RoomSettings: Loading room from Myntra Fashion database:', id);
+      
+      if (!token || !user) {
+        console.error('No authentication token or user');
+        return;
+      }
+
+      // Try to get room from context first
+      const existingRoom = allRooms.find(r => r._id === id);
+      if (existingRoom) {
+        console.log('✅ Room found in context:', existingRoom.name);
+        setRoomData(existingRoom);
+        return;
+      }
+
+      // If not in context, fetch from API
+      console.log('🔄 Fetching room from API...');
+      const roomData = await roomApi.getRoom(token, id as string);
+      console.log('✅ Room fetched from API:', roomData.data.room.name);
+      setRoomData(roomData.data.room);
+      
+    } catch (error: any) {
+      console.error('❌ Failed to load room:', error);
+      Alert.alert('Error', 'Failed to load room data');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Set room data to form fields
+  const setRoomData = (roomData: Room) => {
+    setRoom(roomData);
+    setRoomName(roomData.name);
+    setEmoji(roomData.emoji || '👗');
+    setDescription(roomData.description || '');
+    setIsPrivate(roomData.isPrivate);
+    setAiEnabled(roomData.settings.aiEnabled);
+    
+    // Convert room members to display format
+    const displayMembers: RoomMember[] = roomData.members.map(member => ({
+      id: member.userId._id,
+      name: member.userId.name,
+      email: member.userId.email,
+      role: member.role,
+    }));
+    setMembers(displayMembers);
+    
+    // Set invitation link if available
+    if (roomData.invitationToken) {
+      setInvitationLink(`https://myntra-fashion.com/join/${roomData._id}?token=${roomData.invitationToken}`);
+    }
+  };
+
+  // Search for users
+  const searchUsers = async (query: string) => {
+    if (!token) return;
+
+    try {
+      setIsSearchingUsers(true);
+      setSearchError(null);
+      
+      console.log('🔍 Searching users from Myntra Fashion Database...', { query: query.trim() });
+      
+      const response = await userApi.searchUsers(token, {
+        query: query.trim(),
+        limit: 20
+      });
+      
+      console.log('✅ Found users from Myntra Fashion Database:', response.data.users.length);
+      setAvailableUsers(response.data.users);
+    } catch (error: any) {
+      console.error('Search users error:', error);
+      setSearchError(error.response?.data?.message || 'Failed to search users');
+      setAvailableUsers([]);
+    } finally {
+      setIsSearchingUsers(false);
+    }
+  };
+
+  // Load initial users when modal opens
+  const handleOpenUserModal = async () => {
+    setShowUserModal(true);
+    setSearchQuery('');
+    await searchUsers('');
+  };
+
+  // Handle search query change
+  const handleSearchChange = async (query: string) => {
+    setSearchQuery(query);
+    await searchUsers(query);
+  };
+
+  const addMemberToLocalList = (userToAdd: User) => {
     const newMember: RoomMember = {
-      id: user.id,
-      name: user.name,
-      email: user.email,
+      id: userToAdd.id,
+      name: userToAdd.name,
+      email: userToAdd.email,
       role: 'Contributor',
     };
     setMembers([...members, newMember]);
   };
 
-  const removeMember = (id: string) => {
+  const removeMember = async (id: string) => {
+    if (!room) return;
+    
+    const memberToRemove = members.find(m => m.id === id);
+    if (!memberToRemove) return;
+    
+    // Show confirmation dialog
+    Alert.alert(
+      'Remove Member',
+      `Are you sure you want to remove ${memberToRemove.name} from this room?`,
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel'
+        },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              // Find the actual member ID from the room data
+              const roomMember = room.members.find(m => m.userId._id === id);
+              if (!roomMember) {
+                Alert.alert('Error', 'Member not found in room');
+                return;
+              }
+              
+              // Remove from database using the member's _id
+              await removeMemberFromRoom(room._id, (roomMember as any)._id);
+              
+              // Update local state
     setMembers(members.filter(member => member.id !== id));
+              
+              Toast.show({
+                type: 'success',
+                text1: '✅ Member Removed',
+                text2: `${memberToRemove.name} has been removed from the room`,
+                position: 'top',
+                visibilityTime: 3000,
+              });
+              
+            } catch (error: any) {
+              console.error('Remove member error:', error);
+              Alert.alert('Error', error.message || 'Failed to remove member');
+            }
+          }
+        }
+      ]
+    );
   };
 
   const updateMemberRole = (id: string, role: RoomMember['role']) => {
@@ -76,21 +219,109 @@ export default function RoomSettingsScreen() {
 
   const copyInvitationLink = async () => {
     try {
-      await Clipboard.setString(invitationLink);
-      Alert.alert('Success', 'Invitation link copied to clipboard');
+      if (!invitationLink) {
+        Alert.alert('Error', 'No invitation link available');
+        return;
+      }
+      
+      await Clipboard.setStringAsync(invitationLink);
+      
+      Toast.show({
+        type: 'success',
+        text1: '✅ Invitation Link Copied!',
+        text2: 'Share this link with friends to invite them to your room.',
+        position: 'top',
+        visibilityTime: 3000,
+        autoHide: true,
+        topOffset: 60,
+      });
     } catch (error) {
       Alert.alert('Error', 'Failed to copy link');
     }
   };
 
-  const saveSettings = () => {
-    // Here you would typically make an API call to save the room settings
-    console.log('Room settings saved:', { roomName, description, isPrivate, aiEnabled, members });
-    Alert.alert('Success', 'Room settings saved successfully');
+
+  const saveSettings = async () => {
+    if (!room || !token) return;
+
+    try {
+      setIsSaving(true);
+      
+      // First, update basic room properties
+      const updateData = {
+        name: roomName.trim(),
+        emoji,
+        description: description.trim() || undefined,
+        isPrivate,
+        settings: {
+          aiEnabled,
+          allowMemberInvites: true,
+          voiceCallEnabled: true
+        }
+      };
+
+      await updateRoom(room._id, updateData);
+      
+      // Then, add any new members
+      const currentMemberIds = room.members.map(member => member.userId._id);
+      const newMembers = members.filter(member => !currentMemberIds.includes(member.id));
+      
+      for (const newMember of newMembers) {
+        try {
+          // Only add members with valid roles (exclude Owner)
+          const validRole = newMember.role === 'Owner' ? 'Contributor' : newMember.role;
+          await addMember(room._id, {
+            userId: newMember.id,
+            role: validRole as 'Editor' | 'Contributor' | 'Viewer'
+          });
+          console.log(`✅ Added member: ${newMember.name}`);
+        } catch (memberError: any) {
+          console.error(`❌ Failed to add member ${newMember.name}:`, memberError);
+          // Continue with other members even if one fails
+        }
+      }
+      
+      Toast.show({
+        type: 'success',
+        text1: '✅ Room Settings Saved!',
+        text2: `Room "${roomName}" has been updated successfully${newMembers.length > 0 ? ` and ${newMembers.length} member(s) added` : ''}.`,
+        position: 'top',
+        visibilityTime: 3000,
+        autoHide: true,
+        topOffset: 60,
+      });
+      
     router.back();
+    } catch (error: any) {
+      console.error('Failed to save room settings:', error);
+      Alert.alert('Error', error.message || 'Failed to save room settings');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  const filteredUsers = mockUsers.filter(user => 
+  // Check if user has permission to edit room settings
+  const canEditRoom = (): boolean => {
+    if (!user || !room) return false;
+    
+    // Check if user is the room owner
+    if (room.owner._id === user._id) {
+      return true;
+    }
+    
+    // Check if user has Editor role
+    const userMember = room.members.find(member => member.userId._id === user._id);
+    return userMember?.role === 'Editor';
+  };
+
+  // Load room data when component mounts
+  useEffect(() => {
+    if (token && user && id) {
+      loadRoomData();
+    }
+  }, [token, user, id]);
+
+  const filteredUsers = availableUsers.filter(user => 
     !members.some(member => member.id === user.id) &&
     (user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
      user.email.toLowerCase().includes(searchQuery.toLowerCase()))
@@ -99,20 +330,80 @@ export default function RoomSettingsScreen() {
   const renderUser = ({ item }: { item: User }) => (
     <TouchableOpacity
       style={styles.userItem}
-      onPress={() => addMember(item)}
+      onPress={() => addMemberToLocalList(item)}
     >
       <View style={styles.userAvatar}>
+        {item.profileImage ? (
+          <Image source={{ uri: item.profileImage }} style={styles.userAvatarImage} />
+        ) : (
         <Text style={styles.userInitial}>{item.name.charAt(0).toUpperCase()}</Text>
+        )}
       </View>
       <View style={styles.userDetails}>
         <Text style={styles.userName}>{item.name}</Text>
         <Text style={styles.userEmail}>{item.email}</Text>
+        {item.location && (
+          <Text style={styles.userLocation}>📍 {item.location}</Text>
+        )}
       </View>
       <View style={styles.addButton}>
         <Text style={styles.addButtonText}>+</Text>
       </View>
     </TouchableOpacity>
   );
+
+  if (isLoading) {
+    return (
+      <View style={styles.container}>
+        <SafeAreaView style={styles.container}>
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#E91E63" />
+            <Text style={styles.loadingText}>Loading room settings from Myntra Fashion database...</Text>
+          </View>
+        </SafeAreaView>
+      </View>
+    );
+  }
+
+  if (!room) {
+    return (
+      <View style={styles.container}>
+        <SafeAreaView style={styles.container}>
+          <View style={styles.errorContainer}>
+            <Text style={styles.errorText}>Room not found</Text>
+            <Text style={styles.databaseIndicator}>
+              📊 Connected to Myntra Fashion Database
+            </Text>
+            <TouchableOpacity style={styles.backButtonStyle} onPress={() => router.back()}>
+              <Text style={styles.backButtonText}>Go Back</Text>
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
+      </View>
+    );
+  }
+
+  // Check permissions - redirect if user cannot edit room
+  if (!canEditRoom()) {
+    return (
+      <View style={styles.container}>
+        <SafeAreaView style={styles.container}>
+          <View style={styles.errorContainer}>
+            <Text style={styles.errorText}>Access Denied</Text>
+            <Text style={styles.databaseIndicator}>
+              You don't have permission to edit this room settings.
+            </Text>
+            <Text style={styles.databaseIndicator}>
+              Only room owners and editors can access room settings.
+            </Text>
+            <TouchableOpacity style={styles.backButtonStyle} onPress={() => router.back()}>
+              <Text style={styles.backButtonText}>Go Back</Text>
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -123,25 +414,33 @@ export default function RoomSettingsScreen() {
             <Text style={styles.backButton}>‹</Text>
           </TouchableOpacity>
           <Text style={styles.title}>Room Settings</Text>
-           <TouchableOpacity onPress={saveSettings} style={styles.editButtonContainer}>
+           <TouchableOpacity 
+             onPress={saveSettings} 
+             style={styles.editButtonContainer}
+             disabled={isSaving}
+           >
+             {isSaving ? (
+               <ActivityIndicator size="small" color="#E91E63" />
+             ) : (
              <Image 
                source={require('@/assets/images/okay_icon.png')} 
                style={styles.editButtonIcon}
                resizeMode="contain"
              />
+             )}
            </TouchableOpacity>
         </View>
 
         <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
           {/* Copy Invitation Link Section */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Copy invitation link</Text>
+            <Text style={styles.sectionTitle}>Invitation Link</Text>
             <View style={styles.copyLinkContainer}>
               <TextInput
                 style={styles.copyLinkInput}
-                value={invitationLink}
+                value={invitationLink || 'No invitation link available'}
                 editable={false}
-                placeholder="XXXX-XXX-XXXX"
+                placeholder="Generating invitation link..."
                 placeholderTextColor="#999"
               />
                <TouchableOpacity onPress={copyInvitationLink} style={styles.copyButton}>
@@ -153,6 +452,24 @@ export default function RoomSettingsScreen() {
           {/* Room Details Section */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Room Details</Text>
+            
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Room emoji*</Text>
+              <View style={styles.emojiContainer}>
+                {['👗', '🎉', '👰', '🌟', '💼', '🏠', '🎨', '✨'].map((emojiOption) => (
+                  <TouchableOpacity
+                    key={emojiOption}
+                    style={[
+                      styles.emojiOption,
+                      emoji === emojiOption && styles.emojiOptionSelected
+                    ]}
+                    onPress={() => setEmoji(emojiOption)}
+                  >
+                    <Text style={styles.emojiText}>{emojiOption}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
             
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Room name*</Text>
@@ -217,7 +534,7 @@ export default function RoomSettingsScreen() {
             
             <TouchableOpacity 
               style={styles.selectUsersButton}
-              onPress={() => setShowUserModal(true)}
+              onPress={handleOpenUserModal}
             >
               <Text style={styles.selectUsersText}>Select Users to Invite</Text>
               <Text style={styles.dropdownIcon}>▼</Text>
@@ -278,12 +595,24 @@ export default function RoomSettingsScreen() {
               <View style={styles.searchContainer}>
                 <TextInput
                   style={styles.searchInput}
-                  placeholder="Search users..."
+                  placeholder="Search users from Myntra Fashion database..."
                   placeholderTextColor="#999"
                   value={searchQuery}
-                  onChangeText={setSearchQuery}
+                  onChangeText={handleSearchChange}
                 />
+                {isSearchingUsers && (
+                  <ActivityIndicator size="small" color="#E91E63" style={styles.searchLoading} />
+                )}
               </View>
+              
+              {searchError && (
+                <View style={styles.errorContainer}>
+                  <Text style={styles.errorText}>{searchError}</Text>
+                  <TouchableOpacity style={styles.retryButton} onPress={() => searchUsers(searchQuery)}>
+                    <Text style={styles.retryButtonText}>Retry</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
               
               {/* Users List */}
               <FlatList
@@ -295,7 +624,10 @@ export default function RoomSettingsScreen() {
                 ListEmptyComponent={
                   <View style={styles.emptyState}>
                     <Text style={styles.emptyStateText}>
-                      {searchQuery ? 'No users found' : 'No users available'}
+                      {searchQuery ? 'No users found in Myntra Fashion database' : 'Search for users to invite'}
+                    </Text>
+                    <Text style={styles.databaseIndicator}>
+                      📊 Connected to Myntra Fashion Database
                     </Text>
                   </View>
                 }
@@ -303,6 +635,9 @@ export default function RoomSettingsScreen() {
             </View>
           </View>
         </Modal>
+        
+        {/* Toast Component */}
+        <Toast />
       </SafeAreaView>
     </View>
   );
@@ -656,6 +991,109 @@ const styles = StyleSheet.create({
   addButtonText: {
     color: 'white',
     fontSize: 16,
+    fontWeight: '600',
+  },
+  // New styles for real data integration
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'white',
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    backgroundColor: 'white',
+  },
+  errorText: {
+    fontSize: 18,
+    color: '#666',
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  databaseIndicator: {
+    fontSize: 12,
+    color: '#E91E63',
+    textAlign: 'center',
+    fontWeight: '600',
+    backgroundColor: '#ffe6f0',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    marginBottom: 20,
+  },
+  backButtonStyle: {
+    backgroundColor: 'transparent',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#8B5CF6',
+  },
+  backButtonText: {
+    fontSize: 16,
+    color: '#8B5CF6',
+    fontWeight: '600',
+  },
+  // Emoji selection styles
+  emojiContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 12,
+  },
+  emojiOption: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#f8f9fa',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  emojiOptionSelected: {
+    borderColor: '#E91E63',
+    backgroundColor: '#ffe6f0',
+  },
+  emojiText: {
+    fontSize: 20,
+  },
+  // User avatar image styles
+  userAvatarImage: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+  },
+  userLocation: {
+    fontSize: 10,
+    color: '#999',
+    marginTop: 2,
+  },
+  // Search loading styles
+  searchLoading: {
+    position: 'absolute',
+    right: 12,
+    top: 12,
+  },
+  retryButton: {
+    backgroundColor: '#E91E63',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 6,
+    marginTop: 8,
+  },
+  retryButtonText: {
+    color: 'white',
+    fontSize: 12,
     fontWeight: '600',
   },
 });

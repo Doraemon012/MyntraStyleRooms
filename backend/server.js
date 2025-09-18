@@ -38,19 +38,26 @@ const { authenticateToken } = require('./middleware/auth');
 app.use(helmet());
 app.use(compression());
 
-// Rate limiting
-const limiter = rateLimit({
-  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 minutes
-  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100, // limit each IP to 100 requests per windowMs
-  message: 'Too many requests from this IP, please try again later.'
-});
-app.use('/api/', limiter);
+// Rate limiting - DISABLED FOR DEVELOPMENT
+// const limiter = rateLimit({
+//   windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 minutes
+//   max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100, // limit each IP to 100 requests per windowMs
+//   message: 'Too many requests from this IP, please try again later.'
+// });
+// app.use('/api/', limiter);
 
 // CORS configuration
 app.use(cors({
   origin: process.env.NODE_ENV === 'production' 
     ? ['https://yourdomain.com'] 
-    : ['http://localhost:3000', 'http://localhost:19006'],
+    : [
+        'http://localhost:3000', 
+        'http://localhost:19006',
+        'http://172.20.10.2:3000',
+        'http://172.20.10.2:19006',
+        'exp://172.20.10.2:19000',
+        'exp://localhost:19000'
+      ],
   credentials: true
 }));
 
@@ -63,12 +70,20 @@ if (process.env.NODE_ENV === 'development') {
   app.use(morgan('dev'));
 }
 
-// Database connection
-mongoose.connect(process.env.MONGODB_URI, {
+// Database connection - FORCE MYNTRA FASHION DATABASE
+const mongoUri = process.env.MONGODB_URI;
+// Ensure we're using the myntra-fashion database
+const mongoUriWithDb = mongoUri.includes('myntra-fashion') 
+  ? mongoUri 
+  : mongoUri.replace('mongodb.net/', 'mongodb.net/myntra-fashion');
+
+console.log('🔗 Connecting to Myntra Fashion Database:', mongoUriWithDb);
+
+mongoose.connect(mongoUriWithDb, {
   useNewUrlParser: true,
   useUnifiedTopology: true,
 })
-.then(() => console.log('✅ MongoDB connected successfully'))
+.then(() => console.log('✅ Connected to MYNTRA FASHION DATABASE successfully'))
 .catch(err => console.error('❌ MongoDB connection error:', err));
 
 // Socket.io connection handling
