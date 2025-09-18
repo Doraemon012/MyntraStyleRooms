@@ -1,13 +1,14 @@
 import { ThemedView } from "@/components/themed-view";
+import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import React, { useState } from "react";
 import {
-	FlatList,
-	Image,
-	StyleSheet,
-	Text,
-	TouchableOpacity,
-	View,
+    FlatList,
+    Image,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -15,6 +16,7 @@ interface WardrobeCategory {
     id: string;
     name: string;
     subtitle: string;
+    role: string;
     items: WardrobeItem[];
 }
 
@@ -28,6 +30,7 @@ const wardrobeCategories: WardrobeCategory[] = [
         id: "1",
         name: "Striped Crop Shirt",
         subtitle: "AI Powered",
+        role: "Editor",
         items: [
             {
                 id: "1",
@@ -55,6 +58,7 @@ const wardrobeCategories: WardrobeCategory[] = [
         id: "2",
         name: "Modern Kurtis",
         subtitle: "AI Powered",
+        role: "Editor",
         items: [
             {
                 id: "6",
@@ -74,6 +78,7 @@ const wardrobeCategories: WardrobeCategory[] = [
         id: "3",
         name: "Daytime Looks",
         subtitle: "AI Powered",
+        role: "Viewer",
         items: [
             {
                 id: "9",
@@ -105,26 +110,42 @@ export default function WardrobesScreen() {
         });
     };
 
-    const renderWardrobeCategory = ({ item }: { item: WardrobeCategory }) => (
-        <View style={styles.categoryContainer}>
-            <FlatList
-                data={item.items}
-                renderItem={renderWardrobeItem}
-                keyExtractor={(wardrobeItem) => wardrobeItem.id}
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.itemsList}
-                style={styles.horizontalList}
-            />
-
-            <View style={styles.categoryHeader}>
-                <View style={styles.categoryInfo}>
-                    <Text style={styles.categoryName}>{item.name}</Text>
-                    <View style={styles.subtitleContainer}>
-                        <View style={styles.aiIcon} />
-                        <Text style={styles.categorySubtitle}>{item.subtitle}</Text>
+    const renderWardrobeCategory = ({ item, index }: { item: WardrobeCategory; index: number }) => {
+        const isEven = index % 2 === 0;
+        const gradientColors = isEven 
+            ? ['#F3F1FE', '#FFFFFF'] as const // Purple to white
+            : ['#FFEEEC', '#FFFFFF'] as const; // Pink to white
+        
+        return (
+            <LinearGradient
+                colors={gradientColors}
+                style={styles.categoryContainer}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 0, y: 1 }}
+            >
+                <View style={styles.roleBadge}>
+                    <Text style={styles.roleText}>{item.role}</Text>
+                </View>
+                
+                <View style={styles.categoryHeader}>
+                    <View style={styles.categoryInfo}>
+                        <Text style={styles.categoryName}>{item.name}</Text>
+                        <View style={styles.subtitleContainer}>
+                            <View style={styles.aiIcon} />
+                            <Text style={styles.categorySubtitle}>{item.subtitle}</Text>
+                        </View>
                     </View>
                 </View>
+
+                <FlatList
+                    data={item.items}
+                    renderItem={renderWardrobeItem}
+                    keyExtractor={(wardrobeItem) => wardrobeItem.id}
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.itemsList}
+                    style={styles.horizontalList}
+                />
 
                 <TouchableOpacity
                     style={styles.viewAllButton}
@@ -133,23 +154,23 @@ export default function WardrobesScreen() {
                     <Text style={styles.viewAllText}>View all</Text>
                     <Text style={styles.viewAllArrow}>›</Text>
                 </TouchableOpacity>
-            </View>
-        </View>
-    );
+            </LinearGradient>
+        );
+    };
 
     return (
         <ThemedView style={styles.container}>
             <SafeAreaView style={styles.safeArea}>
                 <View style={styles.header}>
-                    <View style={styles.headerLeft}>
-                        <TouchableOpacity>
-                            <Text style={styles.backButton}>‹</Text>
-                        </TouchableOpacity>
-                        <View>
-                            <Text style={styles.title}>Wardrobes</Text>
-                            <Text style={styles.subtitle}>Room No. 1</Text>
-                        </View>
+                    <TouchableOpacity onPress={() => router.back()} style={styles.backButtonContainer}>
+                        <Text style={styles.backButton}>‹</Text>
+                    </TouchableOpacity>
+                    
+                    <View style={styles.headerCenter}>
+                        <Text style={styles.title}>Wardrobes</Text>
+                        <Text style={styles.subtitle}>Room No. 1</Text>
                     </View>
+                    
                     <TouchableOpacity
                         style={styles.createButton}
                         onPress={() => router.push("/wardrobe/create")}
@@ -160,7 +181,7 @@ export default function WardrobesScreen() {
 
                 <FlatList
                     data={wardrobeCategories}
-                    renderItem={renderWardrobeCategory}
+                    renderItem={({ item, index }) => renderWardrobeCategory({ item, index })}
                     keyExtractor={(item) => item.id}
                     showsVerticalScrollIndicator={false}
                     contentContainerStyle={styles.categoriesList}
@@ -173,7 +194,6 @@ export default function WardrobesScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: "#f8f8f8",
     },
     safeArea: {
         flex: 1,
@@ -182,59 +202,61 @@ const styles = StyleSheet.create({
         flexDirection: "row",
         justifyContent: "space-between",
         alignItems: "center",
-        paddingHorizontal: 16,
-        paddingVertical: 12,
+        paddingHorizontal: 20,
+        paddingVertical: 16,
         backgroundColor: "white",
     },
-    headerLeft: {
-        flexDirection: "row",
-        alignItems: "center",
+    backButtonContainer: {
+        width: 40,
+        alignItems: "flex-start",
     },
     backButton: {
         fontSize: 24,
         color: "#666",
-        marginRight: 12,
+        fontWeight: "300",
+    },
+    headerCenter: {
+        flex: 1,
+        alignItems: "center",
     },
     title: {
-        fontSize: 18,
-        fontWeight: "600",
+        fontSize: 16,
+        fontWeight: "400",
         color: "#000",
+        textAlign: "center",
     },
     subtitle: {
-        fontSize: 12,
+        fontSize: 10,
         color: "#666",
-        marginTop: 2,
+        textAlign: "center",
     },
     createButton: {
-        backgroundColor: "#FF69B4",
+        backgroundColor: "transparent",
         paddingHorizontal: 16,
         paddingVertical: 8,
         borderRadius: 20,
         borderWidth: 1,
         borderColor: "#FF69B4",
+        minWidth: 80,
+        alignItems: "center",
+        justifyContent: "center",
     },
     createButtonText: {
-        color: "white",
-        fontSize: 14,
-        fontWeight: "500",
+        color: "#FF69B4",
+        fontSize: 12,
+        fontWeight: "600",
     },
     categoriesList: {
         paddingVertical: 16,
     },
     categoryContainer: {
-        marginBottom: 32,
-        backgroundColor: "white",
-        marginHorizontal: 16,
-        borderRadius: 12,
-        paddingTop: 16,
+        marginBottom: 24,
+        paddingTop: 12,
         paddingHorizontal: 16,
         paddingBottom: 0,
     },
     categoryHeader: {
-        flexDirection: "row",
-        justifyContent: "space-between",
-        alignItems: "center",
-        marginTop: 12,
+        marginBottom: 8,
     },
     horizontalList: {
         marginHorizontal: -16,
@@ -242,13 +264,13 @@ const styles = StyleSheet.create({
     },
     itemsList: {
         paddingHorizontal: 16,
-        gap: 8,
+        gap: 12,
     },
     wardrobeItemImage: {
-        width: 110,
+        width: 160,
         height: 140,
-        borderRadius: 8,
-        marginRight: 8,
+        borderRadius: 12,
+        marginRight: 12,
         backgroundColor: "#f0f0f0",
     },
     categoryFooter: {
@@ -260,7 +282,7 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     categoryName: {
-        fontSize: 16,
+        fontSize: 14,
         fontWeight: "600",
         color: "#000",
     },
@@ -279,23 +301,43 @@ const styles = StyleSheet.create({
         fontSize: 12,
         color: "#666",
     },
+    roleBadge: {
+        position: "absolute",
+        top: 12,
+        right: 16,
+        backgroundColor: "rgba(0, 0, 0, 0.6)",
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 12,
+        zIndex: 10,
+    },
+    roleText: {
+        fontSize: 10,
+        color: "#CCCCCC",
+        fontWeight: "500",
+    },
     viewAllButton: {
         flexDirection: "row",
         alignItems: "center",
         justifyContent: "center",
-        paddingVertical: 12,
-        borderTopWidth: 1,
-        borderTopColor: "#f0f0f0",
-        marginHorizontal: -16,
-        marginTop: 12,
+        paddingVertical: 8,
+        marginTop: 16,
+        marginHorizontal: 16,
+        marginBottom: 16,
+        backgroundColor: "#F5F5F5",
+        borderRadius: 12,
+        alignSelf: "center",
+        minWidth: 380,
     },
     viewAllText: {
         fontSize: 14,
-        color: "#666",
-        marginRight: 4,
+        color: "#333",
+        fontWeight: "500",
+        marginRight: 6,
     },
     viewAllArrow: {
-        fontSize: 16,
-        color: "#666",
+        fontSize: 14,
+        color: "#333",
+        fontWeight: "500",
     },
 });

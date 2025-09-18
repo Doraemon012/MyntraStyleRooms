@@ -3,12 +3,12 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useState } from 'react';
 import {
-	FlatList,
-	Image,
-	StyleSheet,
-	Text,
-	TouchableOpacity,
-	View,
+  FlatList,
+  Image,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -131,15 +131,10 @@ export default function WardrobeItemsScreen() {
             <Text style={styles.title}>{displayName}</Text>
             <Text style={styles.itemCount}>121+ Items</Text>
           </View>
-          <LinearGradient
-            colors={['#FF6FD8', '#FF66A6']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.filterButton}
-          >
+          <View style={styles.filterButton}>
             <Text style={styles.filterIcon}>⚙</Text>
             <Text style={styles.filterText}>AI Powered</Text>
-          </LinearGradient>
+          </View>
         </View>
 
         <View style={styles.filterTabs}>
@@ -202,17 +197,19 @@ const styles = StyleSheet.create({
   },
   headerCenter: {
     flex: 1,
-	marginLeft: 16,
+    alignItems: 'center',
   },
   title: {
-    fontSize: 18,
-    fontWeight: '600',
+    fontSize: 14,
+    fontWeight: '400',
     color: '#000',
+    textAlign: 'center',
   },
   itemCount: {
-    fontSize: 12,
+    fontSize: 10,
     color: '#666',
     marginTop: 2,
+    textAlign: 'center',
   },
   filterButton: {
     flexDirection: 'row',
@@ -220,15 +217,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 20,
+    backgroundColor: 'white',
+    borderWidth: 1,
+    borderColor: '#FF69B4',
   },
   filterIcon: {
     fontSize: 12,
-    color: 'white',
+    color: '#FF69B4',
     marginRight: 4,
   },
   filterText: {
     fontSize: 12,
-    color: 'white',
+    color: '#FF69B4',
     fontWeight: '500',
   },
   filterTabs: {
@@ -255,12 +255,12 @@ const styles = StyleSheet.create({
     borderRadius: 20,
   },
   filterTabText: {
-    fontSize: 13,
+    fontSize: 11,
     color: '#666',
     fontWeight: '500',
   },
   activeFilterTabText: {
-    fontSize: 13,
+    fontSize: 11,
     color: '#fff',
     fontWeight: '600',
   },
@@ -318,19 +318,15 @@ const styles = StyleSheet.create({
     right: 8,
     width: 28,
     height: 28,
-    borderRadius: 14,
-    backgroundColor: 'rgba(255,255,255,0.95)',
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#eee',
   },
   favoriteIcon: {
-    fontSize: 14,
-    color: '#FF69B4',
+    fontSize: 18,
+    color: 'rgba(255,255,255,0.8)',
   },
   favoriteIconActive: {
-    color: '#FF1744',
+    color: '#FF69B4',
   },
   itemName: {
     fontSize: 13,

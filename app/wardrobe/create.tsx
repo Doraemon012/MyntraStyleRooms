@@ -1,61 +1,62 @@
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
+import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import React, { useState } from 'react';
 import {
   Alert,
-  KeyboardAvoidingView,
-  Platform,
+  FlatList,
+  Modal,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  View,
+  View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+
+interface User {
+  id: string;
+  name: string;
+  email: string;
+  avatar?: string;
+}
 
 interface WardrobeMember {
   id: string;
   name: string;
   email: string;
-  role: 'Owner' | 'Editor' | 'Contributor' | 'Viewer';
+  role: 'Editor' | 'Viewer';
 }
 
-const predefinedEmojis = ['👗', '👰', '💼', '🌟', '🎉', '👠', '💍', '🎪', '🔥', '💄'];
-const occasionTypes = [
-  'Wedding & Celebrations',
-  'Office & Professional',
-  'Casual & Weekend',
-  'Party & Nightlife',
-  'Travel & Vacation',
-  'Festival & Cultural',
-  'Sports & Fitness',
-  'Date Night',
-  'General Collection',
+// Mock users data (in real app, this would come from room members)
+const mockUsers: User[] = [
+  { id: '1', name: 'Richa Sharma', email: 'richa@email.com', avatar: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face' },
+  { id: '2', name: 'Priya Patel', email: 'priya@email.com', avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face' },
+  { id: '3', name: 'Sarah Johnson', email: 'sarah@email.com', avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150&h=150&fit=crop&crop=face' },
+  { id: '4', name: 'Aisha Khan', email: 'aisha@email.com', avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&h=150&fit=crop&crop=face' },
+  { id: '5', name: 'Emma Wilson', email: 'emma@email.com', avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&h=150&fit=crop&crop=face' },
+  { id: '6', name: 'Sofia Rodriguez', email: 'sofia@email.com', avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop&crop=face' },
+  { id: '7', name: 'Maya Chen', email: 'maya@email.com', avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&h=150&fit=crop&crop=face' },
+  { id: '8', name: 'Zara Ahmed', email: 'zara@email.com', avatar: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=150&h=150&fit=crop&crop=face' },
 ];
+
 
 export default function CreateWardrobeScreen() {
   const [wardrobeName, setWardrobeName] = useState('');
-  const [selectedEmoji, setSelectedEmoji] = useState('👗');
   const [description, setDescription] = useState('');
-  const [selectedOccasion, setSelectedOccasion] = useState('');
   const [isPrivate, setIsPrivate] = useState(false);
-  const [memberEmail, setMemberEmail] = useState('');
   const [members, setMembers] = useState<WardrobeMember[]>([]);
-  const [budgetRange, setBudgetRange] = useState({ min: '', max: '' });
+  const [showUserModal, setShowUserModal] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
-  const addMember = () => {
-    if (memberEmail.trim()) {
-      const newMember: WardrobeMember = {
-        id: Date.now().toString(),
-        name: memberEmail.split('@')[0],
-        email: memberEmail.trim(),
-        role: 'Contributor',
-      };
-      setMembers([...members, newMember]);
-      setMemberEmail('');
-    }
+  const addMember = (user: User) => {
+    const newMember: WardrobeMember = {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: 'Editor',
+    };
+    setMembers([...members, newMember]);
   };
 
   const removeMember = (id: string) => {
@@ -68,14 +69,16 @@ export default function CreateWardrobeScreen() {
     ));
   };
 
+  const filteredUsers = mockUsers.filter(user => 
+    !members.some(member => member.id === user.id) &&
+    (user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+     user.email.toLowerCase().includes(searchQuery.toLowerCase()))
+  );
+
+
   const createWardrobe = () => {
     if (!wardrobeName.trim()) {
       Alert.alert('Error', 'Please enter a wardrobe name');
-      return;
-    }
-
-    if (!selectedOccasion) {
-      Alert.alert('Error', 'Please select an occasion type');
       return;
     }
 
@@ -91,70 +94,38 @@ export default function CreateWardrobeScreen() {
     );
   };
 
-  const renderMember = (member: WardrobeMember) => (
-    <View key={member.id} style={styles.memberItem}>
-      <View style={styles.memberInfo}>
-        <View style={styles.memberAvatar}>
-          <Text style={styles.memberInitial}>{member.name.charAt(0).toUpperCase()}</Text>
-        </View>
-        <View style={styles.memberDetails}>
-          <Text style={styles.memberName}>{member.name}</Text>
-          <Text style={styles.memberEmail}>{member.email}</Text>
-        </View>
+  const renderUser = ({ item }: { item: User }) => (
+    <TouchableOpacity
+      style={styles.userItem}
+      onPress={() => addMember(item)}
+    >
+      <View style={styles.userAvatar}>
+        <Text style={styles.userInitial}>{item.name.charAt(0).toUpperCase()}</Text>
       </View>
-      <View style={styles.memberActions}>
-        <TouchableOpacity
-          style={[styles.roleButton, member.role === 'Editor' && styles.activeRole]}
-          onPress={() => updateMemberRole(member.id, 'Editor')}
-        >
-          <Text style={[styles.roleText, member.role === 'Editor' && styles.activeRoleText]}>
-            Editor
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.roleButton, member.role === 'Contributor' && styles.activeRole]}
-          onPress={() => updateMemberRole(member.id, 'Contributor')}
-        >
-          <Text style={[styles.roleText, member.role === 'Contributor' && styles.activeRoleText]}>
-            Contributor
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.roleButton, member.role === 'Viewer' && styles.activeRole]}
-          onPress={() => updateMemberRole(member.id, 'Viewer')}
-        >
-          <Text style={[styles.roleText, member.role === 'Viewer' && styles.activeRoleText]}>
-            Viewer
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.removeButton}
-          onPress={() => removeMember(member.id)}
-        >
-          <Text style={styles.removeButtonText}>×</Text>
-        </TouchableOpacity>
+      <View style={styles.userDetails}>
+        <Text style={styles.userName}>{item.name}</Text>
+        <Text style={styles.userEmail}>{item.email}</Text>
       </View>
-    </View>
+      <View style={styles.addButton}>
+        <Text style={styles.addButtonText}>+</Text>
+      </View>
+    </TouchableOpacity>
   );
 
   return (
-    <ThemedView style={styles.container}>
+    <View style={styles.container}>
       <SafeAreaView style={styles.container}>
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()}>
-            <Text style={styles.backButton}>←</Text>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backButtonContainer}>
+            <Text style={styles.backButton}>‹</Text>
           </TouchableOpacity>
-          <ThemedText style={styles.title}>Create Wardrobe</ThemedText>
+          <Text style={styles.title}>Create Wardrobe</Text>
           <View style={styles.placeholder} />
         </View>
 
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.keyboardView}
-        >
-          <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-            <View style={styles.section}>
-              <ThemedText style={styles.sectionTitle}>Wardrobe Details</ThemedText>
+        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Wardrobe Details</Text>
               
               <View style={styles.inputGroup}>
                 <Text style={styles.label}>Wardrobe Name *</Text>
@@ -165,68 +136,6 @@ export default function CreateWardrobeScreen() {
                   onChangeText={setWardrobeName}
                   maxLength={50}
                 />
-              </View>
-
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>Choose Icon</Text>
-                <View style={styles.emojiGrid}>
-                  {predefinedEmojis.map((emoji) => (
-                    <TouchableOpacity
-                      key={emoji}
-                      style={[
-                        styles.emojiButton,
-                        selectedEmoji === emoji && styles.selectedEmoji,
-                      ]}
-                      onPress={() => setSelectedEmoji(emoji)}
-                    >
-                      <Text style={styles.emojiText}>{emoji}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>Occasion Type *</Text>
-                <View style={styles.occasionGrid}>
-                  {occasionTypes.map((occasion) => (
-                    <TouchableOpacity
-                      key={occasion}
-                      style={[
-                        styles.occasionButton,
-                        selectedOccasion === occasion && styles.selectedOccasion,
-                      ]}
-                      onPress={() => setSelectedOccasion(occasion)}
-                    >
-                      <Text style={[
-                        styles.occasionText,
-                        selectedOccasion === occasion && styles.selectedOccasionText,
-                      ]}>
-                        {occasion}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>Budget Range (Optional)</Text>
-                <View style={styles.budgetRow}>
-                  <TextInput
-                    style={[styles.textInput, styles.budgetInput]}
-                    placeholder="Min ₹"
-                    value={budgetRange.min}
-                    onChangeText={(text) => setBudgetRange({...budgetRange, min: text})}
-                    keyboardType="numeric"
-                  />
-                  <Text style={styles.budgetSeparator}>to</Text>
-                  <TextInput
-                    style={[styles.textInput, styles.budgetInput]}
-                    placeholder="Max ₹"
-                    value={budgetRange.max}
-                    onChangeText={(text) => setBudgetRange({...budgetRange, max: text})}
-                    keyboardType="numeric"
-                  />
-                </View>
               </View>
 
               <View style={styles.inputGroup}>
@@ -241,6 +150,7 @@ export default function CreateWardrobeScreen() {
                   maxLength={200}
                 />
               </View>
+
 
               <View style={styles.inputGroup}>
                 <View style={styles.privacyToggle}>
@@ -260,221 +170,213 @@ export default function CreateWardrobeScreen() {
               </View>
             </View>
 
-            <View style={styles.section}>
-              <ThemedText style={styles.sectionTitle}>Add Collaborators</ThemedText>
-              
-              <View style={styles.addMemberContainer}>
-                <TextInput
-                  style={[styles.textInput, styles.memberInput]}
-                  placeholder="Enter email address"
-                  value={memberEmail}
-                  onChangeText={setMemberEmail}
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                />
-                <TouchableOpacity style={styles.addButton} onPress={addMember}>
-                  <Text style={styles.addButtonText}>Add</Text>
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Add Collaborators</Text>
+            
+            <View style={styles.permissionInfo}>
+              <Text style={styles.permissionText}>
+                Everyone in the room can view this wardrobe by default. Select members to make them editors.
+              </Text>
+            </View>
+            
+            <TouchableOpacity 
+              style={styles.selectUsersButton}
+              onPress={() => setShowUserModal(true)}
+            >
+              <Text style={styles.selectUsersText}>Select Members to Make Editors</Text>
+              <Text style={styles.dropdownIcon}>▼</Text>
+            </TouchableOpacity>
+
+            {/* Members List */}
+            {members.length > 0 ? (
+              <View style={styles.membersList}>
+                <Text style={styles.membersCount}>{members.length} editor(s) selected</Text>
+                {members.map((member, index) => (
+                  <View key={member.id} style={styles.memberItem}>
+                    <View style={styles.memberAvatar}>
+                      <Text style={styles.memberInitial}>{member.name.charAt(0)}</Text>
+                    </View>
+                    <View style={styles.memberInfo}>
+                      <Text style={styles.memberName}>{member.name}</Text>
+                      <Text style={styles.memberUsername}>@{member.email.split('@')[0]}</Text>
+                    </View>
+                    <View style={styles.memberActions}>
+                      <TouchableOpacity
+                        style={[styles.roleButton, member.role === 'Editor' && styles.activeRole]}
+                        onPress={() => updateMemberRole(member.id, 'Editor')}
+                      >
+                        <Text style={[styles.roleText, member.role === 'Editor' && styles.activeRoleText]}>
+                          Editor
+                        </Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.roleButton, member.role === 'Viewer' && styles.activeRole]}
+                        onPress={() => updateMemberRole(member.id, 'Viewer')}
+                      >
+                        <Text style={[styles.roleText, member.role === 'Viewer' && styles.activeRoleText]}>
+                          Viewer
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                    <TouchableOpacity 
+                      style={styles.removeMemberButton}
+                      onPress={() => removeMember(member.id)}
+                    >
+                      <Text style={styles.removeMemberText}>×</Text>
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </View>
+            ) : (
+              <Text style={styles.noMembersText}>No editors selected yet</Text>
+            )}
+          </View>
+
+        </ScrollView>
+
+        <View style={styles.bottomActions}>
+          <TouchableOpacity onPress={createWardrobe}>
+            <LinearGradient
+              colors={['#E91E63', '#FF6B35']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.createButton}
+            >
+              <Text style={styles.createButtonText}>Create Wardrobe</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+        </View>
+
+        {/* User Selection Modal */}
+        <Modal
+          visible={showUserModal}
+          animationType="slide"
+          transparent={true}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContainer}>
+              <View style={styles.modalHeader}>
+                <TouchableOpacity onPress={() => {
+                  setShowUserModal(false);
+                  setSearchQuery('');
+                }}>
+                  <Text style={styles.modalCloseButton}>Cancel</Text>
+                </TouchableOpacity>
+                <Text style={styles.modalTitle}>Add Editors</Text>
+                <TouchableOpacity onPress={() => {
+                  setShowUserModal(false);
+                  setSearchQuery('');
+                }}>
+                  <Text style={styles.modalDoneButton}>Done</Text>
                 </TouchableOpacity>
               </View>
-
-              <View style={styles.roleExplanation}>
-                <Text style={styles.roleTitle}>Permission Levels:</Text>
-                <Text style={styles.roleDescription}>• Editor: Can add, remove, and edit items</Text>
-                <Text style={styles.roleDescription}>• Contributor: Can add items and reactions</Text>
-                <Text style={styles.roleDescription}>• Viewer: Can view and react to items</Text>
+              
+              {/* Search Bar */}
+              <View style={styles.searchContainer}>
+                <TextInput
+                  style={styles.searchInput}
+                  placeholder="Search users..."
+                  placeholderTextColor="#999"
+                  value={searchQuery}
+                  onChangeText={setSearchQuery}
+                />
               </View>
-
-              {members.length > 0 && (
-                <View style={styles.membersList}>
-                  <Text style={styles.membersCount}>{members.length} collaborator(s) added</Text>
-                  {members.map(renderMember)}
-                </View>
-              )}
+              
+              {/* Users List */}
+              <FlatList
+                data={filteredUsers}
+                renderItem={renderUser}
+                keyExtractor={item => item.id}
+                style={styles.usersList}
+                showsVerticalScrollIndicator={false}
+                ListEmptyComponent={
+                  <View style={styles.emptyState}>
+                    <Text style={styles.emptyStateText}>
+                      {searchQuery ? 'No users found' : 'No users available'}
+                    </Text>
+                  </View>
+                }
+              />
             </View>
-
-            <View style={styles.section}>
-              <ThemedText style={styles.sectionTitle}>AI Features</ThemedText>
-              <View style={styles.featuresList}>
-                <View style={styles.featureItem}>
-                  <Text style={styles.featureIcon}>🤖</Text>
-                  <View style={styles.featureInfo}>
-                    <Text style={styles.featureTitle}>Smart Outfit Suggestions</Text>
-                    <Text style={styles.featureDescription}>
-                      AI will create complete outfits from your wardrobe items
-                    </Text>
-                  </View>
-                </View>
-                <View style={styles.featureItem}>
-                  <Text style={styles.featureIcon}>📊</Text>
-                  <View style={styles.featureInfo}>
-                    <Text style={styles.featureTitle}>Style Analytics</Text>
-                    <Text style={styles.featureDescription}>
-                      Get insights on your style preferences and gaps
-                    </Text>
-                  </View>
-                </View>
-                <View style={styles.featureItem}>
-                  <Text style={styles.featureIcon}>🛍️</Text>
-                  <View style={styles.featureInfo}>
-                    <Text style={styles.featureTitle}>Smart Shopping</Text>
-                    <Text style={styles.featureDescription}>
-                      AI recommends new items that complement your wardrobe
-                    </Text>
-                  </View>
-                </View>
-              </View>
-            </View>
-          </ScrollView>
-
-          <View style={styles.bottomActions}>
-            <TouchableOpacity style={styles.cancelButton} onPress={() => router.back()}>
-              <Text style={styles.cancelButtonText}>Cancel</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.createButton} onPress={createWardrobe}>
-              <Text style={styles.createButtonText}>Create Wardrobe</Text>
-            </TouchableOpacity>
           </View>
-        </KeyboardAvoidingView>
+        </Modal>
       </SafeAreaView>
-    </ThemedView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: 'white',
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 15,
+    paddingHorizontal: 24,
+    paddingVertical: 2,
     backgroundColor: 'white',
     borderBottomWidth: 1,
-    borderBottomColor: '#e1e5e9',
+    borderBottomColor: '#f0f0f0',
+  },
+  backButtonContainer: {
+    padding: 8,
+    marginLeft: -8,
   },
   backButton: {
-    fontSize: 24,
-    color: '#ff6b6b',
+    fontSize: 28,
+    color: '#1a1a1a',
+    fontWeight: '300',
   },
   title: {
-    fontSize: 18,
-    fontWeight: '600',
+    fontSize: 16,
+    fontWeight: '500',
     color: '#1a1a1a',
   },
   placeholder: {
-    width: 24,
-  },
-  keyboardView: {
-    flex: 1,
+    width: 44,
   },
   content: {
     flex: 1,
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
+    paddingTop: 12,
   },
   section: {
-    backgroundColor: 'white',
-    borderRadius: 16,
-    padding: 20,
-    marginVertical: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1a1a1a',
     marginBottom: 16,
   },
-  inputGroup: {
-    marginBottom: 20,
-  },
-  label: {
+  sectionTitle: {
     fontSize: 16,
     fontWeight: '500',
     color: '#1a1a1a',
     marginBottom: 8,
   },
-  sublabel: {
+  inputGroup: {
+    marginBottom: 12,
+  },
+  label: {
     fontSize: 14,
+    fontWeight: '400',
+    color: '#1a1a1a',
+    marginBottom: 4,
+  },
+  sublabel: {
+    fontSize: 12,
     color: '#666',
   },
   textInput: {
     borderWidth: 1,
-    borderColor: '#e1e5e9',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    fontSize: 16,
-    color: '#1a1a1a',
-  },
-  textArea: {
-    height: 80,
-    textAlignVertical: 'top',
-  },
-  emojiGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-  },
-  emojiButton: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: '#f0f0f0',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: 'transparent',
-  },
-  selectedEmoji: {
-    borderColor: '#ff6b6b',
-    backgroundColor: '#ffebee',
-  },
-  emojiText: {
-    fontSize: 24,
-  },
-  occasionGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  occasionButton: {
+    borderColor: '#e0e0e0',
+    borderRadius: 6,
     paddingHorizontal: 12,
     paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: '#f0f0f0',
-    borderWidth: 1,
-    borderColor: 'transparent',
+    fontSize: 12,
+    color: '#1a1a1a',
+    backgroundColor: '#f8f9fa',
   },
-  selectedOccasion: {
-    backgroundColor: '#ffebee',
-    borderColor: '#ff6b6b',
-  },
-  occasionText: {
-    fontSize: 14,
-    color: '#666',
-  },
-  selectedOccasionText: {
-    color: '#ff6b6b',
-    fontWeight: '500',
-  },
-  budgetRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  budgetInput: {
-    flex: 1,
-  },
-  budgetSeparator: {
-    fontSize: 16,
-    color: '#666',
+  textArea: {
+    height: 60,
+    textAlignVertical: 'top',
   },
   privacyToggle: {
     flexDirection: 'row',
@@ -482,112 +384,121 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   toggle: {
-    width: 50,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: '#e1e5e9',
+    width: 40,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#e0e0e0',
     justifyContent: 'center',
     padding: 2,
   },
   toggleActive: {
-    backgroundColor: '#ff6b6b',
+    backgroundColor: '#E91E63',
   },
   toggleThumb: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
     backgroundColor: 'white',
   },
   toggleThumbActive: {
-    transform: [{ translateX: 20 }],
+    transform: [{ translateX: 16 }],
   },
-  addMemberContainer: {
+  permissionInfo: {
+    backgroundColor: '#f8f9fa',
+    padding: 8,
+    borderRadius: 6,
+    marginBottom: 12,
+  },
+  permissionText: {
+    fontSize: 12,
+    color: '#666',
+    lineHeight: 16,
+  },
+  selectUsersButton: {
     flexDirection: 'row',
-    gap: 12,
-    marginBottom: 16,
-  },
-  memberInput: {
-    flex: 1,
-  },
-  addButton: {
-    backgroundColor: '#ff6b6b',
-    paddingHorizontal: 20,
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    borderRadius: 6,
+    paddingHorizontal: 12,
     paddingVertical: 12,
-    borderRadius: 12,
-    justifyContent: 'center',
+    backgroundColor: '#f8f9fa',
+    marginBottom: 12,
   },
-  addButtonText: {
-    color: 'white',
-    fontWeight: '600',
+  selectUsersText: {
+    fontSize: 12,
+    color: '#999',
+  },
+  dropdownIcon: {
+    fontSize: 12,
+    color: '#999',
   },
   roleExplanation: {
     backgroundColor: '#f8f9fa',
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 16,
+    padding: 8,
+    borderRadius: 6,
+    marginBottom: 12,
   },
   roleTitle: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '600',
     color: '#1a1a1a',
     marginBottom: 4,
   },
   roleDescription: {
-    fontSize: 12,
+    fontSize: 10,
     color: '#666',
-    lineHeight: 16,
+    lineHeight: 14,
   },
   membersList: {
-    marginTop: 16,
+    marginTop: 8,
   },
   membersCount: {
-    fontSize: 14,
+    fontSize: 12,
     color: '#666',
-    marginBottom: 12,
+    marginBottom: 8,
   },
   memberItem: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 12,
+    paddingVertical: 6,
+    position: 'relative',
     borderBottomWidth: 1,
     borderBottomColor: '#f0f0f0',
   },
-  memberInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
   memberAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#ff6b6b',
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#E91E63',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginRight: 10,
   },
   memberInitial: {
     color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 12,
+    fontWeight: '500',
   },
-  memberDetails: {
+  memberInfo: {
     flex: 1,
   },
   memberName: {
-    fontSize: 16,
-    fontWeight: '500',
+    fontSize: 12,
+    fontWeight: '400',
     color: '#1a1a1a',
+    marginBottom: 1,
   },
-  memberEmail: {
-    fontSize: 14,
+  memberUsername: {
+    fontSize: 10,
     color: '#666',
   },
   memberActions: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
+    marginRight: 8,
   },
   roleButton: {
     paddingHorizontal: 6,
@@ -596,7 +507,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#f0f0f0',
   },
   activeRole: {
-    backgroundColor: '#ff6b6b',
+    backgroundColor: '#E91E63',
   },
   roleText: {
     fontSize: 10,
@@ -605,75 +516,170 @@ const styles = StyleSheet.create({
   activeRoleText: {
     color: 'white',
   },
-  removeButton: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+  removeMemberButton: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
     backgroundColor: '#ff4444',
     justifyContent: 'center',
     alignItems: 'center',
-    marginLeft: 8,
   },
-  removeButtonText: {
+  removeMemberText: {
     color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
+    fontSize: 12,
+    fontWeight: '500',
+    textAlign: 'center',
+    lineHeight: 12,
   },
-  featuresList: {
-    gap: 16,
+  noMembersText: {
+    fontSize: 12,
+    color: '#999',
+    textAlign: 'center',
+    fontStyle: 'italic',
+    marginTop: 16,
+    marginBottom: 16,
   },
-  featureItem: {
+  bottomActions: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: 'white',
+    borderTopWidth: 1,
+    borderTopColor: '#f0f0f0',
+  },
+  createButton: {
+    paddingVertical: 12,
+    borderRadius: 6,
+    alignItems: 'center',
+    shadowColor: '#E91E63',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  createButtonText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: 'white',
+  },
+  // Modal styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContainer: {
+    height: '50%',
+    backgroundColor: '#f8f9fa',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+  },
+  modalHeader: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: 'white',
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
   },
-  featureIcon: {
-    fontSize: 24,
+  modalCloseButton: {
+    fontSize: 14,
+    color: '#E91E63',
+    fontWeight: '500',
+  },
+  modalTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1a1a1a',
+  },
+  modalDoneButton: {
+    fontSize: 14,
+    color: '#E91E63',
+    fontWeight: '600',
+  },
+  searchContainer: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: 'white',
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  searchInput: {
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 14,
+    backgroundColor: '#f8f9fa',
+  },
+  usersList: {
+    flex: 1,
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    maxHeight: '70%',
+  },
+  emptyState: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  emptyStateText: {
+    fontSize: 14,
+    color: '#999',
+    textAlign: 'center',
+  },
+  userItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    backgroundColor: 'white',
+    borderRadius: 8,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#f0f0f0',
+  },
+  userAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#E91E63',
+    justifyContent: 'center',
+    alignItems: 'center',
     marginRight: 12,
   },
-  featureInfo: {
+  userInitial: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  userDetails: {
     flex: 1,
   },
-  featureTitle: {
-    fontSize: 16,
+  userName: {
+    fontSize: 14,
     fontWeight: '500',
     color: '#1a1a1a',
     marginBottom: 2,
   },
-  featureDescription: {
-    fontSize: 14,
+  userEmail: {
+    fontSize: 12,
     color: '#666',
   },
-  bottomActions: {
-    flexDirection: 'row',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    backgroundColor: 'white',
-    borderTopWidth: 1,
-    borderTopColor: '#e1e5e9',
-    gap: 12,
-  },
-  cancelButton: {
-    flex: 1,
-    paddingVertical: 14,
-    borderRadius: 12,
-    backgroundColor: '#f0f0f0',
+  addButton: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#E91E63',
+    justifyContent: 'center',
     alignItems: 'center',
   },
-  cancelButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#666',
-  },
-  createButton: {
-    flex: 2,
-    paddingVertical: 14,
-    borderRadius: 12,
-    backgroundColor: '#ff6b6b',
-    alignItems: 'center',
-  },
-  createButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
+  addButtonText: {
     color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
