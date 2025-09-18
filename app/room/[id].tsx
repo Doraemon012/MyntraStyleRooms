@@ -3,17 +3,17 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
-  FlatList,
-  Image,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View
+    ActivityIndicator,
+    FlatList,
+    Image,
+    KeyboardAvoidingView,
+    Modal,
+    Platform,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -66,6 +66,23 @@ interface Room {
 }
 
 
+// Helper function to format timestamp
+const formatTimestamp = (date: Date): string => {
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const messageDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  
+  if (messageDate.getTime() === today.getTime()) {
+    // Today - show only time
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  } else {
+    // Not today - show date and time
+    const dateStr = date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+    const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return `${dateStr}, ${timeStr}`;
+  }
+};
+
 const mockMessages: Message[] = [
   {
     id: '1',
@@ -73,7 +90,7 @@ const mockMessages: Message[] = [
     sender: 'user',
     senderName: 'You',
     senderAvatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face',
-    timestamp: '10:30 AM',
+    timestamp: formatTimestamp(new Date(Date.now() - 2 * 60 * 60 * 1000)), // 2 hours ago
   },
   {
     id: '2',
@@ -81,8 +98,7 @@ const mockMessages: Message[] = [
     sender: 'ai',
     senderName: 'Maya(AI)',
     senderAvatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face',
-    timestamp: '11:25',
-
+    timestamp: formatTimestamp(new Date(Date.now() - 1 * 60 * 60 * 1000)), // 1 hour ago
   },
   {
     id: '3',
@@ -90,7 +106,7 @@ const mockMessages: Message[] = [
     sender: 'user',
     senderName: 'You',
     senderAvatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face',
-    timestamp: '10:30 AM',
+    timestamp: formatTimestamp(new Date(Date.now() - 30 * 60 * 1000)), // 30 minutes ago
   },
   {
     id: '4',
@@ -98,7 +114,7 @@ const mockMessages: Message[] = [
     sender: 'ai',
     senderName: 'Maya(AI)',
     senderAvatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face',
-    timestamp: '11:25',
+    timestamp: formatTimestamp(new Date(Date.now() - 15 * 60 * 1000)), // 15 minutes ago
     isProduct: true,
     productData: {
       name: 'Red Silk Saree with Golden Border',
@@ -119,7 +135,7 @@ const mockMessages: Message[] = [
     sender: 'friend',
     senderName: 'Richa',
     senderAvatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150&h=150&fit=crop&crop=face',
-    timestamp: '11:25',
+    timestamp: formatTimestamp(new Date(Date.now() - 10 * 60 * 1000)), // 10 minutes ago
   },
   {
     id: '6',
@@ -127,7 +143,24 @@ const mockMessages: Message[] = [
     sender: 'friend',
     senderName: 'Neyati',
     senderAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&h=150&fit=crop&crop=face',
-    timestamp: '11:25',
+    timestamp: formatTimestamp(new Date(Date.now() - 5 * 60 * 1000)), // 5 minutes ago
+  },
+  // Add some older messages to demonstrate date display
+  {
+    id: '7',
+    text: 'Great choice! This saree looks perfect for the occasion.',
+    sender: 'friend',
+    senderName: 'Priya',
+    senderAvatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&h=150&fit=crop&crop=face',
+    timestamp: formatTimestamp(new Date(Date.now() - 24 * 60 * 60 * 1000)), // Yesterday
+  },
+  {
+    id: '8',
+    text: 'Thanks for the suggestions everyone!',
+    sender: 'user',
+    senderName: 'You',
+    senderAvatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face',
+    timestamp: formatTimestamp(new Date(Date.now() - 2 * 24 * 60 * 60 * 1000)), // 2 days ago
   },
 ];
 
@@ -256,13 +289,14 @@ export default function RoomChatScreen() {
 
   const sendMessage = () => {
     if (inputText.trim()) {
+      const now = new Date();
       const newMessage: Message = {
         id: Date.now().toString(),
         text: inputText.trim(),
         sender: 'user',
         senderName: 'You',
         senderAvatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face',
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        timestamp: formatTimestamp(now),
       };
       
       setMessages([...messages, newMessage]);
@@ -271,13 +305,14 @@ export default function RoomChatScreen() {
       // Check if message mentions Maya AI
       if (inputText.toLowerCase().includes('@maya') || inputText.toLowerCase().includes('@mayaai')) {
       setTimeout(() => {
+        const aiResponseTime = new Date();
         const aiResponse: Message = {
           id: (Date.now() + 1).toString(),
             text: 'I found some beautiful options for you! Here\'s a stunning piece from Myntra\'s collection.',
           sender: 'ai',
             senderName: 'Maya(AI)',
             senderAvatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face',
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          timestamp: formatTimestamp(aiResponseTime),
             isProduct: true,
             productData: {
               name: 'Designer Ethnic Wear',
@@ -385,155 +420,158 @@ export default function RoomChatScreen() {
       
         {isUserMessage ? (
           <LinearGradient
-            colors={['#E91E63', '#FF6B9D', '#FF8A9B']}
+            colors={['#E91E63', '#FF6B9D']}
             start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
+            end={{ x: 1, y: 0 }}
             style={[styles.messageContainer, styles.userMessage]}
           >
-      {item.isProduct && item.productData ? (
-        <View style={styles.productCard}>
-                <Image source={{ uri: item.productData.image }} style={styles.productImage} />
-                <View style={styles.productInfo}>
-                  <Text style={styles.productName}>{item.productData.name}</Text>
-                  <Text style={styles.productPrice}>{item.productData.price}</Text>
-                </View>
-                <View style={styles.productActions}>
-                  <LinearGradient
-                    colors={['#E91E63', '#FF6B9D']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 0 }}
-                    style={styles.addToWardrobeBtn}
-                  >
-                    <TouchableOpacity style={styles.addToWardrobeBtnInner}>
-                      <Text style={styles.addToWardrobeText}>Add to Wardrobe</Text>
-                    </TouchableOpacity>
-                  </LinearGradient>
-                  <TouchableOpacity style={styles.showMoreBtn}>
-                    <Text style={styles.showMoreText}>Show more options</Text>
-                  </TouchableOpacity>
-                </View>
-                {item.reactions && (
-                  <View style={styles.reactions}>
-                    <TouchableOpacity 
-                      style={[
-                        styles.reactionButton,
-                        item.reactions.userThumbsUp && styles.reactionButtonActive
-                      ]}
-                      onPress={() => handleReaction(item.id, 'thumbsUp')}
+            <View style={styles.messageContent}>
+              {item.isProduct && item.productData ? (
+                <View style={styles.productCard}>
+                  <Image source={{ uri: item.productData.image }} style={styles.productImage} />
+                  <View style={styles.productInfo}>
+                    <Text style={styles.productName}>{item.productData.name}</Text>
+                    <Text style={styles.productPrice}>{item.productData.price}</Text>
+                  </View>
+                  <View style={styles.productActions}>
+                    <LinearGradient
+                      colors={['#E91E63', '#FF6B9D']}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 0 }}
+                      style={styles.addToWardrobeBtn}
                     >
-                      <Image 
-                        source={require('@/assets/images/thumbs_up_icon.png')} 
-                        style={[
-                          styles.reactionIcon,
-                          item.reactions.userThumbsUp && styles.reactionIconActive
-                        ]}
-                        resizeMode="contain"
-                      />
-                      <Text style={styles.reactionCount}>{item.reactions.thumbsUp}</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity 
-                      style={[
-                        styles.reactionButton,
-                        item.reactions.userThumbsDown && styles.reactionButtonActive
-                      ]}
-                      onPress={() => handleReaction(item.id, 'thumbsDown')}
-                    >
-                      <Image 
-                        source={require('@/assets/images/thumbs_down_icon.png')} 
-                        style={[
-                          styles.reactionIcon,
-                          item.reactions.userThumbsDown && styles.reactionIconActive
-                        ]}
-                        resizeMode="contain"
-                      />
-                      <Text style={styles.reactionCount}>{item.reactions.thumbsDown}</Text>
+                      <TouchableOpacity style={styles.addToWardrobeBtnInner}>
+                        <Text style={styles.addToWardrobeText}>Add to Wardrobe</Text>
+                      </TouchableOpacity>
+                    </LinearGradient>
+                    <TouchableOpacity style={styles.showMoreBtn}>
+                      <Text style={styles.showMoreText}>Show more options</Text>
                     </TouchableOpacity>
                   </View>
-                )}
-          </View>
-            ) : (
-              <Text style={styles.userMessageText}>
-                {item.text}
+                  {item.reactions && (
+                    <View style={styles.reactions}>
+                      <TouchableOpacity 
+                        style={[
+                          styles.reactionButton,
+                          item.reactions.userThumbsUp && styles.reactionButtonActive
+                        ]}
+                        onPress={() => handleReaction(item.id, 'thumbsUp')}
+                      >
+                        <Image 
+                          source={require('@/assets/images/thumbs_up_icon.png')} 
+                          style={[
+                            styles.reactionIcon,
+                            item.reactions.userThumbsUp && styles.reactionIconActive
+                          ]}
+                          resizeMode="contain"
+                        />
+                        <Text style={styles.reactionCount}>{item.reactions.thumbsUp}</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity 
+                        style={[
+                          styles.reactionButton,
+                          item.reactions.userThumbsDown && styles.reactionButtonActive
+                        ]}
+                        onPress={() => handleReaction(item.id, 'thumbsDown')}
+                      >
+                        <Image 
+                          source={require('@/assets/images/thumbs_down_icon.png')} 
+                          style={[
+                            styles.reactionIcon,
+                            item.reactions.userThumbsDown && styles.reactionIconActive
+                          ]}
+                          resizeMode="contain"
+                        />
+                        <Text style={styles.reactionCount}>{item.reactions.thumbsDown}</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </View>
+              ) : (
+                <Text style={styles.userMessageText}>
+                  {item.text}
+                </Text>
+              )}
+              <Text style={styles.userTimestamp}>
+                {item.timestamp}
               </Text>
-            )}
+            </View>
           </LinearGradient>
         ) : (
           <View style={[styles.messageContainer, styles.otherMessage]}>
-            {item.isProduct && item.productData ? (
-              <View style={styles.productCard}>
-                <Image source={{ uri: item.productData.image }} style={styles.productImage} />
-          <View style={styles.productInfo}>
-            <Text style={styles.productName}>{item.productData.name}</Text>
-            <Text style={styles.productPrice}>{item.productData.price}</Text>
-          </View>
-                <View style={styles.productActions}>
-                  <LinearGradient
-                    colors={['#E91E63', '#FF6B9D']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 0 }}
-                    style={styles.addToWardrobeBtn}
-                  >
-                    <TouchableOpacity style={styles.addToWardrobeBtnInner}>
-            <Text style={styles.addToWardrobeText}>Add to Wardrobe</Text>
-          </TouchableOpacity>
-                  </LinearGradient>
-                  <TouchableOpacity style={styles.showMoreBtn}>
-                    <Text style={styles.showMoreText}>Show more options</Text>
-                  </TouchableOpacity>
-                </View>
-                {item.reactions && (
-                  <View style={styles.reactions}>
-                    <TouchableOpacity 
-                      style={[
-                        styles.reactionButton,
-                        item.reactions.userThumbsUp && styles.reactionButtonActive
-                      ]}
-                      onPress={() => handleReaction(item.id, 'thumbsUp')}
+            <View style={styles.messageContent}>
+              {item.isProduct && item.productData ? (
+                <View style={styles.productCard}>
+                  <Image source={{ uri: item.productData.image }} style={styles.productImage} />
+                  <View style={styles.productInfo}>
+                    <Text style={styles.productName}>{item.productData.name}</Text>
+                    <Text style={styles.productPrice}>{item.productData.price}</Text>
+                  </View>
+                  <View style={styles.productActions}>
+                    <LinearGradient
+                      colors={['#E91E63', '#FF6B9D']}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 0 }}
+                      style={styles.addToWardrobeBtn}
                     >
-                      <Image 
-                        source={require('@/assets/images/thumbs_up_icon.png')} 
-                        style={[
-                          styles.reactionIcon,
-                          item.reactions.userThumbsUp && styles.reactionIconActive
-                        ]}
-                        resizeMode="contain"
-                      />
-                      <Text style={styles.reactionCount}>{item.reactions.thumbsUp}</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity 
-                      style={[
-                        styles.reactionButton,
-                        item.reactions.userThumbsDown && styles.reactionButtonActive
-                      ]}
-                      onPress={() => handleReaction(item.id, 'thumbsDown')}
-                    >
-                      <Image 
-                        source={require('@/assets/images/thumbs_down_icon.png')} 
-                        style={[
-                          styles.reactionIcon,
-                          item.reactions.userThumbsDown && styles.reactionIconActive
-                        ]}
-                        resizeMode="contain"
-                      />
-                      <Text style={styles.reactionCount}>{item.reactions.thumbsDown}</Text>
+                      <TouchableOpacity style={styles.addToWardrobeBtnInner}>
+                        <Text style={styles.addToWardrobeText}>Add to Wardrobe</Text>
+                      </TouchableOpacity>
+                    </LinearGradient>
+                    <TouchableOpacity style={styles.showMoreBtn}>
+                      <Text style={styles.showMoreText}>Show more options</Text>
                     </TouchableOpacity>
                   </View>
-                )}
-        </View>
-      ) : (
-              <Text style={styles.otherMessageText}>
-                {item.text}
+                  {item.reactions && (
+                    <View style={styles.reactions}>
+                      <TouchableOpacity 
+                        style={[
+                          styles.reactionButton,
+                          item.reactions.userThumbsUp && styles.reactionButtonActive
+                        ]}
+                        onPress={() => handleReaction(item.id, 'thumbsUp')}
+                      >
+                        <Image 
+                          source={require('@/assets/images/thumbs_up_icon.png')} 
+                          style={[
+                            styles.reactionIcon,
+                            item.reactions.userThumbsUp && styles.reactionIconActive
+                          ]}
+                          resizeMode="contain"
+                        />
+                        <Text style={styles.reactionCount}>{item.reactions.thumbsUp}</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity 
+                        style={[
+                          styles.reactionButton,
+                          item.reactions.userThumbsDown && styles.reactionButtonActive
+                        ]}
+                        onPress={() => handleReaction(item.id, 'thumbsDown')}
+                      >
+                        <Image 
+                          source={require('@/assets/images/thumbs_down_icon.png')} 
+                          style={[
+                            styles.reactionIcon,
+                            item.reactions.userThumbsDown && styles.reactionIconActive
+                          ]}
+                          resizeMode="contain"
+                        />
+                        <Text style={styles.reactionCount}>{item.reactions.thumbsDown}</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </View>
+              ) : (
+                <Text style={styles.otherMessageText}>
+                  {item.text}
+                </Text>
+              )}
+              <Text style={styles.otherTimestamp}>
+                {item.timestamp}
               </Text>
-            )}
+            </View>
           </View>
         )}
-        
-        <Text style={[
-          styles.timestamp,
-          isUserMessage ? styles.userTimestamp : styles.otherTimestamp
-        ]}>
-          {item.timestamp}
-        </Text>
     </View>
 
   );
@@ -759,7 +797,7 @@ const styles = StyleSheet.create({
     color: '#000',
   },
   messageContainer: {
-    padding: 8,
+    padding: 0,
     borderRadius: 12,
     maxWidth: '80%',
     position: 'relative',
@@ -767,40 +805,42 @@ const styles = StyleSheet.create({
   userMessage: {
     alignSelf: 'flex-end',
     marginLeft: '20%',
-    backgroundColor: '#E91E63',
+    backgroundColor: 'transparent',
   },
   otherMessage: {
     alignSelf: 'flex-start',
-    backgroundColor: '#F0F0F0',
+    backgroundColor: 'white',
     marginRight: '20%',
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
+  messageContent: {
+    padding: 12,
+    position: 'relative',
   },
   userMessageText: {
-    fontSize: 13,
+    fontSize: 14,
     color: 'white',
-    lineHeight: 18,
+    lineHeight: 20,
+    marginBottom: 4,
   },
   otherMessageText: {
-    fontSize: 13,
-    color: '#000',
-    lineHeight: 18,
-  },
-  messageText: {
-    fontSize: 13,
-    lineHeight: 18,
-  },
-  timestamp: {
-    fontSize: 9,
-    color: '#666',
-    marginTop: 2,
+    fontSize: 14,
+    color: '#1a1a1a',
+    lineHeight: 20,
+    marginBottom: 4,
   },
   userTimestamp: {
-    alignSelf: 'flex-end',
-    marginRight: '20%',
+    fontSize: 11,
     color: 'rgba(255, 255, 255, 0.8)',
+    alignSelf: 'flex-end',
+    marginTop: 2,
   },
   otherTimestamp: {
-    alignSelf: 'flex-start',
-    marginLeft: 6,
+    fontSize: 11,
+    color: '#666',
+    alignSelf: 'flex-end',
+    marginTop: 2,
   },
   productCard: {
     backgroundColor: 'white',
