@@ -1,9 +1,10 @@
 import { ThemedView } from '@/components/themed-view';
 import { LinearGradient } from 'expo-linear-gradient';
-import { router, useLocalSearchParams } from 'expo-router';
-import React, { useEffect, useRef, useState } from 'react';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
     ActivityIndicator,
+    Alert,
     FlatList,
     Image,
     KeyboardAvoidingView,
@@ -16,6 +17,9 @@ import {
     View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useAuth } from '../../contexts/auth-context';
+import { useRoom } from '../../contexts/room-context';
+import { Room } from '../../services/roomApi';
 
 interface Message {
   id: string;
@@ -37,32 +41,6 @@ interface Message {
     userThumbsUp?: boolean;
     userThumbsDown?: boolean;
   };
-}
-
-interface Room {
-  _id: string;
-  name: string;
-  description?: string;
-  emoji?: string;
-  isPrivate: boolean;
-  owner: {
-    _id: string;
-    name: string;
-    email: string;
-    profileImage?: string;
-  };
-  members: Array<{
-    userId: {
-      _id: string;
-      name: string;
-      email: string;
-      profileImage?: string;
-    };
-    role: 'Owner' | 'Editor' | 'Contributor' | 'Viewer';
-    joinedAt: string;
-  }>;
-  createdAt: string;
-  updatedAt: string;
 }
 
 
@@ -164,19 +142,15 @@ const mockMessages: Message[] = [
   },
 ];
 
-// Mock room data that matches the rooms from index page
-const mockRooms: Record<string, { name: string; memberCount: number }> = {
-  '1': { name: 'College Freshers Party', memberCount: 12 },
-  '2': { name: 'Wedding Shopping', memberCount: 8 },
-  '3': { name: 'Family Wedding', memberCount: 25 },
-  '4': { name: 'Friends Reunion', memberCount: 18 },
-  '5': { name: 'Work Conference', memberCount: 7 },
-};
+// No more mock data - using real data from Myntra Fashion database
 
 
 export default function RoomChatScreen() {
   const { id } = useLocalSearchParams();
-  const roomData = mockRooms[id as string] || mockRooms['1'];
+  
+  // Get real data from contexts
+  const { user, token, logout } = useAuth();
+  const { rooms: allRooms, getRoom, refreshRoom } = useRoom();
   
   const [messages, setMessages] = useState<Message[]>(mockMessages);
   const [inputText, setInputText] = useState('');
@@ -186,106 +160,76 @@ export default function RoomChatScreen() {
 
   const flatListRef = useRef<FlatList>(null);
   
-  // Fetch room data from API with better error handling
+  // Check if user has permission to edit room settings
+  const canEditRoom = (): boolean => {
+    if (!user || !room) return false;
+    
+    // Check if user is the room owner
+    if (room.owner._id === user._id) {
+      return true;
+    }
+    
+    // Check if user has Editor role
+    const userMember = room.members.find(member => member.userId._id === user._id);
+    return userMember?.role === 'Editor';
+  };
+  
+  // Fetch room data from real API
   const fetchRoomData = async () => {
     try {
       setLoading(true);
+      console.log('🏠 RoomChatScreen: Fetching room from Myntra Fashion database:', id);
       
-      // For development, we'll use mock data directly to avoid network errors
-      // In production, you would uncomment the API call below
-      
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Use mock data directly for now
-      const mockRoomData = mockRooms[id as string];
-      if (mockRoomData) {
-        setRoom({
-          _id: id as string,
-          name: mockRoomData.name,
-          emoji: getRoomEmoji(id as string),
-          members: generateMockMembers(mockRoomData.memberCount - 1),
-          owner: { _id: '1', name: 'Room Owner', email: 'owner@example.com' },
-          isPrivate: false,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        });
-      } else {
+      if (!token || !user) {
+        console.error('No authentication token or user');
         setRoom(null);
+        return;
       }
-      
-      /* 
-      // Uncomment this section when your backend is running
-      const API_BASE_URL = 'http://localhost:5000/api';
-      const response = await fetch(`${API_BASE_URL}/rooms/${id}`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          // 'Authorization': `Bearer ${authToken}` // Add when auth is implemented
-        },
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        setRoom(data.data.room);
-      } else {
-        throw new Error(`API Error: ${response.status}`);
+
+      // Try to get room from context first (if already loaded)
+      const existingRoom = allRooms.find(r => r._id === id);
+      if (existingRoom) {
+        console.log('✅ Room found in context:', existingRoom.name);
+        setRoom(existingRoom);
+        return;
       }
-      */
+
+      // If not in context, fetch from API
+      console.log('🔄 Fetching room from API...');
+      const roomData = await getRoom(id as string);
+      console.log('✅ Room fetched from API:', roomData.name);
+      setRoom(roomData);
       
-    } catch (error) {
-      console.log('Using mock data for room:', id);
-      // Fallback to mock data
-      const mockRoomData = mockRooms[id as string];
-      if (mockRoomData) {
-        setRoom({
-          _id: id as string,
-          name: mockRoomData.name,
-          emoji: getRoomEmoji(id as string),
-          members: generateMockMembers(mockRoomData.memberCount - 1),
-          owner: { _id: '1', name: 'Room Owner', email: 'owner@example.com' },
-          isPrivate: false,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        });
-      } else {
-        setRoom(null);
-      }
+    } catch (error: any) {
+      console.error('❌ Failed to fetch room:', error);
+      setRoom(null);
     } finally {
       setLoading(false);
     }
   };
   
-  // Helper function to get room emoji based on ID
-  const getRoomEmoji = (roomId: string): string => {
-    const emojiMap: Record<string, string> = {
-      '1': '🎉',
-      '2': '👰',
-      '3': '👗',
-      '4': '🌟',
-      '5': '💼',
-    };
-    return emojiMap[roomId] || '👗';
-  };
-  
-  // Helper function to generate mock members
-  const generateMockMembers = (count: number) => {
-    const mockNames = ['Alice', 'Bob', 'Charlie', 'Diana', 'Eve', 'Frank', 'Grace', 'Henry'];
-    return Array.from({ length: Math.min(count, mockNames.length) }, (_, index) => ({
-      userId: {
-        _id: `member_${index + 1}`,
-        name: mockNames[index] || `Member ${index + 1}`,
-        email: `${mockNames[index]?.toLowerCase() || `member${index + 1}`}@example.com`,
-        profileImage: undefined,
-      },
-      role: 'Contributor' as const,
-      joinedAt: new Date().toISOString(),
-    }));
-  };
+  // No more mock helper functions - using real data from database
   
   useEffect(() => {
     fetchRoomData();
   }, [id]);
+
+  // Refresh room data when screen comes into focus (e.g., returning from settings)
+  useFocusEffect(
+    useCallback(() => {
+      console.log('🔄 Room screen focused - refreshing room data...');
+      if (id && token && user) {
+        refreshRoom(id as string).then(updatedRoom => {
+          console.log('✅ Room refreshed:', updatedRoom.name);
+          setRoom(updatedRoom);
+        }).catch(error => {
+          console.error('❌ Failed to refresh room:', error);
+          // Fallback to fetchRoomData if refreshRoom fails
+          fetchRoomData();
+        });
+      }
+    }, [id, token, user, refreshRoom])
+  );
 
   const sendMessage = () => {
     if (inputText.trim()) {
@@ -345,6 +289,30 @@ export default function RoomChatScreen() {
       case 'roomSettings':
         // Navigate to room settings
         router.push(`/room/settings?id=${id}`);
+        break;
+      case 'logout':
+        // Logout user
+        Alert.alert(
+          'Logout',
+          'Are you sure you want to logout?',
+          [
+            {
+              text: 'Cancel',
+              style: 'cancel',
+            },
+            {
+              text: 'Logout',
+              style: 'destructive',
+              onPress: async () => {
+                try {
+                  await logout();
+                } catch (error) {
+                  Alert.alert('Error', 'Failed to logout. Please try again.');
+                }
+              },
+            },
+          ]
+        );
         break;
     }
   };
@@ -583,8 +551,8 @@ export default function RoomChatScreen() {
       <ThemedView style={styles.container}>
         <SafeAreaView style={styles.container}>
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#ff6b6b" />
-            <Text style={styles.loadingText}>Loading room...</Text>
+            <ActivityIndicator size="large" color="#E91E63" />
+            <Text style={styles.loadingText}>Loading room from Myntra Fashion database...</Text>
           </View>
         </SafeAreaView>
       </ThemedView>
@@ -597,6 +565,9 @@ export default function RoomChatScreen() {
         <SafeAreaView style={styles.container}>
           <View style={styles.errorContainer}>
             <Text style={styles.errorText}>Room not found</Text>
+            <Text style={styles.databaseIndicator}>
+              📊 Connected to Myntra Fashion Database
+            </Text>
             <TouchableOpacity style={styles.backButtonStyle} onPress={() => router.back()}>
               <Text style={styles.backButtonText}>Go Back</Text>
             </TouchableOpacity>
@@ -688,19 +659,21 @@ export default function RoomChatScreen() {
                 </View>
                 <Text style={styles.menuText}>Start Session</Text>
               </TouchableOpacity>
-              <TouchableOpacity 
-                style={styles.menuItem}
-                onPress={() => handleMenuAction('roomSettings')}
-              >
-                <View style={styles.menuIconContainer}>
-                  <Image 
-                    source={require('@/assets/images/room_settings.png')} 
-                    style={styles.menuIconImage}
-                    resizeMode="contain"
-                  />
-                </View>
-                <Text style={styles.menuText}>Room Settings</Text>
-              </TouchableOpacity>
+              {canEditRoom() && (
+                <TouchableOpacity 
+                  style={styles.menuItem}
+                  onPress={() => handleMenuAction('roomSettings')}
+                >
+                  <View style={styles.menuIconContainer}>
+                    <Image 
+                      source={require('@/assets/images/room_settings.png')} 
+                      style={styles.menuIconImage}
+                      resizeMode="contain"
+                    />
+                  </View>
+                  <Text style={styles.menuText}>Room Settings</Text>
+                </TouchableOpacity>
+              )}
               <TouchableOpacity 
                 style={styles.menuItem}
                 onPress={() => handleMenuAction('wardrobe')}
@@ -713,6 +686,15 @@ export default function RoomChatScreen() {
                   />
                 </View>
                 <Text style={styles.menuText}>Wardrobe</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.menuItem}
+                onPress={() => handleMenuAction('logout')}
+              >
+                <View style={styles.menuIconContainer}>
+                  <Text style={styles.menuIconText}>🚪</Text>
+                </View>
+                <Text style={styles.menuText}>Logout</Text>
               </TouchableOpacity>
             </View>
           </TouchableOpacity>
@@ -1040,6 +1022,10 @@ const styles = StyleSheet.create({
     width: 16,
     height: 16,
   },
+  menuIconText: {
+    fontSize: 16,
+    color: '#000',
+  },
   menuText: {
     fontSize: 14,
     color: '#000',
@@ -1197,5 +1183,16 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     borderWidth: 1,
     borderColor: '#8B5CF6',
+  },
+  databaseIndicator: {
+    fontSize: 12,
+    color: '#E91E63',
+    textAlign: 'center',
+    fontWeight: '600',
+    backgroundColor: '#ffe6f0',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    marginBottom: 20,
   },
 });

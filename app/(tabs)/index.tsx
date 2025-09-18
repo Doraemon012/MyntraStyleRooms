@@ -95,146 +95,134 @@ import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
-    ScrollView,
-    StatusBar,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useAuth } from '../../contexts/auth-context';
+import { useRoom } from '../../contexts/room-context';
+import { Room } from '../../services/roomApi';
 
-interface Room {
-  id: string;
-  name: string;
-  lastMessage: string;
-  memberCount: number;
-  status: 'joined' | 'invited' | 'accepted';
-  lastActivity: string;
+// Extended Room interface for UI display
+interface DisplayRoom extends Room {
+  status: 'joined' | 'invited' | 'owner';
   invitedBy?: string;
-  memberAvatars: string[];
   acceptedAt?: Date;
 }
 
-const mockRooms: Room[] = [
-  // Invited Rooms
-  {
-    id: '1',
-    name: 'College Freshers Party',
-    lastMessage: 'Richa: Hey! Check out this cute top I found',
-    memberCount: 12,
-    status: 'invited',
-    lastActivity: '2 mins ago',
-    invitedBy: 'Richa',
-    memberAvatars: [
-      'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face',
-      'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face',
-      'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150&h=150&fit=crop&crop=face'
-    ]
-  },
-  {
-    id: '2',
-    name: 'Wedding Shopping',
-    lastMessage: 'AI: Elegant lehenga suggestions under ₹15K',
-    memberCount: 8,
-    status: 'invited',
-    lastActivity: '5 mins ago',
-    invitedBy: 'Priya',
-    memberAvatars: [
-      'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&h=150&fit=crop&crop=face',
-      'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&h=150&fit=crop&crop=face',
-      'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop&crop=face'
-    ]
-  },
-  // Joined Rooms
-  {
-    id: '3',
-    name: 'Family Wedding',
-    lastMessage: 'Mom: The saree looks perfect!',
-    memberCount: 25,
-    status: 'joined',
-    lastActivity: '30 mins ago',
-    invitedBy: undefined,
-    memberAvatars: [
-      'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&h=150&fit=crop&crop=face',
-      'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=150&h=150&fit=crop&crop=face',
-      'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=150&h=150&fit=crop&crop=face'
-    ]
-  },
-  {
-    id: '4',
-    name: 'Friends Reunion',
-    lastMessage: 'Sarah: Can\'t wait to see everyone!',
-    memberCount: 18,
-    status: 'joined',
-    lastActivity: '1 hour ago',
-    invitedBy: undefined,
-    memberAvatars: [
-      'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=150&h=150&fit=crop&crop=face',
-      'https://images.unsplash.com/photo-1507591064344-4c6ce005b128?w=150&h=150&fit=crop&crop=face',
-      'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face'
-    ]
-  },
-  {
-    id: '5',
-    name: 'Work Conference',
-    lastMessage: 'AI: Professional business attire',
-    memberCount: 7,
-    status: 'joined',
-    lastActivity: '2 hours ago',
-    invitedBy: undefined,
-    memberAvatars: [
-      'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop&crop=face',
-      'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&h=150&fit=crop&crop=face',
-      'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face'
-    ]
-  },
-];
-
 export default function HomeScreen() {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [activeTab, setActiveTab] = useState<'all' | 'joined' | 'invited'>('all');
-  const [rooms, setRooms] = useState<Room[]>(mockRooms);
-  const [invitationLink, setInvitationLink] = useState('');
-  
+  // Load fonts first (must be called before any conditional returns)
   let [fontsLoaded] = useFonts({
     DancingScript_400Regular,
     DancingScript_700Bold,
   });
 
+  const [searchQuery, setSearchQuery] = useState('');
+  const [activeTab, setActiveTab] = useState<'all' | 'joined' | 'invited'>('all');
+  const [invitationLink, setInvitationLink] = useState('');
+  
+  // Get real data from contexts
+  const { user, token } = useAuth();
+  const { rooms: realRooms, isLoading, refreshRooms } = useRoom();
+
+  // Load rooms when component mounts - ONLY if user is authenticated
+  useEffect(() => {
+    if (token && user) {
+      console.log('🏠 HomeScreen: Loading rooms from Myntra Fashion database...');
+      refreshRooms();
+    } else {
+      console.log('🏠 HomeScreen: Waiting for authentication before loading rooms...');
+    }
+  }, [token, user]);
+
+  // Log rooms data for debugging - ONLY if user is authenticated
+  useEffect(() => {
+    if (token && user) {
+      console.log('🏠 HomeScreen: Real rooms from database:', realRooms.length);
+      realRooms.forEach((room, index) => {
+        console.log(`Room ${index + 1}: "${room.name}" - Owner: ${room.owner.name} - Members: ${room.memberCount}`);
+      });
+    }
+  }, [realRooms, token, user]);
+
+  // Show loading screen while fonts are loading
   if (!fontsLoaded) {
-    return null;
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#E91E63" />
+          <Text style={styles.loadingText}>Loading fonts...</Text>
+        </View>
+      </SafeAreaView>
+    );
   }
 
-  const handleAcceptInvitation = (roomId: string) => {
-    setRooms(prevRooms => 
-      prevRooms.map(room => 
-        room.id === roomId 
-          ? { ...room, status: 'accepted' as const, invitedBy: undefined, acceptedAt: new Date() }
-          : room
-      )
+  // Show authentication required message if user is not logged in
+  if (!user || !token) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <Text style={styles.loadingText}>Please log in to view your rooms</Text>
+        </View>
+      </SafeAreaView>
     );
+  }
+
+  // Convert real rooms to display format and categorize them
+  const displayRooms: DisplayRoom[] = realRooms.map(room => {
+    const isOwner = room.owner._id === user?._id;
+    const userMember = room.members.find(member => member.userId._id === user?._id);
+    
+    let status: 'joined' | 'invited' | 'owner';
+    if (isOwner) {
+      status = 'owner';
+    } else if (userMember) {
+      status = 'joined';
+    } else {
+      status = 'invited'; // This would be for rooms user was invited to but hasn't joined yet
+    }
+
+    return {
+      ...room,
+      status,
+      invitedBy: isOwner ? undefined : room.owner.name,
+    };
+  });
+
+
+  const handleAcceptInvitation = (roomId: string) => {
+    console.log('Accepting invitation for room:', roomId);
+    // TODO: Implement actual invitation acceptance API call
+    // For now, just refresh rooms to get updated data
+    refreshRooms();
   };
 
   const handleDeclineInvitation = (roomId: string) => {
-    setRooms(prevRooms => 
-      prevRooms.filter(room => room.id !== roomId)
-    );
+    console.log('Declining invitation for room:', roomId);
+    // TODO: Implement actual invitation decline API call
+    // For now, just refresh rooms to get updated data
+    refreshRooms();
   };
 
-  const filteredRooms = rooms.filter(room => {
+  // Filter rooms based on search and active tab
+  const filteredRooms = displayRooms.filter(room => {
     const matchesSearch = room.name.toLowerCase().includes(searchQuery.toLowerCase());
     if (activeTab === 'all') return matchesSearch;
-    if (activeTab === 'joined') return matchesSearch && (room.status === 'joined' || room.status === 'accepted');
+    if (activeTab === 'joined') return matchesSearch && (room.status === 'joined' || room.status === 'owner');
     if (activeTab === 'invited') return matchesSearch && room.status === 'invited';
     return matchesSearch;
   }).sort((a, b) => {
-    // Custom ordering for 'all' tab: invited first, then accepted, then joined
+    // Custom ordering for 'all' tab: invited first, then owner, then joined
     if (activeTab === 'all') {
-      const statusOrder = { 'invited': 0, 'accepted': 1, 'joined': 2 };
+      const statusOrder = { 'invited': 0, 'owner': 1, 'joined': 2 };
       const aOrder = statusOrder[a.status];
       const bOrder = statusOrder[b.status];
       
@@ -242,44 +230,78 @@ export default function HomeScreen() {
         return aOrder - bOrder;
       }
       
-      // Within same status, sort by acceptedAt for accepted rooms (most recent first)
-      if (a.status === 'accepted' && b.status === 'accepted') {
-        return (b.acceptedAt?.getTime() || 0) - (a.acceptedAt?.getTime() || 0);
-      }
+      // Within same status, sort by lastActivity (most recent first)
+      return new Date(b.lastActivity).getTime() - new Date(a.lastActivity).getTime();
     }
     
-    return 0;
+    // For other tabs, sort by lastActivity (most recent first)
+    return new Date(b.lastActivity).getTime() - new Date(a.lastActivity).getTime();
   });
 
-  const renderRoom = ({ item }: { item: Room }) => (
-    <View style={styles.roomCard}>
+  const renderRoom = ({ item }: { item: DisplayRoom }) => (
+    <TouchableOpacity 
+      style={styles.roomCard}
+      onPress={() => router.push(`/room/${item._id}`)}
+    >
       {item.status === 'invited' && (
         <Text style={styles.invitedText}>{item.invitedBy} invited you to:</Text>
+      )}
+      {item.status === 'owner' && (
+        <Text style={styles.ownerText}>You own this room</Text>
       )}
       <View style={styles.roomHeader}>
         <View style={styles.roomInfo}>
           <Text style={styles.roomName}>{item.name}</Text>
           <View style={styles.memberSection}>
             <View style={styles.avatarGroup}>
-              <View style={[styles.avatar, styles.avatar1]} />
-              <View style={[styles.avatar, styles.avatar2]} />
-              <View style={[styles.avatar, styles.avatar3]} />
+              {item.members.slice(0, 3).map((member, index) => (
+                <View 
+                  key={member.userId._id}
+                  style={[
+                    styles.avatar, 
+                    { 
+                      backgroundColor: ['#FF6B35', '#E91E63', '#9C27B0'][index],
+                      marginLeft: index > 0 ? -8 : 0 
+                    }
+                  ]} 
+                />
+              ))}
             </View>
-            <Text style={styles.memberCount}>{item.memberCount}+ members</Text>
+            <Text style={styles.memberCount}>{item.memberCount} members</Text>
           </View>
+          <Text style={styles.lastMessage}>
+            {item.lastMessage || `Created by ${item.owner.name}`}
+          </Text>
         </View>
+        <View style={styles.roomRight}>
         {item.status === 'invited' && (
           <View style={styles.actionButtons}>
-            <TouchableOpacity style={styles.acceptButton}>
-              <Ionicons name="checkmark" size={16} color="white" />
+              <TouchableOpacity 
+                style={styles.acceptButton}
+                onPress={(e) => {
+                  e.stopPropagation();
+                  handleAcceptInvitation(item._id);
+                }}
+              >
+                <Ionicons name="checkmark" size={14} color="#4CAF50" />
             </TouchableOpacity>
-            <TouchableOpacity style={styles.declineButton}>
-              <Ionicons name="close" size={16} color="white" />
+              <TouchableOpacity 
+                style={styles.declineButton}
+                onPress={(e) => {
+                  e.stopPropagation();
+                  handleDeclineInvitation(item._id);
+                }}
+              >
+                <Ionicons name="close" size={14} color="#F44336" />
             </TouchableOpacity>
           </View>
         )}
+          <Text style={styles.timeStamp}>
+            {new Date(item.lastActivity).toLocaleDateString()}
+          </Text>
+        </View>
       </View>
-    </View>
+    </TouchableOpacity>
   );
 
   return (
@@ -294,7 +316,10 @@ export default function HomeScreen() {
               style={styles.logo}
               contentFit="contain"
             />
+            <View>
             <Text style={styles.title}>Fashion Rooms</Text>
+              <Text style={styles.databaseSubtitle}>Myntra Fashion Database</Text>
+            </View>
           </View>
           <View style={styles.headerActions}>
             <TouchableOpacity 
@@ -382,73 +407,35 @@ export default function HomeScreen() {
 
         {/* Rooms List */}
         <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-          {filteredRooms.map((item) => (
-            <TouchableOpacity 
-              key={item.id} 
-              style={styles.roomCard}
-              onPress={() => router.push(`/room/${item.id}`)}
-            >
-              {item.status === 'invited' && (
-                <Text style={styles.invitedText}>{item.invitedBy} invited you to:</Text>
-              )}
-              <View style={styles.roomHeader}>
-                <View style={styles.roomInfo}>
-                  <Text style={styles.roomName}>{item.name}</Text>
-                  <View style={styles.memberSection}>
-                    <View style={styles.avatarGroup}>
-                      {item.memberAvatars.slice(0, 3).map((avatar, index) => (
-                        <Image
-                          key={index}
-                          source={{ uri: avatar }}
-                          style={[styles.avatar, { marginLeft: index > 0 ? -8 : 0 }]}
-                        />
-                      ))}
+          {isLoading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color="#E91E63" />
+              <Text style={styles.loadingText}>Loading rooms from Myntra Fashion database...</Text>
                     </View>
-                    <Text style={styles.memberCount}>{item.memberCount}+ members</Text>
-                  </View>
-                  <Text style={styles.lastMessage}>{item.lastMessage}</Text>
-                </View>
-                <View style={styles.roomRight}>
-                  {item.status === 'invited' && (
-                    <View style={styles.actionButtons}>
-                      <TouchableOpacity 
-                        style={styles.acceptButton}
-                        onPress={(e) => {
-                          e.stopPropagation();
-                          handleAcceptInvitation(item.id);
-                        }}
-                      >
-                        <Ionicons 
-                          name="checkmark" 
-                          size={14} 
-                          color="#4CAF50" 
-                        />
-                      </TouchableOpacity>
-                      <TouchableOpacity 
-                        style={styles.declineButton}
-                        onPress={(e) => {
-                          e.stopPropagation();
-                          handleDeclineInvitation(item.id);
-                        }}
-                      >
-                        <Ionicons 
-                          name="close" 
-                          size={14} 
-                          color="#F44336" 
-                        />
-                      </TouchableOpacity>
-                    </View>
-                  )}
-                  <Text style={styles.timeStamp}>
-                    {item.status === 'accepted' && item.acceptedAt 
-                      ? 'Just accepted' 
-                      : item.lastActivity
-                    }
+          ) : filteredRooms.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyStateEmoji}>🏠</Text>
+              <Text style={styles.emptyStateTitle}>
+                {activeTab === 'all' ? 'No Rooms Found' : 
+                 activeTab === 'joined' ? 'No Joined Rooms' : 
+                 'No Invitations'}
+              </Text>
+              <Text style={styles.emptyStateDescription}>
+                {activeTab === 'all' ? 'Create your first room or wait for invitations.' :
+                 activeTab === 'joined' ? 'You haven\'t joined any rooms yet.' :
+                 'You don\'t have any pending invitations.'}
+              </Text>
+              <Text style={styles.databaseIndicator}>
+                📊 Connected to Myntra Fashion Database
                   </Text>
                 </View>
+          ) : (
+            filteredRooms.map((item) => (
+              <View key={item._id}>
+                {renderRoom({ item })}
               </View>
-            </TouchableOpacity>
-          ))}
+            ))
+          )}
         </ScrollView>
 
       </View>
@@ -485,6 +472,12 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#1a1a1a',
     fontFamily: 'DancingScript_400Regular',
+  },
+  databaseSubtitle: {
+    fontSize: 10,
+    color: '#E91E63',
+    fontWeight: '600',
+    marginTop: 1,
   },
   headerActions: {
     flexDirection: 'row',
@@ -714,6 +707,59 @@ const styles = StyleSheet.create({
     borderColor: '#F44336',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  ownerText: {
+    fontSize: 10,
+    color: '#4CAF50',
+    marginBottom: 6,
+    fontWeight: '500',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+  },
+  emptyState: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 40,
+    paddingHorizontal: 20,
+  },
+  emptyStateEmoji: {
+    fontSize: 48,
+    marginBottom: 16,
+  },
+  emptyStateTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1a1a1a',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  emptyStateDescription: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 16,
+  },
+  databaseIndicator: {
+    fontSize: 12,
+    color: '#E91E63',
+    textAlign: 'center',
+    fontWeight: '600',
+    backgroundColor: '#ffe6f0',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
   },
 
 });
