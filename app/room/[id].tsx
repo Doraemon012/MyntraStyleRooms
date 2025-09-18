@@ -336,6 +336,7 @@ export default function RoomChatScreen() {
     switch (action) {
       case 'startSession':
         // Start a styling session
+        router.push('/start-session');
         break;
       case 'wardrobe':
         // Navigate to wardrobe
