@@ -11,7 +11,7 @@ const getApiUrl = () => {
 
 export const API_CONFIG = {
   BASE_URL: getApiUrl(),
-  TIMEOUT: 10000,
+  TIMEOUT: 30000, // Increased timeout for better reliability
 };
 
 export const AUTH_CONFIG = {

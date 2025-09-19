@@ -11,13 +11,131 @@ const app = express();
 const server = require('http').createServer(app);
 const io = require('socket.io')(server, {
   cors: {
-    origin: process.env.SOCKET_CORS_ORIGIN || "http://localhost:3000",
-    methods: ["GET", "POST"]
-  }
+    origin: [
+      process.env.SOCKET_CORS_ORIGIN || "http://localhost:3000",
+      "http://172.20.10.2:3000",
+      "http://localhost:8081",
+      "exp://172.20.10.2:8081",
+      "exp://localhost:8081"
+    ],
+    methods: ["GET", "POST"],
+    credentials: true
+  },
+  transports: ['websocket', 'polling'],
+  pingTimeout: 60000,
+  pingInterval: 25000,
+  upgradeTimeout: 10000,
+  allowEIO3: true,
+  compression: true,
+  maxHttpBufferSize: 1e6
 });
 
 // Attach Socket.io to app for use in routes
 app.set('io', io);
+
+// Socket.io authentication middleware
+io.use(async (socket, next) => {
+  try {
+    const token = socket.handshake.auth.token;
+    const userId = socket.handshake.auth.userId;
+    
+    if (!token) {
+      return next(new Error('Authentication token required'));
+    }
+    
+    // Verify JWT token
+    const jwt = require('jsonwebtoken');
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    
+    if (decoded.id !== userId) {
+      return next(new Error('Token user mismatch'));
+    }
+    
+    // Attach user info to socket
+    socket.userId = userId;
+    socket.userName = socket.handshake.auth.userName;
+    
+    console.log(`🔌 Socket authenticated for user: ${socket.userName} (${userId})`);
+    next();
+  } catch (error) {
+    console.error('❌ Socket authentication error:', error.message);
+    next(new Error('Authentication failed'));
+  }
+});
+
+// Socket.io connection handling
+io.on('connection', (socket) => {
+  console.log(`🔌 User connected: ${socket.userName} (${socket.userId})`);
+  
+  // Store typing timeouts for cleanup
+  const typingTimeouts = new Map();
+  
+  // Handle joining rooms
+  socket.on('join-room', (roomId) => {
+    console.log(`🚪 User ${socket.userName} joining room: ${roomId}`);
+    socket.join(roomId);
+    socket.emit('room-joined', roomId);
+  });
+  
+  // Handle leaving rooms
+  socket.on('leave-room', (roomId) => {
+    console.log(`🚪 User ${socket.userName} leaving room: ${roomId}`);
+    socket.leave(roomId);
+    socket.emit('room-left', roomId);
+  });
+
+  // Handle typing indicators with automatic timeout
+  socket.on('typing-start', (data) => {
+    // Clear existing timeout for this room
+    if (typingTimeouts.has(data.roomId)) {
+      clearTimeout(typingTimeouts.get(data.roomId));
+    }
+    
+    // Emit typing start
+    socket.to(data.roomId).emit('typing-start', {
+      userId: socket.userId,
+      userName: socket.userName,
+      roomId: data.roomId
+    });
+    
+    // Set timeout to automatically stop typing after 3 seconds
+    const timeout = setTimeout(() => {
+      socket.to(data.roomId).emit('typing-stop', {
+        userId: socket.userId,
+        userName: socket.userName,
+        roomId: data.roomId
+      });
+      typingTimeouts.delete(data.roomId);
+    }, 3000);
+    
+    typingTimeouts.set(data.roomId, timeout);
+  });
+
+  socket.on('typing-stop', (data) => {
+    // Clear timeout and emit stop
+    if (typingTimeouts.has(data.roomId)) {
+      clearTimeout(typingTimeouts.get(data.roomId));
+      typingTimeouts.delete(data.roomId);
+    }
+    
+    socket.to(data.roomId).emit('typing-stop', {
+      userId: socket.userId,
+      userName: socket.userName,
+      roomId: data.roomId
+    });
+  });
+  
+  // Handle disconnection
+  socket.on('disconnect', (reason) => {
+    console.log(`🔌 User disconnected: ${socket.userName} (${socket.userId}) - ${reason}`);
+    
+    // Clear all typing timeouts
+    typingTimeouts.forEach((timeout) => {
+      clearTimeout(timeout);
+    });
+    typingTimeouts.clear();
+  });
+});
 
 // Import routes
 const authRoutes = require('./routes/auth');

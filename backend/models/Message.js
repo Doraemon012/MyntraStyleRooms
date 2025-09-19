@@ -13,7 +13,7 @@ const messageSchema = new mongoose.Schema({
   },
   senderType: {
     type: String,
-    enum: ['user', 'ai'],
+    enum: ['user', 'ai', 'system'],
     default: 'user'
   },
   text: {
@@ -220,22 +220,5 @@ messageSchema.statics.createSystemMessage = function(roomId, action, data = {}) 
   });
 };
 
-// Static method to create AI message
-messageSchema.statics.createAIMessage = function(roomId, text, productData = null) {
-  const messageData = {
-    roomId,
-    senderId: null, // AI messages don't have a human sender
-    senderType: 'ai',
-    messageType: productData ? 'product' : 'text',
-    text,
-    timestamp: new Date()
-  };
-
-  if (productData) {
-    messageData.productData = productData;
-  }
-
-  return this.create(messageData);
-};
 
 module.exports = mongoose.model('Message', messageSchema);

@@ -7,6 +7,7 @@ import AuthWrapper from '@/components/auth-wrapper';
 import { AuthProvider } from '@/contexts/auth-context';
 import { RoomProvider } from '@/contexts/room-context';
 import { SessionProvider } from '@/contexts/session-context';
+import { SocketProvider } from '@/contexts/socket-context';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
 export const unstable_settings = {
@@ -20,8 +21,9 @@ export default function RootLayout() {
     <AuthProvider>
       <SessionProvider>
         <RoomProvider>
-          <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-            <AuthWrapper>
+          <SocketProvider>
+            <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+              <AuthWrapper>
               <Stack>
                 <Stack.Screen name="auth/login" options={{ headerShown: false }} />
                 <Stack.Screen name="auth/register" options={{ headerShown: false }} />
@@ -38,8 +40,9 @@ export default function RootLayout() {
                 <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
               </Stack>
               <StatusBar style="auto" />
-            </AuthWrapper>
-          </ThemeProvider>
+              </AuthWrapper>
+            </ThemeProvider>
+          </SocketProvider>
         </RoomProvider>
       </SessionProvider>
     </AuthProvider>

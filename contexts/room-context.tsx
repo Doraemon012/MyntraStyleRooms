@@ -172,7 +172,7 @@ export const RoomProvider = ({ children }: { children: ReactNode }) => {
     if (!token) throw new Error('No authentication token');
 
     try {
-      setIsLoading(true);
+      // Don't set loading state for refresh to prevent UI glitching
       setError(null);
       const response = await roomApi.getRoom(token, roomId);
       const room = response.data.room;
@@ -193,8 +193,6 @@ export const RoomProvider = ({ children }: { children: ReactNode }) => {
       const errorMessage = error.response?.data?.message || 'Failed to refresh room';
       setError(errorMessage);
       throw new Error(errorMessage);
-    } finally {
-      setIsLoading(false);
     }
   };
 
