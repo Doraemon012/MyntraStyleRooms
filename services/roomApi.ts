@@ -6,7 +6,7 @@ const API_BASE_URL = API_CONFIG.BASE_URL;
 // Create axios instance for room API
 const roomApiClient = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 10000,
+  timeout: 15000, // Increased timeout to prevent frequent timeouts
   headers: {
     'Content-Type': 'application/json',
   },

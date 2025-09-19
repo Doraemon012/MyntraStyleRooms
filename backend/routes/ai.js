@@ -13,6 +13,7 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
+
 // @route   POST /api/ai/chat
 // @desc    Chat with AI stylist
 // @access  Private
@@ -386,6 +387,7 @@ async function getAIResponse(prompt) {
     return getMockAIResponse(prompt);
   }
 }
+
 
 // Mock AI response for testing
 function getMockAIResponse(prompt) {
