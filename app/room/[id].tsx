@@ -1,4 +1,6 @@
+import MayaChat from '@/components/maya-chat';
 import { ThemedView } from '@/components/themed-view';
+import MayaTheme from '@/constants/maya-theme';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
@@ -6,12 +8,9 @@ import {
     ActivityIndicator,
     FlatList,
     Image,
-    KeyboardAvoidingView,
     Modal,
-    Platform,
     StyleSheet,
     Text,
-    TextInput,
     TouchableOpacity,
     View
 } from 'react-native';
@@ -20,7 +19,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 interface Message {
   id: string;
   text: string;
-  sender: 'user' | 'friend' | 'ai';
+  sender: 'user' | 'friend' | 'ai' | 'maya';
   senderName: string;
   senderAvatar?: string;
   timestamp: string;
@@ -30,6 +29,7 @@ interface Message {
     price: string;
     image: string;
     description?: string;
+    images?: string[];
   };
   reactions?: {
     thumbsUp: number;
@@ -606,127 +606,148 @@ export default function RoomChatScreen() {
     );
   }
 
+  // Convert existing messages to Maya format
+  const mayaMessages: Message[] = messages.map(msg => ({
+    ...msg,
+    sender: msg.sender === 'ai' ? 'maya' : msg.sender,
+    senderName: msg.sender === 'ai' ? 'Maya(AI)' : msg.senderName,
+    productData: msg.isProduct && msg.productData ? {
+      ...msg.productData,
+      images: [
+        msg.productData.image,
+        'https://images.unsplash.com/photo-1594736797933-d0401ba2fe65?w=300&h=400&fit=crop',
+        'https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=300&h=400&fit=crop',
+        'https://images.unsplash.com/photo-1594633312681-425c7b97ccd1?w=300&h=400&fit=crop',
+      ]
+    } : undefined,
+  }));
+
+  const handleSendMessage = (text: string) => {
+    const now = new Date();
+    const newMessage: Message = {
+      id: Date.now().toString(),
+      text: text,
+      sender: 'user',
+      senderName: 'You',
+      senderAvatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face',
+      timestamp: formatTimestamp(now),
+    };
+    
+    setMessages([...messages, newMessage]);
+    
+    // Check if message mentions Maya AI
+    if (text.toLowerCase().includes('@maya') || text.toLowerCase().includes('@mayaai')) {
+      setTimeout(() => {
+        const aiResponseTime = new Date();
+        const aiResponse: Message = {
+          id: (Date.now() + 1).toString(),
+          text: 'I found some beautiful options for you! Here\'s a stunning piece from Myntra\'s collection.',
+          sender: 'ai',
+          senderName: 'Maya(AI)',
+          senderAvatar: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face',
+          timestamp: formatTimestamp(aiResponseTime),
+          isProduct: true,
+          productData: {
+            name: 'Stylish Sneakers',
+            price: '₹3,999',
+            image: 'https://images.unsplash.com/photo-1594633312681-425c7b97ccd1?w=300&h=400&fit=crop',
+            description: 'Step out in style with these stylish sneakers that offer both comfort and flair. Perfect for casual outings or workouts, they will keep you looking fresh and trendy.',
+            images: [
+              'https://images.unsplash.com/photo-1594633312681-425c7b97ccd1?w=300&h=400&fit=crop',
+              'https://images.unsplash.com/photo-1594736797933-d0401ba2fe65?w=300&h=400&fit=crop',
+              'https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=300&h=400&fit=crop',
+              'https://images.unsplash.com/photo-1594633312681-425c7b97ccd1?w=300&h=400&fit=crop',
+            ]
+          },
+          reactions: {
+            thumbsUp: 0,
+            thumbsDown: 0,
+          },
+        };
+        setMessages(prev => [...prev, aiResponse]);
+      }, 1500);
+    }
+  };
+
+  const handleProductAction = (action: string, productData: any) => {
+    console.log('Product action:', action, productData);
+    // Handle product actions like "Ask More", "View Items", etc.
+  };
+
   return (
-    <View style={styles.container}>
-      <SafeAreaView style={styles.container}>
-        {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButtonContainer}>
-            <Text style={styles.backButton}>‹</Text>
-          </TouchableOpacity>
-           <Text style={styles.roomTitle}>
-             {room ? room.name : 'Room'}
-           </Text>
-          <TouchableOpacity onPress={() => setShowMenu(true)}>
-            <Text style={styles.menuButton}>⋮</Text>
-          </TouchableOpacity>
-        </View>
+    <>
+      <MayaChat
+        roomName={room ? room.name : 'Room'}
+        onBack={() => router.back()}
+        onMenuPress={() => setShowMenu(true)}
+        messages={mayaMessages}
+        onSendMessage={handleSendMessage}
+        onProductAction={handleProductAction}
+      />
 
-        {/* Chat Area */}
-        <View style={styles.chatArea}>
-        <FlatList
-          ref={flatListRef}
-          data={messages}
-          renderItem={renderMessage}
-          keyExtractor={item => item.id}
-          style={styles.messagesList}
-          showsVerticalScrollIndicator={false}
-          onContentSizeChange={() => flatListRef.current?.scrollToEnd()}
-        />
-        </View>
-
-        {/* Input Area */}
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
-          style={styles.inputContainer}
+      {/* Menu Modal */}
+      <Modal
+        visible={showMenu}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowMenu(false)}
+      >
+        <TouchableOpacity 
+          style={styles.modalOverlay} 
+          activeOpacity={1} 
+          onPress={() => setShowMenu(false)}
         >
-          <TouchableOpacity style={styles.addButton}>
-            <Text style={styles.addButtonText}>+</Text>
-          </TouchableOpacity>
-          <TextInput
-            style={styles.textInput}
-            value={inputText}
-            onChangeText={setInputText}
-            placeholder="Type your message here..."
-            placeholderTextColor="#999"
-            multiline
-            maxLength={500}
-          />
-          <TouchableOpacity style={styles.sendButton} onPress={sendMessage}>
-            <Image 
-              source={require('@/assets/images/send_icon.png')} 
-              style={styles.sendIcon}
-              resizeMode="contain"
-            />
-          </TouchableOpacity>
-        </KeyboardAvoidingView>
-
-        {/* Menu Modal */}
-        <Modal
-          visible={showMenu}
-          transparent={true}
-          animationType="fade"
-          onRequestClose={() => setShowMenu(false)}
-        >
-          <TouchableOpacity 
-            style={styles.modalOverlay} 
-            activeOpacity={1} 
-            onPress={() => setShowMenu(false)}
-          >
-            <View style={styles.menuContainer}>
-              <TouchableOpacity 
-                style={styles.menuItem}
-                onPress={() => handleMenuAction('startSession')}
-              >
-                <View style={styles.menuIconContainer}>
-                  <Image 
-                    source={require('@/assets/images/start_session_icon.png')} 
-                    style={styles.menuIconImage}
-                    resizeMode="contain"
-                  />
-                </View>
-                <Text style={styles.menuText}>Start Session</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={styles.menuItem}
-                onPress={() => handleMenuAction('roomSettings')}
-              >
-                <View style={styles.menuIconContainer}>
-                  <Image 
-                    source={require('@/assets/images/room_settings.png')} 
-                    style={styles.menuIconImage}
-                    resizeMode="contain"
-                  />
-                </View>
-                <Text style={styles.menuText}>Room Settings</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={styles.menuItem}
-                onPress={() => handleMenuAction('wardrobe')}
-              >
-                <View style={styles.menuIconContainer}>
-                  <Image 
-                    source={require('@/assets/images/wardrobe_icon.png')} 
-                    style={styles.menuIconImage}
-                    resizeMode="contain"
-                  />
-                </View>
-                <Text style={styles.menuText}>Wardrobe</Text>
-              </TouchableOpacity>
-            </View>
-          </TouchableOpacity>
-        </Modal>
-      </SafeAreaView>
-    </View>
-
+          <View style={styles.menuContainer}>
+            <TouchableOpacity 
+              style={styles.menuItem}
+              onPress={() => handleMenuAction('startSession')}
+            >
+              <View style={styles.menuIconContainer}>
+                <Image 
+                  source={require('@/assets/images/start_session_icon.png')} 
+                  style={styles.menuIconImage}
+                  resizeMode="contain"
+                />
+              </View>
+              <Text style={styles.menuText}>Start Session</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.menuItem}
+              onPress={() => handleMenuAction('roomSettings')}
+            >
+              <View style={styles.menuIconContainer}>
+                <Image 
+                  source={require('@/assets/images/room_settings.png')} 
+                  style={styles.menuIconImage}
+                  resizeMode="contain"
+                />
+              </View>
+              <Text style={styles.menuText}>Room Settings</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.menuItem}
+              onPress={() => handleMenuAction('wardrobe')}
+            >
+              <View style={styles.menuIconContainer}>
+                <Image 
+                  source={require('@/assets/images/wardrobe_icon.png')} 
+                  style={styles.menuIconImage}
+                  resizeMode="contain"
+                />
+              </View>
+              <Text style={styles.menuText}>Wardrobe</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+    </>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: MayaTheme.colors.background,
   },
   header: {
     flexDirection: 'row',
@@ -734,13 +755,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 8,
-    backgroundColor: 'white',
+    backgroundColor: MayaTheme.colors.backgroundWhite,
     minHeight: 44,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 2,
+    ...MayaTheme.shadows.sm,
   },
   backButtonContainer: {
     padding: 8,
