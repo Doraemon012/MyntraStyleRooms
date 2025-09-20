@@ -1,9 +1,10 @@
 import { ThemedView } from '@/components/themed-view';
 import { LinearGradient } from 'expo-linear-gradient';
-import { router, useLocalSearchParams } from 'expo-router';
-import React, { useEffect, useRef, useState } from 'react';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
     ActivityIndicator,
+    Alert,
     FlatList,
     Image,
     KeyboardAvoidingView,
@@ -16,54 +17,13 @@ import {
     View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useAuth } from '../../contexts/auth-context';
+import { useRoom } from '../../contexts/room-context';
+import { useSocket } from '../../contexts/socket-context';
+import { Message, messageApi } from '../../services/messageApi';
+import { Room } from '../../services/roomApi';
 
-interface Message {
-  id: string;
-  text: string;
-  sender: 'user' | 'friend' | 'ai';
-  senderName: string;
-  senderAvatar?: string;
-  timestamp: string;
-  isProduct?: boolean;
-  productData?: {
-    name: string;
-    price: string;
-    image: string;
-    description?: string;
-  };
-  reactions?: {
-    thumbsUp: number;
-    thumbsDown: number;
-    userThumbsUp?: boolean;
-    userThumbsDown?: boolean;
-  };
-}
-
-interface Room {
-  _id: string;
-  name: string;
-  description?: string;
-  emoji?: string;
-  isPrivate: boolean;
-  owner: {
-    _id: string;
-    name: string;
-    email: string;
-    profileImage?: string;
-  };
-  members: Array<{
-    userId: {
-      _id: string;
-      name: string;
-      email: string;
-      profileImage?: string;
-    };
-    role: 'Owner' | 'Editor' | 'Contributor' | 'Viewer';
-    joinedAt: string;
-  }>;
-  createdAt: string;
-  updatedAt: string;
-}
+// Using Message interface from messageApi service
 
 
 // Helper function to format timestamp
@@ -83,251 +43,385 @@ const formatTimestamp = (date: Date): string => {
   }
 };
 
-const mockMessages: Message[] = [
-  {
-    id: '1',
-    text: '@Maya Looking for some ethnic wear for the wedding',
-    sender: 'user',
-    senderName: 'You',
-    senderAvatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face',
-    timestamp: formatTimestamp(new Date(Date.now() - 2 * 60 * 60 * 1000)), // 2 hours ago
-  },
-  {
-    id: '2',
-    text: 'What\'s your Budget range?',
-    sender: 'ai',
-    senderName: 'Maya(AI)',
-    senderAvatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face',
-    timestamp: formatTimestamp(new Date(Date.now() - 1 * 60 * 60 * 1000)), // 1 hour ago
-  },
-  {
-    id: '3',
-    text: 'Around ₹5,000 would be perfect!',
-    sender: 'user',
-    senderName: 'You',
-    senderAvatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face',
-    timestamp: formatTimestamp(new Date(Date.now() - 30 * 60 * 1000)), // 30 minutes ago
-  },
-  {
-    id: '4',
-    text: 'I found some beautiful sarees in your budget! Here\'s a stunning red silk saree that would be perfect for the wedding.',
-    sender: 'ai',
-    senderName: 'Maya(AI)',
-    senderAvatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face',
-    timestamp: formatTimestamp(new Date(Date.now() - 15 * 60 * 1000)), // 15 minutes ago
-    isProduct: true,
-    productData: {
-      name: 'Red Silk Saree with Golden Border',
-      price: '₹4,999',
-      image: 'https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=300&h=400&fit=crop&crop=face',
-      description: 'Elegant red silk saree with intricate golden border work',
-    },
+// Helper function to convert API message to display format
+const convertApiMessageToDisplay = (apiMessage: Message, currentUserId: string): any => {
+  const isUserMessage = apiMessage.senderId?._id === currentUserId;
+  const isSystemMessage = apiMessage.senderType === 'system';
+  
+  return {
+    id: apiMessage._id,
+    text: apiMessage.text || '',
+    sender: isUserMessage ? 'user' : 'friend',
+    senderName: isUserMessage ? 'You' : (isSystemMessage ? 'System' : apiMessage.senderId?.name || 'Unknown'),
+    senderAvatar: apiMessage.senderId?.profileImage || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face',
+    timestamp: formatTimestamp(new Date(apiMessage.timestamp)),
+    isProduct: apiMessage.messageType === 'product',
+    productData: apiMessage.productData,
     reactions: {
-      thumbsUp: 2,
-      thumbsDown: 2,
-      userThumbsUp: false,
-      userThumbsDown: false,
+      thumbsUp: apiMessage.reactions?.filter(r => r.type === 'like').length || 0,
+      thumbsDown: apiMessage.reactions?.filter(r => r.type === 'angry').length || 0,
+      heart: apiMessage.reactions?.filter(r => r.type === 'love').length || 0,
+      laugh: apiMessage.reactions?.filter(r => r.type === 'laugh').length || 0,
+      wow: apiMessage.reactions?.filter(r => r.type === 'wow').length || 0,
+      sad: apiMessage.reactions?.filter(r => r.type === 'sad').length || 0,
+      userThumbsUp: apiMessage.reactions?.some(r => r.userId === currentUserId && r.type === 'like') || false,
+      userThumbsDown: apiMessage.reactions?.some(r => r.userId === currentUserId && r.type === 'angry') || false,
+      userHeart: apiMessage.reactions?.some(r => r.userId === currentUserId && r.type === 'love') || false,
+      userLaugh: apiMessage.reactions?.some(r => r.userId === currentUserId && r.type === 'laugh') || false,
+      userWow: apiMessage.reactions?.some(r => r.userId === currentUserId && r.type === 'wow') || false,
+      userSad: apiMessage.reactions?.some(r => r.userId === currentUserId && r.type === 'sad') || false,
     },
-  },
-  {
-    id: '5',
-    text: 'I think it would look good on you',
-    sender: 'friend',
-    senderName: 'Richa',
-    senderAvatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150&h=150&fit=crop&crop=face',
-    timestamp: formatTimestamp(new Date(Date.now() - 10 * 60 * 1000)), // 10 minutes ago
-  },
-  {
-    id: '6',
-    text: '++',
-    sender: 'friend',
-    senderName: 'Neyati',
-    senderAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&h=150&fit=crop&crop=face',
-    timestamp: formatTimestamp(new Date(Date.now() - 5 * 60 * 1000)), // 5 minutes ago
-  },
-  // Add some older messages to demonstrate date display
-  {
-    id: '7',
-    text: 'Great choice! This saree looks perfect for the occasion.',
-    sender: 'friend',
-    senderName: 'Priya',
-    senderAvatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&h=150&fit=crop&crop=face',
-    timestamp: formatTimestamp(new Date(Date.now() - 24 * 60 * 60 * 1000)), // Yesterday
-  },
-  {
-    id: '8',
-    text: 'Thanks for the suggestions everyone!',
-    sender: 'user',
-    senderName: 'You',
-    senderAvatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face',
-    timestamp: formatTimestamp(new Date(Date.now() - 2 * 24 * 60 * 60 * 1000)), // 2 days ago
-  },
-];
-
-// Mock room data that matches the rooms from index page
-const mockRooms: Record<string, { name: string; memberCount: number }> = {
-  '1': { name: 'College Freshers Party', memberCount: 12 },
-  '2': { name: 'Wedding Shopping', memberCount: 8 },
-  '3': { name: 'Family Wedding', memberCount: 25 },
-  '4': { name: 'Friends Reunion', memberCount: 18 },
-  '5': { name: 'Work Conference', memberCount: 7 },
+  };
 };
 
 
 export default function RoomChatScreen() {
   const { id } = useLocalSearchParams();
-  const roomData = mockRooms[id as string] || mockRooms['1'];
   
-  const [messages, setMessages] = useState<Message[]>(mockMessages);
+  // Get real data from contexts
+  const { user, token, logout } = useAuth();
+  const { rooms: allRooms, getRoom, refreshRoom } = useRoom();
+  const { socket, isConnected, joinRoom, leaveRoom, onNewMessage, onMessageEdited, onMessageDeleted, onMessageReaction, onTypingStart, onTypingStop, emitTypingStart, emitTypingStop, offEvent } = useSocket();
+  
+  const [messages, setMessages] = useState<any[]>([]);
   const [inputText, setInputText] = useState('');
   const [room, setRoom] = useState<Room | null>(null);
   const [loading, setLoading] = useState(true);
   const [showMenu, setShowMenu] = useState(false);
+  const [sendingMessage, setSendingMessage] = useState(false);
+  const [typingUsers, setTypingUsers] = useState<string[]>([]);
+  const [isTyping, setIsTyping] = useState(false);
+  const [isLoadingMessages, setIsLoadingMessages] = useState(false);
 
   const flatListRef = useRef<FlatList>(null);
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   
-  // Fetch room data from API with better error handling
+  // Check if user has permission to edit room settings
+  const canEditRoom = (): boolean => {
+    if (!user || !room) return false;
+    
+    // Check if user is the room owner
+    if (room.owner._id === user._id) {
+      return true;
+    }
+    
+    // Check if user has Editor role
+    const userMember = room.members.find(member => member.userId._id === user._id);
+    return userMember?.role === 'Editor';
+  };
+  
+  // Fetch room data from real API
   const fetchRoomData = async () => {
     try {
       setLoading(true);
+      console.log('🏠 RoomChatScreen: Fetching room from Myntra Fashion database:', id);
       
-      // For development, we'll use mock data directly to avoid network errors
-      // In production, you would uncomment the API call below
-      
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Use mock data directly for now
-      const mockRoomData = mockRooms[id as string];
-      if (mockRoomData) {
-        setRoom({
-          _id: id as string,
-          name: mockRoomData.name,
-          emoji: getRoomEmoji(id as string),
-          members: generateMockMembers(mockRoomData.memberCount - 1),
-          owner: { _id: '1', name: 'Room Owner', email: 'owner@example.com' },
-          isPrivate: false,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        });
-      } else {
+      if (!token || !user) {
+        console.error('No authentication token or user');
         setRoom(null);
+        return;
       }
-      
-      /* 
-      // Uncomment this section when your backend is running
-      const API_BASE_URL = 'http://localhost:5000/api';
-      const response = await fetch(`${API_BASE_URL}/rooms/${id}`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          // 'Authorization': `Bearer ${authToken}` // Add when auth is implemented
-        },
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        setRoom(data.data.room);
-      } else {
-        throw new Error(`API Error: ${response.status}`);
+
+      // Try to get room from context first (if already loaded)
+      const existingRoom = allRooms.find(r => r._id === id);
+      if (existingRoom) {
+        console.log('✅ Room found in context:', existingRoom.name);
+        setRoom(existingRoom);
+        return;
       }
-      */
+
+      // If not in context, fetch from API
+      console.log('🔄 Fetching room from API...');
+      const roomData = await getRoom(id as string);
+      console.log('✅ Room fetched from API:', roomData.name);
+      setRoom(roomData);
       
-    } catch (error) {
-      console.log('Using mock data for room:', id);
-      // Fallback to mock data
-      const mockRoomData = mockRooms[id as string];
-      if (mockRoomData) {
-        setRoom({
-          _id: id as string,
-          name: mockRoomData.name,
-          emoji: getRoomEmoji(id as string),
-          members: generateMockMembers(mockRoomData.memberCount - 1),
-          owner: { _id: '1', name: 'Room Owner', email: 'owner@example.com' },
-          isPrivate: false,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        });
-      } else {
-        setRoom(null);
-      }
+    } catch (error: any) {
+      console.error('❌ Failed to fetch room:', error);
+      setRoom(null);
     } finally {
       setLoading(false);
     }
   };
-  
-  // Helper function to get room emoji based on ID
-  const getRoomEmoji = (roomId: string): string => {
-    const emojiMap: Record<string, string> = {
-      '1': '🎉',
-      '2': '👰',
-      '3': '👗',
-      '4': '🌟',
-      '5': '💼',
-    };
-    return emojiMap[roomId] || '👗';
+
+  // Fetch messages for the room with retry logic
+  const fetchMessages = async (retryCount = 0) => {
+    try {
+      if (!token || !user || !id || isLoadingMessages) {
+        console.error('Missing required data for fetching messages or already loading');
+        return;
+      }
+
+      setIsLoadingMessages(true);
+      console.log(`💬 Fetching messages for room: ${id} (attempt ${retryCount + 1})`);
+      const response = await messageApi.getMessages(token, id as string, {
+        page: 1,
+        limit: 50
+      });
+
+      if (response.status === 'success') {
+        const displayMessages = response.data.messages.map(msg => 
+          convertApiMessageToDisplay(msg, user._id)
+        );
+        setMessages(displayMessages);
+        console.log('✅ Messages loaded:', displayMessages.length);
+      } else {
+        console.error('❌ Failed to fetch messages:', response.message);
+        if (retryCount < 2) {
+          console.log('🔄 Retrying message fetch...');
+          setTimeout(() => fetchMessages(retryCount + 1), 1000);
+        } else {
+          Alert.alert('Error', 'Failed to load messages after multiple attempts.');
+        }
+      }
+    } catch (error: any) {
+      console.error('❌ Error fetching messages:', error);
+      
+      if (retryCount < 2) {
+        console.log('🔄 Retrying message fetch due to error...');
+        setTimeout(() => fetchMessages(retryCount + 1), 1000);
+      } else {
+        Alert.alert('Error', 'Failed to load messages. Please check your connection and try again.');
+      }
+    } finally {
+      setIsLoadingMessages(false);
+    }
   };
   
-  // Helper function to generate mock members
-  const generateMockMembers = (count: number) => {
-    const mockNames = ['Alice', 'Bob', 'Charlie', 'Diana', 'Eve', 'Frank', 'Grace', 'Henry'];
-    return Array.from({ length: Math.min(count, mockNames.length) }, (_, index) => ({
-      userId: {
-        _id: `member_${index + 1}`,
-        name: mockNames[index] || `Member ${index + 1}`,
-        email: `${mockNames[index]?.toLowerCase() || `member${index + 1}`}@example.com`,
-        profileImage: undefined,
-      },
-      role: 'Contributor' as const,
-      joinedAt: new Date().toISOString(),
-    }));
-  };
+  // No more mock helper functions - using real data from database
   
   useEffect(() => {
     fetchRoomData();
   }, [id]);
 
-  const sendMessage = () => {
-    if (inputText.trim()) {
-      const now = new Date();
-      const newMessage: Message = {
-        id: Date.now().toString(),
-        text: inputText.trim(),
-        sender: 'user',
-        senderName: 'You',
-        senderAvatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face',
-        timestamp: formatTimestamp(now),
-      };
-      
-      setMessages([...messages, newMessage]);
-      setInputText('');
-      
-      // Check if message mentions Maya AI
-      if (inputText.toLowerCase().includes('@maya') || inputText.toLowerCase().includes('@mayaai')) {
-      setTimeout(() => {
-        const aiResponseTime = new Date();
-        const aiResponse: Message = {
-          id: (Date.now() + 1).toString(),
-            text: 'I found some beautiful options for you! Here\'s a stunning piece from Myntra\'s collection.',
-          sender: 'ai',
-            senderName: 'Maya(AI)',
-            senderAvatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face',
-          timestamp: formatTimestamp(aiResponseTime),
-            isProduct: true,
-            productData: {
-              name: 'Designer Ethnic Wear',
-              price: '₹3,999',
-              image: 'https://images.unsplash.com/photo-1594736797933-d0401ba2fe65?w=300&h=400&fit=crop&crop=face',
-              description: 'Beautiful ethnic wear perfect for special occasions',
-            },
-            reactions: {
-              thumbsUp: 0,
-              thumbsDown: 0,
-            },
-        };
-        setMessages(prev => [...prev, aiResponse]);
-        }, 1500);
+  // Fetch messages when room is loaded
+  useEffect(() => {
+    if (room && token && user && !isLoadingMessages && messages.length === 0) {
+      fetchMessages();
+    }
+  }, [room, token, user, isLoadingMessages, messages.length]);
+
+
+  // Socket.io real-time messaging
+  useEffect(() => {
+    if (!socket || !isConnected || !room || !user) return;
+
+    console.log('🔌 Setting up Socket.io listeners for room:', room._id);
+    
+    // Join the room
+    joinRoom(room._id);
+
+    // Listen for new messages
+    const handleNewMessage = (data: any) => {
+      console.log('📨 New message received:', data);
+      if (data.roomId === room._id) {
+        const newMessage = convertApiMessageToDisplay(data.message, user._id);
+        setMessages(prev => {
+          // Check if message already exists to avoid duplicates
+          const exists = prev.some(msg => msg.id === newMessage.id);
+          if (exists) return prev;
+          return [...prev, newMessage];
+        });
+        
+        // Scroll to bottom immediately when new message arrives
+        flatListRef.current?.scrollToEnd({ animated: true });
       }
+    };
+
+    // Listen for message edits
+    const handleMessageEdited = (data: any) => {
+      console.log('✏️ Message edited:', data);
+      if (data.roomId === room._id) {
+        const updatedMessage = convertApiMessageToDisplay(data.message, user._id);
+        setMessages(prev => 
+          prev.map(msg => msg.id === updatedMessage.id ? updatedMessage : msg)
+        );
+      }
+    };
+
+    // Listen for message deletions
+    const handleMessageDeleted = (data: any) => {
+      console.log('🗑️ Message deleted:', data);
+      if (data.roomId === room._id) {
+        setMessages(prev => prev.filter(msg => msg.id !== data.messageId));
+      }
+    };
+
+    // Listen for message reactions
+    const handleMessageReaction = (data: any) => {
+      console.log('👍 Message reaction:', data);
+      if (data.roomId === room._id) {
+        const updatedMessage = convertApiMessageToDisplay(data.message, user._id);
+        setMessages(prev => 
+          prev.map(msg => msg.id === updatedMessage.id ? updatedMessage : msg)
+        );
+      }
+    };
+
+    // Listen for typing indicators
+    const handleTypingStart = (data: any) => {
+      if (data.roomId === room._id && data.userId !== user._id) {
+        setTypingUsers(prev => {
+          if (!prev.includes(data.userName)) {
+            return [...prev, data.userName];
+          }
+          return prev;
+        });
+      }
+    };
+
+    const handleTypingStop = (data: any) => {
+      if (data.roomId === room._id && data.userId !== user._id) {
+        setTypingUsers(prev => prev.filter(name => name !== data.userName));
+      }
+    };
+
+    // Set up event listeners
+    onNewMessage(handleNewMessage);
+    onMessageEdited(handleMessageEdited);
+    onMessageDeleted(handleMessageDeleted);
+    onMessageReaction(handleMessageReaction);
+    onTypingStart(handleTypingStart);
+    onTypingStop(handleTypingStop);
+
+    // Cleanup function
+    return () => {
+      console.log('🔌 Cleaning up Socket.io listeners');
+      leaveRoom(room._id);
+      offEvent('new-message');
+      offEvent('message-edited');
+      offEvent('message-deleted');
+      offEvent('message-reaction');
+      offEvent('typing-start');
+      offEvent('typing-stop');
+    };
+  }, [socket, isConnected, room, user, joinRoom, leaveRoom, onNewMessage, onMessageEdited, onMessageDeleted, onMessageReaction, onTypingStart, onTypingStop, offEvent]);
+
+  // Cleanup typing indicators on unmount
+  useEffect(() => {
+    return () => {
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+      if (isTyping && room) {
+        emitTypingStop(room._id);
+      }
+    };
+  }, [isTyping, room, emitTypingStop]);
+
+  // Handle typing indicators
+  const handleTextChange = (text: string) => {
+    setInputText(text);
+    
+    if (!room || !isConnected) return;
+    
+    // Clear existing timeout
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+    }
+    
+    // Start typing indicator if not already typing
+    if (!isTyping && text.trim().length > 0) {
+      setIsTyping(true);
+      emitTypingStart(room._id);
+    }
+    
+    // Set timeout to stop typing indicator
+    typingTimeoutRef.current = setTimeout(() => {
+      if (isTyping) {
+        setIsTyping(false);
+        emitTypingStop(room._id);
+      }
+    }, 1000);
+  };
+
+  // Handle message reactions
+  const handleReaction = async (messageId: string, reactionType: 'like' | 'love' | 'laugh' | 'wow' | 'sad' | 'angry') => {
+    if (!token) return;
+    
+    try {
+      await messageApi.addReaction(token, messageId, reactionType);
+    } catch (error) {
+      console.error('Error adding reaction:', error);
+    }
+  };
+
+
+  // Refresh room data when screen comes into focus (e.g., returning from settings)
+  useFocusEffect(
+    useCallback(() => {
+      console.log('🔄 Room screen focused - refreshing room data...');
+      if (id && token && user && !loading) { // Prevent multiple simultaneous calls
+        refreshRoom(id as string).then(updatedRoom => {
+          console.log('✅ Room refreshed:', updatedRoom.name);
+          setRoom(updatedRoom);
+        }).catch(error => {
+          console.error('❌ Failed to refresh room:', error);
+          // Only fallback if room is not already loaded
+          if (!room) {
+            fetchRoomData();
+          }
+        });
+      }
+    }, [id, token, user, refreshRoom, loading, room])
+  );
+
+  const sendMessage = async () => {
+    if (!inputText.trim() || !token || !user || !id || sendingMessage) {
+      return;
+    }
+
+    try {
+      setSendingMessage(true);
+      const messageText = inputText.trim();
+      
+      console.log('📤 Sending message:', messageText);
+      
+      // Send message to API
+      const response = await messageApi.sendMessage(token, id as string, {
+        text: messageText,
+        messageType: 'text'
+      });
+
+      if (response.status === 'success') {
+        // Don't add message to local state here - let Socket.io handle it
+        // This prevents duplicate messages when Socket.io broadcasts
+        setInputText('');
+        
+        // Stop typing indicator
+        if (isTyping) {
+          setIsTyping(false);
+          emitTypingStop(id as string);
+        }
+        
+        // Clear typing timeout
+        if (typingTimeoutRef.current) {
+          clearTimeout(typingTimeoutRef.current);
+        }
+        
+        // Scroll to bottom immediately for faster UX
+        flatListRef.current?.scrollToEnd({ animated: true });
+        
+        console.log('✅ Message sent successfully');
+      } else {
+        console.error('❌ Failed to send message:', response.message);
+        Alert.alert('Error', response.message || 'Failed to send message');
+      }
+    } catch (error: any) {
+      console.error('❌ Error sending message:', error);
+      
+      // Show specific error messages
+      if (error.code === 'ECONNABORTED') {
+        Alert.alert('Error', 'Message sending timed out. Please check your connection.');
+      } else if (error.code === 'ENOTFOUND' || error.code === 'ECONNREFUSED') {
+        Alert.alert('Error', 'Cannot connect to server. Please check your internet connection.');
+      } else if (error.response?.status === 401) {
+        Alert.alert('Error', 'Session expired. Please log in again.');
+      } else {
+        Alert.alert('Error', 'Failed to send message. Please try again.');
+      }
+    } finally {
+      setSendingMessage(false);
     }
   };
 
@@ -346,67 +440,35 @@ export default function RoomChatScreen() {
         // Navigate to room settings
         router.push(`/room/settings?id=${id}`);
         break;
+      case 'logout':
+        // Logout user
+        Alert.alert(
+          'Logout',
+          'Are you sure you want to logout?',
+          [
+            {
+              text: 'Cancel',
+              style: 'cancel',
+            },
+            {
+              text: 'Logout',
+              style: 'destructive',
+              onPress: async () => {
+                try {
+                  await logout();
+                } catch (error) {
+                  Alert.alert('Error', 'Failed to logout. Please try again.');
+                }
+              },
+            },
+          ]
+        );
+        break;
     }
   };
 
-  const handleReaction = (messageId: string, reactionType: 'thumbsUp' | 'thumbsDown') => {
-    setMessages(prevMessages => 
-      prevMessages.map(message => {
-        if (message.id === messageId && message.reactions) {
-          const currentReactions = message.reactions;
-          let newThumbsUp = currentReactions.thumbsUp;
-          let newThumbsDown = currentReactions.thumbsDown;
-          let newUserThumbsUp = currentReactions.userThumbsUp || false;
-          let newUserThumbsDown = currentReactions.userThumbsDown || false;
 
-          if (reactionType === 'thumbsUp') {
-            if (newUserThumbsUp) {
-              // User is unliking
-              newThumbsUp = Math.max(0, newThumbsUp - 1);
-              newUserThumbsUp = false;
-            } else {
-              // User is liking
-              newThumbsUp += 1;
-              newUserThumbsUp = true;
-              // If user was disliking, remove dislike
-              if (newUserThumbsDown) {
-                newThumbsDown = Math.max(0, newThumbsDown - 1);
-                newUserThumbsDown = false;
-              }
-            }
-          } else if (reactionType === 'thumbsDown') {
-            if (newUserThumbsDown) {
-              // User is undisliking
-              newThumbsDown = Math.max(0, newThumbsDown - 1);
-              newUserThumbsDown = false;
-            } else {
-              // User is disliking
-              newThumbsDown += 1;
-              newUserThumbsDown = true;
-              // If user was liking, remove like
-              if (newUserThumbsUp) {
-                newThumbsUp = Math.max(0, newThumbsUp - 1);
-                newUserThumbsUp = false;
-              }
-            }
-          }
-
-          return {
-            ...message,
-            reactions: {
-              thumbsUp: newThumbsUp,
-              thumbsDown: newThumbsDown,
-              userThumbsUp: newUserThumbsUp,
-              userThumbsDown: newUserThumbsDown,
-            }
-          };
-        }
-        return message;
-      })
-    );
-  };
-
-  const renderMessage = ({ item }: { item: Message }) => {
+  const renderMessage = ({ item }: { item: any }) => {
     const isUserMessage = item.sender === 'user';
     
     return (
@@ -414,10 +476,9 @@ export default function RoomChatScreen() {
         {!isUserMessage && (
           <View style={styles.messageHeader}>
             <Image source={{ uri: item.senderAvatar }} style={styles.avatar} />
-
-        <Text style={styles.senderName}>{item.senderName}</Text>
+            <Text style={styles.senderName}>{item.senderName}</Text>
           </View>
-      )}
+        )}
       
         {isUserMessage ? (
           <LinearGradient
@@ -441,7 +502,10 @@ export default function RoomChatScreen() {
                       end={{ x: 1, y: 0 }}
                       style={styles.addToWardrobeBtn}
                     >
-                      <TouchableOpacity style={styles.addToWardrobeBtnInner}>
+                      <TouchableOpacity 
+                        style={styles.addToWardrobeBtnInner}
+                        onPress={() => console.log('Add to wardrobe:', item.productData)}
+                      >
                         <Text style={styles.addToWardrobeText}>Add to Wardrobe</Text>
                       </TouchableOpacity>
                     </LinearGradient>
@@ -456,34 +520,40 @@ export default function RoomChatScreen() {
                           styles.reactionButton,
                           item.reactions.userThumbsUp && styles.reactionButtonActive
                         ]}
-                        onPress={() => handleReaction(item.id, 'thumbsUp')}
+                        onPress={() => handleReaction(item.id, 'like')}
                       >
-                        <Image 
-                          source={require('@/assets/images/thumbs_up_icon.png')} 
-                          style={[
-                            styles.reactionIcon,
-                            item.reactions.userThumbsUp && styles.reactionIconActive
-                          ]}
-                          resizeMode="contain"
-                        />
+                        <Text style={styles.reactionEmoji}>👍</Text>
                         <Text style={styles.reactionCount}>{item.reactions.thumbsUp}</Text>
                       </TouchableOpacity>
                       <TouchableOpacity 
                         style={[
                           styles.reactionButton,
-                          item.reactions.userThumbsDown && styles.reactionButtonActive
+                          item.reactions.userHeart && styles.reactionButtonActive
                         ]}
-                        onPress={() => handleReaction(item.id, 'thumbsDown')}
+                        onPress={() => handleReaction(item.id, 'love')}
                       >
-                        <Image 
-                          source={require('@/assets/images/thumbs_down_icon.png')} 
-                          style={[
-                            styles.reactionIcon,
-                            item.reactions.userThumbsDown && styles.reactionIconActive
-                          ]}
-                          resizeMode="contain"
-                        />
-                        <Text style={styles.reactionCount}>{item.reactions.thumbsDown}</Text>
+                        <Text style={styles.reactionEmoji}>❤️</Text>
+                        <Text style={styles.reactionCount}>{item.reactions.heart}</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity 
+                        style={[
+                          styles.reactionButton,
+                          item.reactions.userLaugh && styles.reactionButtonActive
+                        ]}
+                        onPress={() => handleReaction(item.id, 'laugh')}
+                      >
+                        <Text style={styles.reactionEmoji}>😂</Text>
+                        <Text style={styles.reactionCount}>{item.reactions.laugh}</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity 
+                        style={[
+                          styles.reactionButton,
+                          item.reactions.userWow && styles.reactionButtonActive
+                        ]}
+                        onPress={() => handleReaction(item.id, 'wow')}
+                      >
+                        <Text style={styles.reactionEmoji}>😮</Text>
+                        <Text style={styles.reactionCount}>{item.reactions.wow}</Text>
                       </TouchableOpacity>
                     </View>
                   )}
@@ -515,7 +585,10 @@ export default function RoomChatScreen() {
                       end={{ x: 1, y: 0 }}
                       style={styles.addToWardrobeBtn}
                     >
-                      <TouchableOpacity style={styles.addToWardrobeBtnInner}>
+                      <TouchableOpacity 
+                        style={styles.addToWardrobeBtnInner}
+                        onPress={() => console.log('Add to wardrobe:', item.productData)}
+                      >
                         <Text style={styles.addToWardrobeText}>Add to Wardrobe</Text>
                       </TouchableOpacity>
                     </LinearGradient>
@@ -530,34 +603,40 @@ export default function RoomChatScreen() {
                           styles.reactionButton,
                           item.reactions.userThumbsUp && styles.reactionButtonActive
                         ]}
-                        onPress={() => handleReaction(item.id, 'thumbsUp')}
+                        onPress={() => handleReaction(item.id, 'like')}
                       >
-                        <Image 
-                          source={require('@/assets/images/thumbs_up_icon.png')} 
-                          style={[
-                            styles.reactionIcon,
-                            item.reactions.userThumbsUp && styles.reactionIconActive
-                          ]}
-                          resizeMode="contain"
-                        />
+                        <Text style={styles.reactionEmoji}>👍</Text>
                         <Text style={styles.reactionCount}>{item.reactions.thumbsUp}</Text>
                       </TouchableOpacity>
                       <TouchableOpacity 
                         style={[
                           styles.reactionButton,
-                          item.reactions.userThumbsDown && styles.reactionButtonActive
+                          item.reactions.userHeart && styles.reactionButtonActive
                         ]}
-                        onPress={() => handleReaction(item.id, 'thumbsDown')}
+                        onPress={() => handleReaction(item.id, 'love')}
                       >
-                        <Image 
-                          source={require('@/assets/images/thumbs_down_icon.png')} 
-                          style={[
-                            styles.reactionIcon,
-                            item.reactions.userThumbsDown && styles.reactionIconActive
-                          ]}
-                          resizeMode="contain"
-                        />
-                        <Text style={styles.reactionCount}>{item.reactions.thumbsDown}</Text>
+                        <Text style={styles.reactionEmoji}>❤️</Text>
+                        <Text style={styles.reactionCount}>{item.reactions.heart}</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity 
+                        style={[
+                          styles.reactionButton,
+                          item.reactions.userLaugh && styles.reactionButtonActive
+                        ]}
+                        onPress={() => handleReaction(item.id, 'laugh')}
+                      >
+                        <Text style={styles.reactionEmoji}>😂</Text>
+                        <Text style={styles.reactionCount}>{item.reactions.laugh}</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity 
+                        style={[
+                          styles.reactionButton,
+                          item.reactions.userWow && styles.reactionButtonActive
+                        ]}
+                        onPress={() => handleReaction(item.id, 'wow')}
+                      >
+                        <Text style={styles.reactionEmoji}>😮</Text>
+                        <Text style={styles.reactionCount}>{item.reactions.wow}</Text>
                       </TouchableOpacity>
                     </View>
                   )}
@@ -583,8 +662,8 @@ export default function RoomChatScreen() {
       <ThemedView style={styles.container}>
         <SafeAreaView style={styles.container}>
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#ff6b6b" />
-            <Text style={styles.loadingText}>Loading room...</Text>
+            <ActivityIndicator size="large" color="#E91E63" />
+            <Text style={styles.loadingText}>Loading room from Myntra Fashion database...</Text>
           </View>
         </SafeAreaView>
       </ThemedView>
@@ -597,6 +676,9 @@ export default function RoomChatScreen() {
         <SafeAreaView style={styles.container}>
           <View style={styles.errorContainer}>
             <Text style={styles.errorText}>Room not found</Text>
+            <Text style={styles.databaseIndicator}>
+              📊 Connected to Myntra Fashion Database
+            </Text>
             <TouchableOpacity style={styles.backButtonStyle} onPress={() => router.back()}>
               <Text style={styles.backButtonText}>Go Back</Text>
             </TouchableOpacity>
@@ -633,6 +715,23 @@ export default function RoomChatScreen() {
           showsVerticalScrollIndicator={false}
           onContentSizeChange={() => flatListRef.current?.scrollToEnd()}
         />
+        
+        {/* Typing Indicator */}
+        {typingUsers.length > 0 && (
+          <View style={styles.typingIndicator}>
+            <Text style={styles.typingText}>
+              {typingUsers.length === 1 
+                ? `${typingUsers[0]} is typing...` 
+                : `${typingUsers.length} people are typing...`
+              }
+            </Text>
+            <View style={styles.typingDots}>
+              <View style={[styles.typingDot, styles.typingDot1]} />
+              <View style={[styles.typingDot, styles.typingDot2]} />
+              <View style={[styles.typingDot, styles.typingDot3]} />
+            </View>
+          </View>
+        )}
         </View>
 
         {/* Input Area */}
@@ -647,18 +746,26 @@ export default function RoomChatScreen() {
           <TextInput
             style={styles.textInput}
             value={inputText}
-            onChangeText={setInputText}
+            onChangeText={handleTextChange}
             placeholder="Type your message here..."
             placeholderTextColor="#999"
             multiline
             maxLength={500}
           />
-          <TouchableOpacity style={styles.sendButton} onPress={sendMessage}>
-            <Image 
-              source={require('@/assets/images/send_icon.png')} 
-              style={styles.sendIcon}
-              resizeMode="contain"
-            />
+          <TouchableOpacity 
+            style={[styles.sendButton, sendingMessage && styles.sendButtonDisabled]} 
+            onPress={sendMessage}
+            disabled={sendingMessage || !inputText.trim()}
+          >
+            {sendingMessage ? (
+              <ActivityIndicator size="small" color="#E91E63" />
+            ) : (
+              <Image 
+                source={require('@/assets/images/send_icon.png')} 
+                style={styles.sendIcon}
+                resizeMode="contain"
+              />
+            )}
           </TouchableOpacity>
         </KeyboardAvoidingView>
 
@@ -688,19 +795,21 @@ export default function RoomChatScreen() {
                 </View>
                 <Text style={styles.menuText}>Start Session</Text>
               </TouchableOpacity>
-              <TouchableOpacity 
-                style={styles.menuItem}
-                onPress={() => handleMenuAction('roomSettings')}
-              >
-                <View style={styles.menuIconContainer}>
-                  <Image 
-                    source={require('@/assets/images/room_settings.png')} 
-                    style={styles.menuIconImage}
-                    resizeMode="contain"
-                  />
-                </View>
-                <Text style={styles.menuText}>Room Settings</Text>
-              </TouchableOpacity>
+              {canEditRoom() && (
+                <TouchableOpacity 
+                  style={styles.menuItem}
+                  onPress={() => handleMenuAction('roomSettings')}
+                >
+                  <View style={styles.menuIconContainer}>
+                    <Image 
+                      source={require('@/assets/images/room_settings.png')} 
+                      style={styles.menuIconImage}
+                      resizeMode="contain"
+                    />
+                  </View>
+                  <Text style={styles.menuText}>Room Settings</Text>
+                </TouchableOpacity>
+              )}
               <TouchableOpacity 
                 style={styles.menuItem}
                 onPress={() => handleMenuAction('wardrobe')}
@@ -714,9 +823,19 @@ export default function RoomChatScreen() {
                 </View>
                 <Text style={styles.menuText}>Wardrobe</Text>
               </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.menuItem}
+                onPress={() => handleMenuAction('logout')}
+              >
+                <View style={styles.menuIconContainer}>
+                  <Text style={styles.menuIconText}>🚪</Text>
+                </View>
+                <Text style={styles.menuText}>Logout</Text>
+              </TouchableOpacity>
             </View>
           </TouchableOpacity>
         </Modal>
+
       </SafeAreaView>
     </View>
 
@@ -1028,6 +1147,9 @@ const styles = StyleSheet.create({
     width: 16,
     height: 16,
   },
+  sendButtonDisabled: {
+    opacity: 0.5,
+  },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.3)',
@@ -1063,6 +1185,10 @@ const styles = StyleSheet.create({
   menuIconImage: {
     width: 16,
     height: 16,
+  },
+  menuIconText: {
+    fontSize: 16,
+    color: '#000',
   },
   menuText: {
     fontSize: 14,
@@ -1221,5 +1347,53 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     borderWidth: 1,
     borderColor: '#8B5CF6',
+  },
+  databaseIndicator: {
+    fontSize: 12,
+    color: '#E91E63',
+    textAlign: 'center',
+    fontWeight: '600',
+    backgroundColor: '#ffe6f0',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    marginBottom: 20,
+  },
+  typingIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: '#f8f9fa',
+    borderTopWidth: 1,
+    borderTopColor: '#e9ecef',
+  },
+  typingText: {
+    fontSize: 14,
+    color: '#666',
+    marginRight: 8,
+  },
+  typingDots: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  typingDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#999',
+    marginHorizontal: 2,
+  },
+  typingDot1: {
+    animationDelay: '0s',
+  },
+  typingDot2: {
+    animationDelay: '0.2s',
+  },
+  typingDot3: {
+    animationDelay: '0.4s',
+  },
+  reactionEmoji: {
+    fontSize: 16,
   },
 });
