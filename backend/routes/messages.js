@@ -5,7 +5,6 @@ const Room = require('../models/Room');
 const { authenticateToken, checkRoomPermission } = require('../middleware/auth');
 const router = express.Router();
 
-
 // @route   GET /api/messages/:roomId
 // @desc    Get messages for a room
 // @access  Private
@@ -78,9 +77,6 @@ router.post('/:roomId', authenticateToken, checkRoomPermission('Contributor'), [
     const { text, messageType = 'text', productData, replyTo } = req.body;
     const senderId = req.user._id;
 
-    // Get room to check AI settings
-    const room = await Room.findById(roomId);
-
     // Validate message content based on type
     if (messageType === 'text' && !text) {
       return res.status(400).json({
@@ -127,7 +123,6 @@ router.post('/:roomId', authenticateToken, checkRoomPermission('Contributor'), [
         roomId
       });
     }
-
 
     res.status(201).json({
       status: 'success',

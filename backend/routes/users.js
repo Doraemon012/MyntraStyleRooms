@@ -183,9 +183,8 @@ router.get('/dashboard', authenticateToken, async (req, res) => {
 // @access  Private
 router.get('/search', authenticateToken, [
   query('q')
-    .optional()
-    .isLength({ min: 1 })
-    .withMessage('Search query must be at least 1 character'),
+    .notEmpty()
+    .withMessage('Search query is required'),
   query('limit')
     .optional()
     .isInt({ min: 1, max: 50 })
@@ -201,26 +200,18 @@ router.get('/search', authenticateToken, [
       });
     }
 
-    const { q: searchQuery = '', limit = 20 } = req.query;
-
-    let query = {
-      _id: { $ne: req.user._id }, // Exclude current user
-      isActive: true
-    };
-
-    // If search query provided, add search conditions
-    if (searchQuery.trim()) {
-      query.$or = [
-        { name: { $regex: searchQuery, $options: 'i' } },
-        { email: { $regex: searchQuery, $options: 'i' } }
-      ];
-    }
+    const { q: searchQuery, limit = 10 } = req.query;
 
     // Search users by name or email
-    const users = await User.find(query)
-      .select('name email profileImage location')
-      .sort({ name: 1 }) // Sort by name alphabetically
-      .limit(parseInt(limit));
+    const users = await User.find({
+      $or: [
+        { name: { $regex: searchQuery, $options: 'i' } },
+        { email: { $regex: searchQuery, $options: 'i' } }
+      ],
+      _id: { $ne: req.user._id } // Exclude current user
+    })
+    .select('name email profileImage')
+    .limit(parseInt(limit));
 
     res.json({
       status: 'success',
@@ -229,8 +220,7 @@ router.get('/search', authenticateToken, [
           id: user._id,
           name: user.name,
           email: user.email,
-          profileImage: user.profileImage,
-          location: user.location
+          profileImage: user.profileImage
         }))
       }
     });
@@ -275,6 +265,44 @@ router.get('/:id', authenticateToken, async (req, res) => {
   }
 });
 
+// @route   GET /api/users/search
+// @desc    Search users
+// @access  Private
+router.get('/search', authenticateToken, async (req, res) => {
+  try {
+    const { q, limit = 10 } = req.query;
+
+    if (!q || q.trim().length < 2) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Search query must be at least 2 characters'
+      });
+    }
+
+    const users = await User.find({
+      $or: [
+        { name: { $regex: q, $options: 'i' } },
+        { email: { $regex: q, $options: 'i' } }
+      ],
+      isActive: true
+    })
+      .select('name email profileImage location')
+      .limit(parseInt(limit));
+
+    res.json({
+      status: 'success',
+      data: {
+        users
+      }
+    });
+  } catch (error) {
+    console.error('Search users error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Server error'
+    });
+  }
+});
 
 // @route   POST /api/users/preferences
 // @desc    Update user preferences
