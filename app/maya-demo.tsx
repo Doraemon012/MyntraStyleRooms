@@ -136,8 +136,75 @@ export default function MayaDemoScreen() {
     
     setMessages(prev => [...prev, newMessage]);
     
-    // Simulate Maya AI response
-    if (text.toLowerCase().includes('@maya') || text.toLowerCase().includes('recommend')) {
+    // Detect specific prompts and respond accordingly
+    const lowerText = text.toLowerCase();
+    
+    // Check for party outfit request
+    if (lowerText.includes('@maya') && lowerText.includes('party') && (lowerText.includes('wear') || lowerText.includes('outfit'))) {
+      setTimeout(() => {
+        const aiResponseTime = new Date();
+        const aiResponse: Message = {
+          id: (Date.now() + 1).toString(),
+          text: 'Perfect! Here\'s a stunning party outfit that will make you the center of attention! 🎉',
+          sender: 'maya',
+          senderName: 'Maya(AI)',
+          senderAvatar: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face',
+          timestamp: aiResponseTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          isProduct: true,
+          productData: {
+            name: 'Elegant Evening Dress',
+            price: '₹5,999',
+            image: 'https://images.unsplash.com/photo-1515372039744-b8f02a3ae446?w=300&h=400&fit=crop',
+            description: 'Stunning elegant evening dress perfect for parties and special occasions. Features a beautiful flowing silhouette, delicate embellishments, and premium fabric that drapes beautifully. You\'ll look absolutely gorgeous!',
+            images: [
+              'https://images.unsplash.com/photo-1515372039744-b8f02a3ae446?w=300&h=400&fit=crop',
+              'https://images.unsplash.com/photo-1595777457583-95e059d581b8?w=300&h=400&fit=crop',
+              'https://images.unsplash.com/photo-1539008835657-9e8e9680c956?w=300&h=400&fit=crop',
+              'https://images.unsplash.com/photo-1515372039744-b8f02a3ae446?w=300&h=400&fit=crop',
+            ]
+          },
+          reactions: {
+            thumbsUp: 0,
+            thumbsDown: 0,
+          },
+        };
+        setMessages(prev => [...prev, aiResponse]);
+      }, 1500);
+    }
+    // Check for business casual outfit request
+    else if (lowerText.includes('@maya') && lowerText.includes('business casual') && lowerText.includes('outfit')) {
+      setTimeout(() => {
+        const aiResponseTime = new Date();
+        const aiResponse: Message = {
+          id: (Date.now() + 1).toString(),
+          text: 'Here\'s a perfect business casual outfit that\'s professional yet stylish! 💼',
+          sender: 'maya',
+          senderName: 'Maya(AI)',
+          senderAvatar: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face',
+          timestamp: aiResponseTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          isProduct: true,
+          productData: {
+            name: 'Classic Office Suit',
+            price: '₹7,999',
+            image: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300&h=400&fit=crop',
+            description: 'Professional office suit perfect for business meetings and corporate environments. Features a tailored blazer with matching trousers, crafted from premium wool blend fabric. Clean lines and impeccable fit for a confident professional look.',
+            images: [
+              'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300&h=400&fit=crop',
+              'https://images.unsplash.com/photo-1594938298605-cd64ee8c5d94?w=300&h=400&fit=crop',
+              'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300&h=400&fit=crop',
+              'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300&h=400&fit=crop',
+            ]
+          },
+          reactions: {
+            thumbsUp: 0,
+            thumbsDown: 0,
+          },
+        };
+        setMessages(prev => [...prev, aiResponse]);
+      }, 1500);
+    }
+    // Default Maya AI response for other @maya mentions
+    else if (lowerText.includes('@maya') || lowerText.includes('recommend')) {
       setTimeout(() => {
         const aiResponseTime = new Date();
         const aiResponse: Message = {

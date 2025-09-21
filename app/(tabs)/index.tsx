@@ -116,6 +116,8 @@ interface Room {
   lastActivity: string;
   invitedBy?: string;
   memberAvatars: string[];
+  hasActiveSession?: boolean;
+  sessionHost?: string;
   acceptedAt?: Date;
 }
 
@@ -158,6 +160,8 @@ const mockRooms: Room[] = [
     status: 'joined',
     lastActivity: '30 mins ago',
     invitedBy: undefined,
+    hasActiveSession: true,
+    sessionHost: 'Mom',
     memberAvatars: [
       'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&h=150&fit=crop&crop=face',
       'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=150&h=150&fit=crop&crop=face',
@@ -172,6 +176,8 @@ const mockRooms: Room[] = [
     status: 'joined',
     lastActivity: '1 hour ago',
     invitedBy: undefined,
+    hasActiveSession: true,
+    sessionHost: 'Sarah',
     memberAvatars: [
       'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=150&h=150&fit=crop&crop=face',
       'https://images.unsplash.com/photo-1507591064344-4c6ce005b128?w=150&h=150&fit=crop&crop=face',
@@ -255,6 +261,12 @@ export default function HomeScreen() {
     <View style={styles.roomCard}>
       {item.status === 'invited' && (
         <Text style={styles.invitedText}>{item.invitedBy} invited you to:</Text>
+      )}
+      {item.hasActiveSession && (
+        <View style={styles.sessionIndicator}>
+          <View style={styles.sessionDot} />
+          <Text style={styles.sessionText}>🔴 {item.sessionHost} is hosting a session</Text>
+        </View>
       )}
       <View style={styles.roomHeader}>
         <View style={styles.roomInfo}>
@@ -617,6 +629,29 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: '#E91E63',
     marginBottom: 6,
+    fontWeight: '500',
+  },
+  sessionIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFF3E0',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#FFE0B2',
+  },
+  sessionDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#FF5722',
+    marginRight: 6,
+  },
+  sessionText: {
+    fontSize: 10,
+    color: '#FF5722',
     fontWeight: '500',
   },
   roomHeader: {

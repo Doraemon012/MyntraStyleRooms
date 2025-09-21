@@ -165,11 +165,11 @@ const mockMessages: Message[] = [
 ];
 
 // Mock room data that matches the rooms from index page
-const mockRooms: Record<string, { name: string; memberCount: number }> = {
+const mockRooms: Record<string, { name: string; memberCount: number; hasActiveSession?: boolean; sessionHost?: string }> = {
   '1': { name: 'College Freshers Party', memberCount: 12 },
   '2': { name: 'Wedding Shopping', memberCount: 8 },
-  '3': { name: 'Family Wedding', memberCount: 25 },
-  '4': { name: 'Friends Reunion', memberCount: 18 },
+  '3': { name: 'Family Wedding', memberCount: 25, hasActiveSession: true, sessionHost: 'Mom' },
+  '4': { name: 'Friends Reunion', memberCount: 18, hasActiveSession: true, sessionHost: 'Sarah' },
   '5': { name: 'Work Conference', memberCount: 7 },
 };
 
@@ -337,6 +337,10 @@ export default function RoomChatScreen() {
       case 'startSession':
         // Start a styling session
         router.push('/start-session');
+        break;
+      case 'joinSession':
+        // Join an existing session
+        router.push(`/join-session?roomId=${id}&sessionHost=${roomData?.sessionHost || 'Host'}`);
         break;
       case 'wardrobe':
         // Navigate to wardrobe
@@ -700,7 +704,7 @@ export default function RoomChatScreen() {
           <View style={styles.menuContainer}>
             <TouchableOpacity 
               style={styles.menuItem}
-              onPress={() => handleMenuAction('startSession')}
+              onPress={() => handleMenuAction(roomData?.hasActiveSession ? 'joinSession' : 'startSession')}
             >
               <View style={styles.menuIconContainer}>
                 <Image 
@@ -709,7 +713,9 @@ export default function RoomChatScreen() {
                   resizeMode="contain"
                 />
               </View>
-              <Text style={styles.menuText}>Start Session</Text>
+              <Text style={styles.menuText}>
+                {roomData?.hasActiveSession ? `Join ${roomData.sessionHost}'s Session` : 'Start Session'}
+              </Text>
             </TouchableOpacity>
             <TouchableOpacity 
               style={styles.menuItem}

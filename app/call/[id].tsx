@@ -1,20 +1,19 @@
 
 
 import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
+import { useSession } from '@/contexts/session-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-  ScrollView,
-  Dimensions,
+    Dimensions,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useSession } from '@/contexts/session-context';
 
 const { width } = Dimensions.get('window');
 
@@ -52,8 +51,17 @@ const mockParticipants: Participant[] = [
 
 const mockSessionParticipants = [
   {
+    id: '1',
+    name: 'You',
+    avatar: '👤',
+    isMuted: false,
+    currentProduct: null
+  },
+  {
     id: '2',
-    name: 'Priya',
+    name: 'Chinku',
+    avatar: '👩',
+    isMuted: true,
     currentProduct: {
       id: '1',
       name: 'Red Silk Saree',
@@ -62,12 +70,35 @@ const mockSessionParticipants = [
   },
   {
     id: '3',
-    name: 'Rahul',
+    name: 'Minku',
+    avatar: '👩‍🦱',
+    isMuted: false,
     currentProduct: {
       id: '2',
       name: 'Blue Kurta',
       image: '👔'
     }
+  },
+  {
+    id: '4',
+    name: 'Tinku',
+    avatar: '👩‍🦰',
+    isMuted: false,
+    currentProduct: null
+  },
+  {
+    id: '5',
+    name: 'Poha',
+    avatar: '👩‍💼',
+    isMuted: true,
+    currentProduct: null
+  },
+  {
+    id: '6',
+    name: 'Juhi',
+    avatar: '👩‍🎨',
+    isMuted: true,
+    currentProduct: null
   },
 ];
 
@@ -81,8 +112,8 @@ export default function CallScreen() {
   const [isDeafened, setIsDeafened] = useState(false);
 
   useEffect(() => {
-    // Start session when call screen loads
-    startSession(id as string, mockSessionParticipants);
+    // Start session when call screen loads (as host)
+    startSession(id as string, mockSessionParticipants, true);
     
     return () => {
       // Clean up session when leaving call

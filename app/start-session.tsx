@@ -11,6 +11,7 @@ import {
     View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useSession } from '../contexts/session-context';
 
 interface WardrobeCategory {
     id: string;
@@ -90,7 +91,61 @@ const wardrobeCategories: WardrobeCategory[] = [
 
 type SessionStep = "wardrobe" | "notify" | "start";
 
+const mockSessionParticipants = [
+  {
+    id: '1',
+    name: 'You',
+    avatar: '👤',
+    isMuted: false,
+    currentProduct: null
+  },
+  {
+    id: '2',
+    name: 'Chinku',
+    avatar: '👩',
+    isMuted: true,
+    currentProduct: {
+      id: '1',
+      name: 'Red Silk Saree',
+      image: '👗'
+    }
+  },
+  {
+    id: '3',
+    name: 'Minku',
+    avatar: '👩‍🦱',
+    isMuted: false,
+    currentProduct: {
+      id: '2',
+      name: 'Blue Kurta',
+      image: '👔'
+    }
+  },
+  {
+    id: '4',
+    name: 'Tinku',
+    avatar: '👩‍🦰',
+    isMuted: false,
+    currentProduct: null
+  },
+  {
+    id: '5',
+    name: 'Poha',
+    avatar: '👩‍💼',
+    isMuted: true,
+    currentProduct: null
+  },
+  {
+    id: '6',
+    name: 'Juhi',
+    avatar: '👩‍🎨',
+    isMuted: true,
+    currentProduct: null
+  },
+];
+
 export default function StartSessionScreen() {
+    const { startSession } = useSession();
     const [currentStep, setCurrentStep] = useState<SessionStep>("wardrobe");
     const [selectedWardrobe, setSelectedWardrobe] = useState<string | null>(null);
     const [notifyMembers, setNotifyMembers] = useState(true);
@@ -124,8 +179,9 @@ export default function StartSessionScreen() {
     };
 
     const handleStartSession = () => {
-        // Navigate to the actual session screen
-        router.push("/call/1"); // Assuming call screen exists
+        // Start session as host and navigate to catalog
+        startSession('1', mockSessionParticipants, true);
+        router.push("/catalog");
     };
 
     const handlePrevious = () => {
