@@ -537,8 +537,8 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   itemImagePlaceholder: {
-    width: 60,
-    height: 80,
+    width: 80,
+    height: 100,
     backgroundColor: '#f0f0f0',
     borderRadius: 8,
     justifyContent: 'center',
@@ -558,24 +558,25 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   itemName: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '600',
     color: '#1a1a1a',
     marginBottom: 4,
+    lineHeight: 22,
   },
   itemPrice: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: 'bold',
     color: '#ff6b6b',
     marginBottom: 4,
   },
   itemCategory: {
-    fontSize: 14,
+    fontSize: 16,
     color: '#666',
     marginBottom: 2,
   },
   addedBy: {
-    fontSize: 12,
+    fontSize: 14,
     color: '#999',
   },
   purchaseInfo: {

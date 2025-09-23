@@ -1,19 +1,20 @@
+import { Image } from 'expo-image';
 import React, { useRef, useState } from 'react';
 import {
-    Dimensions,
-    FlatList,
-    Image,
-    KeyboardAvoidingView,
-    Modal,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  Dimensions,
+  FlatList,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { IconSymbol } from './ui/icon-symbol';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -62,7 +63,7 @@ const MayaChat: React.FC<MayaChatProps> = ({
   const [selectedProduct, setSelectedProduct] = useState<any>(null);
   const flatListRef = useRef<FlatList>(null);
 
-  const mayaAvatar = 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face';
+  const mayaAvatar = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&h=150&fit=crop&crop=face';
 
   const handleSendMessage = () => {
     if (inputText.trim() && onSendMessage) {
@@ -85,13 +86,23 @@ const MayaChat: React.FC<MayaChatProps> = ({
     <View style={[styles.productCard, isUserMessage && styles.userProductCard]}>
       {/* Main Product Image */}
       <View style={styles.productImageContainer}>
-        <Image source={{ uri: productData.image }} style={styles.mainProductImage} />
+        <Image 
+          source={{ uri: productData.image }} 
+          style={styles.mainProductImage}
+          contentFit="cover"
+          onError={(error) => {
+            console.log('Image load error:', error);
+            console.log('Failed URL:', productData.image);
+          }}
+          onLoad={() => console.log('Image loaded successfully:', productData.image)}
+          placeholder="https://via.placeholder.com/400x500/cccccc/666666?text=Loading..."
+        />
         
         {/* Small product images grid */}
         {productData.images && productData.images.length > 0 && (
           <View style={styles.productImagesGrid}>
             {productData.images.slice(0, 4).map((img: string, index: number) => (
-              <Image key={index} source={{ uri: img }} style={styles.smallProductImage} />
+              <Image key={index} source={{ uri: img }} style={styles.smallProductImage} contentFit="cover" />
             ))}
             {productData.images.length > 4 && (
               <TouchableOpacity
@@ -111,9 +122,9 @@ const MayaChat: React.FC<MayaChatProps> = ({
           <Text style={styles.productTitle}>{productData.name}</Text>
           <TouchableOpacity
             style={styles.askMoreButton}
-            onPress={() => handleProductAction('ask_more', productData)}
+            onPress={() => handleProductAction('add_to_wardrobe', productData)}
           >
-            <Text style={styles.askMoreText}>Ask More</Text>
+            <Text style={styles.askMoreText}>Add to Wardrobe</Text>
           </TouchableOpacity>
         </View>
         
@@ -153,7 +164,16 @@ const MayaChat: React.FC<MayaChatProps> = ({
           <View style={styles.messageHeader}>
             <Image 
               source={{ uri: item.senderAvatar || mayaAvatar }} 
-              style={styles.avatar} 
+              style={styles.avatar}
+              contentFit="cover"
+              placeholder="https://via.placeholder.com/36x36/E91E63/ffffff?text=M"
+              onError={(error) => {
+                console.log('Avatar load error:', error);
+                console.log('Failed Avatar URL:', item.senderAvatar || mayaAvatar);
+              }}
+              onLoad={() => {
+                console.log('Avatar loaded successfully:', item.senderAvatar || mayaAvatar);
+              }}
             />
             <Text style={styles.senderName}>{item.senderName}</Text>
           </View>
@@ -187,7 +207,8 @@ const MayaChat: React.FC<MayaChatProps> = ({
   };
 
   return (
-    <View style={styles.container}>
+    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'padding'} style={styles.container}>
+    {/* <View style={styles.container}> */}
       <SafeAreaView style={styles.container}>
         {/* Header */}
         <View style={styles.header}>
@@ -219,6 +240,7 @@ const MayaChat: React.FC<MayaChatProps> = ({
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={styles.inputContainer}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
         >
           <View style={styles.inputWrapper}>
             <TextInput
@@ -231,7 +253,7 @@ const MayaChat: React.FC<MayaChatProps> = ({
               maxLength={500}
             />
             <TouchableOpacity style={styles.sendButton} onPress={handleSendMessage}>
-              <Text style={styles.sendButtonText}>✈</Text>
+              <IconSymbol name="paperplane.fill" size={20} color="#000" />
             </TouchableOpacity>
           </View>
           <Text style={styles.disclaimer}>
@@ -257,7 +279,7 @@ const MayaChat: React.FC<MayaChatProps> = ({
               
               {selectedProduct && (
                 <ScrollView style={styles.modalContent}>
-                  <Image source={{ uri: selectedProduct.image }} style={styles.modalProductImage} />
+                  <Image source={{ uri: selectedProduct.image }} style={styles.modalProductImage} contentFit="cover" />
                   <Text style={styles.modalProductName}>{selectedProduct.name}</Text>
                   <Text style={styles.modalProductPrice}>{selectedProduct.price}</Text>
                   {selectedProduct.description && (
@@ -267,7 +289,7 @@ const MayaChat: React.FC<MayaChatProps> = ({
                   {selectedProduct.images && selectedProduct.images.length > 0 && (
                     <View style={styles.modalImagesGrid}>
                       {selectedProduct.images.map((img: string, index: number) => (
-                        <Image key={index} source={{ uri: img }} style={styles.modalSmallImage} />
+                        <Image key={index} source={{ uri: img }} style={styles.modalSmallImage} contentFit="cover" />
                       ))}
                     </View>
                   )}
@@ -277,7 +299,8 @@ const MayaChat: React.FC<MayaChatProps> = ({
           </View>
         </Modal>
       </SafeAreaView>
-    </View>
+    {/* </View> */}
+    </KeyboardAvoidingView>
   );
 };
 
@@ -342,10 +365,13 @@ const styles = StyleSheet.create({
     marginLeft: 4,
   },
   avatar: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     marginRight: 8,
+    backgroundColor: '#E91E63',
+    borderWidth: 2,
+    borderColor: '#ffffff',
   },
   senderName: {
     fontSize: 12,
@@ -412,11 +438,14 @@ const styles = StyleSheet.create({
   },
   productImageContainer: {
     position: 'relative',
+    backgroundColor: '#f0f0f0',
+    height: 200,
   },
   mainProductImage: {
     width: '100%',
     height: 200,
     resizeMode: 'cover',
+    backgroundColor: '#f0f0f0',
   },
   productImagesGrid: {
     position: 'absolute',

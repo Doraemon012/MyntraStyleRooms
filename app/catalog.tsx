@@ -3,16 +3,16 @@ import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  Animated,
-  Dimensions,
-  FlatList,
-  Modal,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View
+    Animated,
+    Dimensions,
+    FlatList,
+    Modal,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AttendeeSessionHeader from '../components/session/AttendeeSessionHeader';
@@ -23,11 +23,11 @@ import { getActiveBanners } from '../data/banners';
 import { Category, mockCategories } from '../data/categories';
 import { getActivePlayMenuItems } from '../data/playMenuItems';
 import {
-  getProductsByCategory,
-  getTrendingProducts,
-  mockProducts,
-  Product,
-  searchProducts
+    getProductsByCategory,
+    getTrendingProducts,
+    mockProducts,
+    Product,
+    searchProducts
 } from '../data/products';
 
 const { width: screenWidth } = Dimensions.get('window');
@@ -38,7 +38,7 @@ const playMenuItems = getActivePlayMenuItems();
 const categories = mockCategories;
 
 export default function CatalogScreen() {
-  const { isInSession, isHost, sessionParticipants, presenterName, isMuted, toggleMute, endSession } = useSession();
+  const { isInSession, isHost, sessionParticipants, presenterName, isMuted, toggleMute, endSession, sessionRoomId } = useSession();
   const [selectedCategory, setSelectedCategory] = useState('1');
   const [showExploreMenu, setShowExploreMenu] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -193,8 +193,9 @@ export default function CatalogScreen() {
           <AttendeeSessionHeader
             participants={sessionParticipants}
             isMuted={isMuted}
-            onBackToSession={() => router.push('/call/1')}
+            onBackToSession={() => router.push(`/room/${sessionRoomId || '1'}`)}
             onToggleMute={toggleMute}
+            roomId={sessionRoomId || '1'}
           />
         )}
         

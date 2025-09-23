@@ -91,65 +91,51 @@ const wardrobeCategories: WardrobeCategory[] = [
 
 type SessionStep = "wardrobe" | "notify" | "start";
 
-const mockSessionParticipants = [
-  {
-    id: '1',
-    name: 'You',
-    avatar: '👤',
-    isMuted: false,
-    currentProduct: null
-  },
-  {
-    id: '2',
-    name: 'Chinku',
-    avatar: '👩',
-    isMuted: true,
-    currentProduct: {
-      id: '1',
-      name: 'Red Silk Saree',
-      image: '👗'
-    }
-  },
-  {
-    id: '3',
-    name: 'Minku',
-    avatar: '👩‍🦱',
-    isMuted: false,
-    currentProduct: {
-      id: '2',
-      name: 'Blue Kurta',
-      image: '👔'
-    }
-  },
-  {
-    id: '4',
-    name: 'Tinku',
-    avatar: '👩‍🦰',
-    isMuted: false,
-    currentProduct: null
-  },
-  {
-    id: '5',
-    name: 'Poha',
-    avatar: '👩‍💼',
-    isMuted: true,
-    currentProduct: null
-  },
-  {
-    id: '6',
-    name: 'Juhi',
-    avatar: '👩‍🎨',
-    isMuted: true,
-    currentProduct: null
-  },
+// Mock participants for the session
+const mockParticipants = [
+    {
+        id: '1',
+        name: 'You',
+        avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face',
+        isMuted: false,
+        currentProduct: null
+    },
+    {
+        id: '2',
+        name: 'Priya',
+        avatar: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face',
+        isMuted: false,
+        currentProduct: null
+    },
+    {
+        id: '3',
+        name: 'Sneha',
+        avatar: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=150&h=150&fit=crop&crop=face',
+        isMuted: true,
+        currentProduct: null
+    },
+    {
+        id: '4',
+        name: 'Ananya',
+        avatar: 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=150&h=150&fit=crop&crop=face',
+        isMuted: false,
+        currentProduct: null
+    },
+    {
+        id: '5',
+        name: 'Riya',
+        avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150&h=150&fit=crop&crop=face',
+        isMuted: false,
+        currentProduct: null
+    },
 ];
 
 export default function StartSessionScreen() {
-    const { startSession } = useSession();
     const [currentStep, setCurrentStep] = useState<SessionStep>("wardrobe");
     const [selectedWardrobe, setSelectedWardrobe] = useState<string | null>(null);
     const [notifyMembers, setNotifyMembers] = useState(true);
     const [isNotifying, setIsNotifying] = useState(false);
+    const { startSession } = useSession();
 
     let [fontsLoaded] = useFonts({
         DancingScript_400Regular,
@@ -179,8 +165,9 @@ export default function StartSessionScreen() {
     };
 
     const handleStartSession = () => {
-        // Start session as host and navigate to catalog
-        startSession('1', mockSessionParticipants, true);
+        // Start the session as host with participants
+        startSession('1', mockParticipants, true);
+        // Navigate to the catalog screen for the session
         router.push("/catalog");
     };
 
@@ -237,6 +224,7 @@ export default function StartSessionScreen() {
     const renderWardrobeItem = ({ item }: { item: WardrobeItem }) => (
         <Image source={{ uri: item.image }} style={styles.wardrobeItemImage} />
     );
+
 
     const renderWardrobeCategory = ({ item, index }: { item: WardrobeCategory; index: number }) => {
         const isEven = index % 2 === 0;

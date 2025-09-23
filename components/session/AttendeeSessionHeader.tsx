@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import React from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
@@ -14,6 +15,7 @@ interface AttendeeSessionHeaderProps {
   isMuted: boolean;
   onBackToSession: () => void;
   onToggleMute: () => void;
+  roomId?: string;
 }
 
 export default function AttendeeSessionHeader({
@@ -21,6 +23,7 @@ export default function AttendeeSessionHeader({
   isMuted,
   onBackToSession,
   onToggleMute,
+  roomId,
 }: AttendeeSessionHeaderProps) {
   return (
     <View style={styles.container}>
@@ -36,7 +39,11 @@ export default function AttendeeSessionHeader({
             <View key={participant.id} style={styles.participantItem}>
               <View style={styles.avatarContainer}>
                 <View style={styles.avatarCircle}>
-                  <Text style={styles.avatar}>{participant.avatar}</Text>
+                  <Image 
+                    source={{ uri: participant.avatar }} 
+                    style={styles.avatarImage}
+                    contentFit="cover"
+                  />
                 </View>
                 <View style={[
                   styles.micIcon,
@@ -58,7 +65,7 @@ export default function AttendeeSessionHeader({
       {/* Control Buttons */}
       <View style={styles.controlsContainer}>
         <TouchableOpacity style={styles.backToSessionButton} onPress={onBackToSession}>
-          <Text style={styles.backToSessionText}>Back to Session</Text>
+          <Text style={styles.backToSessionText}>Back to Room</Text>
         </TouchableOpacity>
         
         <TouchableOpacity style={styles.muteButton} onPress={onToggleMute}>
@@ -108,9 +115,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E0E0E0',
   },
-  avatar: {
-    fontSize: 20,
-    textAlign: 'center',
+  avatarImage: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
   },
   micIcon: {
     position: 'absolute',

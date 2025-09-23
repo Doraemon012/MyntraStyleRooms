@@ -8,50 +8,50 @@ const mockSessionParticipants = [
   {
     id: '1',
     name: 'You',
-    avatar: '👤',
+    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face',
     isMuted: false,
     currentProduct: null
   },
   {
     id: '2',
     name: 'Chinku',
-    avatar: '👩',
+    avatar: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face',
     isMuted: true,
     currentProduct: {
       id: '1',
       name: 'Red Silk Saree',
-      image: '👗'
+      image: 'https://images.unsplash.com/photo-1677002419193-9a74069587af?q=80&w=774&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D'
     }
   },
   {
     id: '3',
     name: 'Minku',
-    avatar: '👩‍🦱',
+    avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150&h=150&fit=crop&crop=face',
     isMuted: false,
     currentProduct: {
       id: '2',
       name: 'Blue Kurta',
-      image: '👔'
+      image: 'https://images.unsplash.com/photo-1594633312681-425c7b97ccd1?w=300&h=400&fit=crop'
     }
   },
   {
     id: '4',
     name: 'Tinku',
-    avatar: '👩‍🦰',
+    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&h=150&fit=crop&crop=face',
     isMuted: false,
     currentProduct: null
   },
   {
     id: '5',
     name: 'Poha',
-    avatar: '👩‍💼',
+    avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&h=150&fit=crop&crop=face',
     isMuted: true,
     currentProduct: null
   },
   {
     id: '6',
     name: 'Juhi',
-    avatar: '👩‍🎨',
+    avatar: 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=150&h=150&fit=crop&crop=face',
     isMuted: true,
     currentProduct: null
   },

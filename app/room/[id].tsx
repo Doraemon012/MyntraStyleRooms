@@ -97,7 +97,7 @@ const mockMessages: Message[] = [
     text: 'What\'s your Budget range?',
     sender: 'ai',
     senderName: 'Maya(AI)',
-    senderAvatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face',
+    senderAvatar: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face',
     timestamp: formatTimestamp(new Date(Date.now() - 1 * 60 * 60 * 1000)), // 1 hour ago
   },
   {
@@ -113,15 +113,15 @@ const mockMessages: Message[] = [
     text: 'I found some beautiful sarees in your budget! Here\'s a stunning red silk saree that would be perfect for the wedding.',
     sender: 'ai',
     senderName: 'Maya(AI)',
-    senderAvatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face',
+    senderAvatar: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face',
     timestamp: formatTimestamp(new Date(Date.now() - 15 * 60 * 1000)), // 15 minutes ago
     isProduct: true,
-    productData: {
-      name: 'Red Silk Saree with Golden Border',
-      price: '₹4,999',
-      image: 'https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=300&h=400&fit=crop&crop=face',
-      description: 'Elegant red silk saree with intricate golden border work',
-    },
+        productData: {
+          name: 'Red Silk Saree with Golden Border',
+          price: '₹4,999',
+          image: 'https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=400&h=500&fit=crop',
+          description: 'Elegant red silk saree with intricate golden border work, perfect for weddings and festive events. Made from luxurious silk with traditional zari weaving.',
+        },
     reactions: {
       thumbsUp: 2,
       thumbsDown: 2,
@@ -145,22 +145,37 @@ const mockMessages: Message[] = [
     senderAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&h=150&fit=crop&crop=face',
     timestamp: formatTimestamp(new Date(Date.now() - 5 * 60 * 1000)), // 5 minutes ago
   },
-  // Add some older messages to demonstrate date display
   {
     id: '7',
-    text: 'Great choice! This saree looks perfect for the occasion.',
+    text: 'That saree is gorgeous! I love the golden border work',
     sender: 'friend',
     senderName: 'Priya',
     senderAvatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&h=150&fit=crop&crop=face',
-    timestamp: formatTimestamp(new Date(Date.now() - 24 * 60 * 60 * 1000)), // Yesterday
+    timestamp: formatTimestamp(new Date(Date.now() - 3 * 60 * 1000)), // 3 minutes ago
   },
   {
     id: '8',
+    text: 'I have a similar one from last year, it\'s really comfortable!',
+    sender: 'friend',
+    senderName: 'Sneha',
+    senderAvatar: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=150&h=150&fit=crop&crop=face',
+    timestamp: formatTimestamp(new Date(Date.now() - 2 * 60 * 1000)), // 2 minutes ago
+  },
+  {
+    id: '9',
+    text: 'Great choice! This saree looks perfect for the occasion.',
+    sender: 'friend',
+    senderName: 'Ananya',
+    senderAvatar: 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=150&h=150&fit=crop&crop=face',
+    timestamp: formatTimestamp(new Date(Date.now() - 1 * 60 * 1000)), // 1 minute ago
+  },
+  {
+    id: '10',
     text: 'Thanks for the suggestions everyone!',
     sender: 'user',
     senderName: 'You',
     senderAvatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face',
-    timestamp: formatTimestamp(new Date(Date.now() - 2 * 24 * 60 * 60 * 1000)), // 2 days ago
+    timestamp: formatTimestamp(new Date(Date.now() - 30 * 1000)), // 30 seconds ago
   },
 ];
 
@@ -654,13 +669,13 @@ export default function RoomChatScreen() {
           productData: {
             name: 'Stylish Sneakers',
             price: '₹3,999',
-            image: 'https://images.unsplash.com/photo-1594633312681-425c7b97ccd1?w=300&h=400&fit=crop',
+            image: 'https://images.unsplash.com/photo-1549298916-b41d501d3772?w=400&h=500&fit=crop',
             description: 'Step out in style with these stylish sneakers that offer both comfort and flair. Perfect for casual outings or workouts, they will keep you looking fresh and trendy.',
             images: [
-              'https://images.unsplash.com/photo-1594633312681-425c7b97ccd1?w=300&h=400&fit=crop',
-              'https://images.unsplash.com/photo-1594736797933-d0401ba2fe65?w=300&h=400&fit=crop',
-              'https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=300&h=400&fit=crop',
-              'https://images.unsplash.com/photo-1594633312681-425c7b97ccd1?w=300&h=400&fit=crop',
+              'https://images.unsplash.com/photo-1549298916-b41d501d3772?w=400&h=500&fit=crop',
+              'https://images.unsplash.com/photo-1594633312681-425c7b97ccd1?w=400&h=500&fit=crop',
+              'https://images.unsplash.com/photo-1594736797933-d0401ba2fe65?w=400&h=500&fit=crop',
+              'https://images.unsplash.com/photo-1549298916-b41d501d3772?w=400&h=500&fit=crop',
             ]
           },
           reactions: {

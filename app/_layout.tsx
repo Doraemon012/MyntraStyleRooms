@@ -29,6 +29,7 @@ export default function RootLayout() {
         <Stack.Screen name="wardrobe/create" options={{ headerShown: false}} />
         <Stack.Screen name="start-session" options={{ headerShown: false }} />
         <Stack.Screen name="join-session" options={{ headerShown: false }} />
+        <Stack.Screen name="call/[id]" options={{ headerShown: false }} />
         <Stack.Screen name="maya-demo" options={{ headerShown: false }} />
         <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
         </Stack>

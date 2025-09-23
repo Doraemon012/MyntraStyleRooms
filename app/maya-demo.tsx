@@ -63,13 +63,13 @@ const demoMessages: Message[] = [
     productData: {
       name: 'Stylish Sneakers',
       price: '₹3,999',
-      image: 'https://images.unsplash.com/photo-1594633312681-425c7b97ccd1?w=300&h=400&fit=crop',
+      image: 'https://images.unsplash.com/photo-1549298916-b41d501d3772?w=400&h=500&fit=crop',
       description: 'Step out in style with these stylish sneakers that offer both comfort and flair. Perfect for casual outings or workouts, they will keep you looking fresh and trendy.',
       images: [
-        'https://images.unsplash.com/photo-1594633312681-425c7b97ccd1?w=300&h=400&fit=crop',
-        'https://images.unsplash.com/photo-1594736797933-d0401ba2fe65?w=300&h=400&fit=crop',
-        'https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=300&h=400&fit=crop',
-        'https://images.unsplash.com/photo-1594633312681-425c7b97ccd1?w=300&h=400&fit=crop',
+        'https://images.unsplash.com/photo-1549298916-b41d501d3772?w=400&h=500&fit=crop',
+        'https://images.unsplash.com/photo-1594633312681-425c7b97ccd1?w=400&h=500&fit=crop',
+        'https://images.unsplash.com/photo-1594736797933-d0401ba2fe65?w=400&h=500&fit=crop',
+        'https://images.unsplash.com/photo-1549298916-b41d501d3772?w=400&h=500&fit=crop',
       ]
     },
     reactions: {
@@ -209,22 +209,22 @@ export default function MayaDemoScreen() {
         const aiResponseTime = new Date();
         const aiResponse: Message = {
           id: (Date.now() + 1).toString(),
-          text: 'I found some beautiful options for you! Here\'s a stunning piece from Myntra\'s collection.',
+          text: 'I found some beautiful options for you! Here\'s a stunning red silk saree from Myntra\'s collection.',
           sender: 'maya',
           senderName: 'Maya(AI)',
           senderAvatar: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face',
           timestamp: aiResponseTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
           isProduct: true,
           productData: {
-            name: 'Elegant Wall Art Piece',
-            price: '₹1,999',
-            image: 'https://images.unsplash.com/photo-1541961017774-22349e4a1262?w=300&h=400&fit=crop',
-            description: 'Transform your living space into a gallery with this elegant wall art piece. Its vibrant colors and unique design will add character to any room.',
+            name: 'Red Silk Saree with Golden Border',
+            price: '₹4,999',
+            image: 'https://images.unsplash.com/photo-1677002419193-9a74069587af?q=80&w=774&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
+            description: 'Elegant red silk saree with intricate golden border work, perfect for weddings and festive events. Made from luxurious silk with traditional zari weaving.',
             images: [
-              'https://images.unsplash.com/photo-1541961017774-22349e4a1262?w=300&h=400&fit=crop',
-              'https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=300&h=400&fit=crop',
-              'https://images.unsplash.com/photo-1594633312681-425c7b97ccd1?w=300&h=400&fit=crop',
-              'https://images.unsplash.com/photo-1541961017774-22349e4a1262?w=300&h=400&fit=crop',
+              'https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=400&h=500&fit=crop',
+              'https://images.unsplash.com/photo-1515372039744-b8f02a3ae446?w=400&h=500&fit=crop',
+              'https://images.unsplash.com/photo-1595777457583-95e059d581b8?w=400&h=500&fit=crop',
+              'https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=400&h=500&fit=crop',
             ]
           },
           reactions: {

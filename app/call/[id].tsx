@@ -2,6 +2,7 @@
 
 import { ThemedText } from '@/components/themed-text';
 import { useSession } from '@/contexts/session-context';
+import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, useState } from 'react';
@@ -42,11 +43,18 @@ const mockRooms: { [key: string]: Room } = {
 };
 
 const mockParticipants: Participant[] = [
-  { id: '1', name: 'You', avatar: '👤', isMuted: false, isDeafened: false, isSpeaking: true, isConnected: true },
-  { id: '2', name: 'Priya', avatar: '👩', isMuted: false, isDeafened: false, isSpeaking: false, isConnected: true },
-  { id: '3', name: 'Rahul', avatar: '👨', isMuted: true, isDeafened: false, isSpeaking: false, isConnected: true },
-  { id: '4', name: 'Sarah', avatar: '👩‍🦱', isMuted: false, isDeafened: true, isSpeaking: false, isConnected: true },
-  { id: '5', name: 'Alex', avatar: '👱', isMuted: false, isDeafened: false, isSpeaking: false, isConnected: false },
+  { id: '1', name: 'You', avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face', isMuted: false, isDeafened: false, isSpeaking: true, isConnected: true },
+  { id: '2', name: 'Priya', avatar: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face', isMuted: false, isDeafened: false, isSpeaking: false, isConnected: true },
+  { id: '3', name: 'Rahul', avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&h=150&fit=crop&crop=face', isMuted: true, isDeafened: false, isSpeaking: false, isConnected: true },
+  { id: '4', name: 'Sarah', avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150&h=150&fit=crop&crop=face', isMuted: false, isDeafened: true, isSpeaking: false, isConnected: true },
+  { id: '5', name: 'Alex', avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop&crop=face', isMuted: false, isDeafened: false, isSpeaking: false, isConnected: false },
+  { id: '6', name: 'Emma', avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&h=150&fit=crop&crop=face', isMuted: false, isDeafened: false, isSpeaking: false, isConnected: true },
+  { id: '7', name: 'Mike', avatar: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=150&h=150&fit=crop&crop=face', isMuted: true, isDeafened: false, isSpeaking: false, isConnected: true },
+  { id: '8', name: 'Lisa', avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&h=150&fit=crop&crop=face', isMuted: false, isDeafened: false, isSpeaking: false, isConnected: true },
+  { id: '9', name: 'John', avatar: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=150&h=150&fit=crop&crop=face', isMuted: false, isDeafened: false, isSpeaking: false, isConnected: true },
+  { id: '10', name: 'Anna', avatar: 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=150&h=150&fit=crop&crop=face', isMuted: true, isDeafened: false, isSpeaking: false, isConnected: true },
+  { id: '11', name: 'David', avatar: 'https://images.unsplash.com/photo-1507591064344-4c6ce005b128?w=150&h=150&fit=crop&crop=face', isMuted: false, isDeafened: false, isSpeaking: false, isConnected: false },
+  { id: '12', name: 'Sophie', avatar: 'https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?w=150&h=150&fit=crop&crop=face', isMuted: false, isDeafened: false, isSpeaking: false, isConnected: true },
 ];
 
 const mockSessionParticipants = [
@@ -158,7 +166,11 @@ export default function CallScreen() {
         participant.isSpeaking && styles.speakingBorder,
         !participant.isConnected && styles.disconnectedBorder
       ]}>
-        <Text style={styles.avatar}>{participant.avatar}</Text>
+        <Image 
+          source={{ uri: participant.avatar }} 
+          style={styles.avatarImage}
+          contentFit="cover"
+        />
         
         <View style={styles.statusIndicators}>
           {participant.isMuted && (
@@ -239,7 +251,11 @@ export default function CallScreen() {
         <View style={styles.bottomControls}>
           <View style={styles.userInfo}>
             <View style={[styles.userAvatar, isMuted && styles.mutedAvatar]}>
-              <Text style={styles.userAvatarText}>👤</Text>
+              <Image 
+                source={{ uri: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face' }} 
+                style={styles.userAvatarImage}
+                contentFit="cover"
+              />
             </View>
             <View style={styles.userDetails}>
               <Text style={styles.userName}>You</Text>
@@ -371,8 +387,10 @@ const styles = StyleSheet.create({
     borderColor: '#747f8d',
     opacity: 0.5,
   },
-  avatar: {
-    fontSize: 28,
+  avatarImage: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
   },
   statusIndicators: {
     position: 'absolute',
@@ -432,8 +450,10 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#f04747',
   },
-  userAvatarText: {
-    fontSize: 16,
+  userAvatarImage: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
   },
   userDetails: {
     flex: 1,
