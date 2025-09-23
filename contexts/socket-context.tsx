@@ -32,20 +32,28 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       console.log('🔌 Initializing Socket.io connection...');
       
       // Create socket connection with authentication
-      const newSocket = io(API_CONFIG.BASE_URL.replace('/api', ''), {
+      const socketUrl = API_CONFIG.BASE_URL.replace('/api', '');
+      console.log('🔌 Connecting to Socket.io at:', socketUrl);
+      
+      const newSocket = io(socketUrl, {
         auth: {
           token,
           userId: user._id,
           userName: user.name
         },
         transports: ['websocket', 'polling'], // Fallback to polling if websocket fails
-        timeout: 10000,
+        timeout: API_CONFIG.SOCKET_TIMEOUT || 15000,
         forceNew: true,
         upgrade: true,
         rememberUpgrade: true,
         compression: true,
         pingTimeout: 60000,
-        pingInterval: 25000
+        pingInterval: 25000,
+        reconnection: true,
+        reconnectionAttempts: 5,
+        reconnectionDelay: 1000,
+        reconnectionDelayMax: 5000,
+        maxReconnectionAttempts: 5
       });
 
       socketRef.current = newSocket;

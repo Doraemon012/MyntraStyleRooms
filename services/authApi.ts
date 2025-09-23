@@ -7,7 +7,7 @@ const API_BASE_URL = API_CONFIG.BASE_URL;
 // Create axios instance with default config
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 10000,
+  timeout: API_CONFIG.TIMEOUT || 30000,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -36,11 +36,24 @@ apiClient.interceptors.request.use(
   }
 );
 
-// Response interceptor to handle token refresh
+// Response interceptor to handle token refresh and retries
 apiClient.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
+
+    // Handle network errors with retry logic
+    if ((error.code === 'ECONNABORTED' || error.code === 'NETWORK_ERROR' || !error.response) && 
+        originalRequest._retryCount < (API_CONFIG.RETRY_ATTEMPTS || 3)) {
+      originalRequest._retryCount = (originalRequest._retryCount || 0) + 1;
+      console.log(`🔄 Retrying request (attempt ${originalRequest._retryCount}): ${originalRequest.url}`);
+      
+      // Wait before retrying (exponential backoff)
+      const delay = Math.pow(2, originalRequest._retryCount) * 1000;
+      await new Promise(resolve => setTimeout(resolve, delay));
+      
+      return apiClient(originalRequest);
+    }
 
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
