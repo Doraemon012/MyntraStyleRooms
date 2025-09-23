@@ -159,7 +159,7 @@ export default function WardrobesScreen() {
     };
 
     return (
-        <ThemedView style={styles.container}>
+        <ThemedView style={[styles.container, { backgroundColor: '#ffffff' }]}>
             <SafeAreaView style={styles.safeArea}>
                 <View style={styles.header}>
                     <TouchableOpacity onPress={() => router.back()} style={styles.backButtonContainer}>

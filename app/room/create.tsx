@@ -1,26 +1,25 @@
-import * as Clipboard from 'expo-clipboard';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import React, { useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    FlatList,
-    Modal,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
+  Alert,
+  FlatList,
+  Modal,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Toast from 'react-native-toast-message';
-import { useAuth } from '../../contexts/auth-context';
-import { useRoom } from '../../contexts/room-context';
-import { roomApi } from '../../services/roomApi';
-import { User, userApi } from '../../services/userApi';
 
+interface User {
+  id: string;
+  name: string;
+  email: string;
+  avatar?: string;
+}
 
 interface RoomMember {
   id: string;
@@ -29,10 +28,20 @@ interface RoomMember {
   role: 'Owner' | 'Editor' | 'Contributor' | 'Viewer';
 }
 
+// Mock users data
+const mockUsers: User[] = [
+  { id: '1', name: 'Richa Sharma', email: 'richa@email.com', avatar: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face' },
+  { id: '2', name: 'Priya Patel', email: 'priya@email.com', avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face' },
+  { id: '3', name: 'Sarah Johnson', email: 'sarah@email.com', avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150&h=150&fit=crop&crop=face' },
+  { id: '4', name: 'Aisha Khan', email: 'aisha@email.com', avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&h=150&fit=crop&crop=face' },
+  { id: '5', name: 'Emma Wilson', email: 'emma@email.com', avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&h=150&fit=crop&crop=face' },
+  { id: '6', name: 'Sofia Rodriguez', email: 'sofia@email.com', avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop&crop=face' },
+  { id: '7', name: 'Maya Chen', email: 'maya@email.com', avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&h=150&fit=crop&crop=face' },
+  { id: '8', name: 'Zara Ahmed', email: 'zara@email.com', avatar: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=150&h=150&fit=crop&crop=face' },
+];
 
 export default function CreateRoomScreen() {
   const [roomName, setRoomName] = useState('');
-  const [emoji, setEmoji] = useState('👗');
   const [description, setDescription] = useState('');
   const [isPrivate, setIsPrivate] = useState(false);
   const [aiEnabled, setAiEnabled] = useState(true);
@@ -40,55 +49,12 @@ export default function CreateRoomScreen() {
   const [showUserModal, setShowUserModal] = useState(false);
   const [invitationLink, setInvitationLink] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
-  const [isCreating, setIsCreating] = useState(false);
-  const [availableUsers, setAvailableUsers] = useState<User[]>([]);
-  const [isSearchingUsers, setIsSearchingUsers] = useState(false);
-  const [searchError, setSearchError] = useState<string | null>(null);
 
-  const { createRoom } = useRoom();
-  const { user, token } = useAuth();
-
-  // Search for users
-  const searchUsers = async (query: string) => {
-    if (!token) return;
-
-    try {
-      setIsSearchingUsers(true);
-      setSearchError(null);
-      
-      const response = await userApi.searchUsers(token, {
-        query: query.trim(),
-        limit: 20
-      });
-      
-      setAvailableUsers(response.data.users);
-    } catch (error: any) {
-      console.error('Search users error:', error);
-      setSearchError(error.response?.data?.message || 'Failed to search users');
-      setAvailableUsers([]);
-    } finally {
-      setIsSearchingUsers(false);
-    }
-  };
-
-  // Load initial users when modal opens
-  const handleOpenUserModal = async () => {
-    setShowUserModal(true);
-    setSearchQuery('');
-    await searchUsers('');
-  };
-
-  // Handle search query change
-  const handleSearchChange = async (query: string) => {
-    setSearchQuery(query);
-    await searchUsers(query);
-  };
-
-  const addMember = (userToAdd: User) => {
+  const addMember = (user: User) => {
     const newMember: RoomMember = {
-      id: userToAdd.id,
-      name: userToAdd.name,
-      email: userToAdd.email,
+      id: user.id,
+      name: user.name,
+      email: user.email,
       role: 'Contributor',
     };
     setMembers([...members, newMember]);
@@ -112,109 +78,28 @@ export default function CreateRoomScreen() {
     return link;
   };
 
-  const handleCreateRoom = async () => {
+  const createRoom = () => {
     if (!roomName.trim()) {
       Alert.alert('Error', 'Please enter a room name');
       return;
     }
 
-    try {
-      setIsCreating(true);
+    // Generate invitation link
+    const link = generateInvitationLink();
 
-      const roomData = {
-        name: roomName.trim(),
-        emoji,
-        description: description.trim() || undefined,
-        isPrivate,
-        members: members.map(member => ({
-          userId: member.id,
-          role: member.role as 'Editor' | 'Contributor' | 'Viewer'
-        })),
-        settings: {
-          aiEnabled,
-          allowMemberInvites: true,
-          voiceCallEnabled: true
-        }
-      };
-
-      const newRoom = await createRoom(roomData);
-      
-      // Generate invitation link
-      try {
-        const invitationResponse = await roomApi.generateInvitation(token!, newRoom._id, {
-          role: 'Contributor',
-          expiresInHours: 168 // 7 days
-        });
-        
-        const invitationLink = invitationResponse.data.invitationLink;
-        
-        // Copy to clipboard
-        await Clipboard.setStringAsync(invitationLink);
-        
-        // Show success toast notification
-        Toast.show({
-          type: 'success',
-          text1: '🎉 Room Created Successfully!',
-          text2: `Room "${newRoom.name}" created and invitation link copied to clipboard!`,
-          position: 'top',
-          visibilityTime: 4000,
-          autoHide: true,
-          topOffset: 60,
-        });
-        
-        // Show additional info alert
-        Alert.alert(
-          'Invitation Link Ready!', 
-          `Your room "${newRoom.name}" has been created and the invitation link has been copied to your clipboard.\n\nShare this link with friends to invite them to your room.`,
-          [
-            {
-              text: 'Share Link',
-              onPress: () => {
-                // You can add sharing functionality here if needed
-                console.log('Share invitation link:', invitationLink);
-              }
-            },
-            {
-              text: 'Done',
-              onPress: () => router.back()
-            }
-          ]
-        );
-      } catch (invitationError: any) {
-        console.error('Failed to generate invitation:', invitationError);
-        
-        // Still show success but without invitation link
-        Toast.show({
-          type: 'success',
-          text1: '✅ Room Created Successfully!',
-          text2: `Room "${newRoom.name}" created!`,
-          position: 'top',
-          visibilityTime: 3000,
-          autoHide: true,
-          topOffset: 60,
-        });
-        
-        Alert.alert(
-          'Room Created!', 
-          `Room "${newRoom.name}" created successfully!\n\nNote: Could not generate invitation link. You can create one later from room settings.`,
-          [
-            {
-              text: 'OK',
-              onPress: () => router.back()
-            }
-          ]
-        );
-      }
-    } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to create room');
-    } finally {
-      setIsCreating(false);
-    }
+    // Here you would typically make an API call to create the room
+    console.log('Room created:', roomName);
+    console.log('Invitation link:', link);
+    
+    // Navigate back directly
+    router.back();
   };
 
 
-  const filteredUsers = availableUsers.filter(userToAdd => 
-    !members.some(member => member.id === userToAdd.id)
+  const filteredUsers = mockUsers.filter(user => 
+    !members.some(member => member.id === user.id) &&
+    (user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+     user.email.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
   const renderUser = ({ item }: { item: User }) => (
@@ -223,18 +108,11 @@ export default function CreateRoomScreen() {
       onPress={() => addMember(item)}
     >
       <View style={styles.userAvatar}>
-        {item.profileImage ? (
-          <Text style={styles.userInitial}>📷</Text>
-        ) : (
-          <Text style={styles.userInitial}>{item.name.charAt(0).toUpperCase()}</Text>
-        )}
+        <Text style={styles.userInitial}>{item.name.charAt(0).toUpperCase()}</Text>
       </View>
       <View style={styles.userDetails}>
         <Text style={styles.userName}>{item.name}</Text>
         <Text style={styles.userEmail}>{item.email}</Text>
-        {item.location && (
-          <Text style={styles.userLocation}>📍 {item.location}</Text>
-        )}
       </View>
       <View style={styles.addButton}>
         <Text style={styles.addButtonText}>+</Text>
@@ -268,22 +146,6 @@ export default function CreateRoomScreen() {
                 onChangeText={setRoomName}
                 maxLength={50}
               />
-            </View>
-
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Room emoji*</Text>
-              <View style={styles.emojiContainer}>
-                <TouchableOpacity style={styles.emojiButton}>
-                  <Text style={styles.emojiText}>{emoji}</Text>
-                </TouchableOpacity>
-                <TextInput
-                  style={[styles.textInput, styles.emojiInput]}
-                  placeholder="👗"
-                  value={emoji}
-                  onChangeText={setEmoji}
-                  maxLength={2}
-                />
-              </View>
             </View>
 
             <View style={styles.inputGroup}>
@@ -338,7 +200,7 @@ export default function CreateRoomScreen() {
             
             <TouchableOpacity 
               style={styles.selectUsersButton}
-              onPress={handleOpenUserModal}
+              onPress={() => setShowUserModal(true)}
             >
               <Text style={styles.selectUsersText}>Select Users to Invite</Text>
               <Text style={styles.dropdownIcon}>▼</Text>
@@ -373,18 +235,14 @@ export default function CreateRoomScreen() {
 
         {/* Bottom Actions */}
         <View style={styles.bottomActions}>
-          <TouchableOpacity onPress={handleCreateRoom} disabled={isCreating}>
+          <TouchableOpacity onPress={createRoom}>
             <LinearGradient
               colors={['#E91E63', '#FF6B35']}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
-              style={[styles.createButton, isCreating && styles.createButtonDisabled]}
+              style={styles.createButton}
             >
-              {isCreating ? (
-                <ActivityIndicator color="white" size="small" />
-              ) : (
-                <Text style={styles.createButtonText}>Create Room</Text>
-              )}
+              <Text style={styles.createButtonText}>Create</Text>
             </LinearGradient>
           </TouchableOpacity>
         </View>
@@ -417,16 +275,11 @@ export default function CreateRoomScreen() {
               <View style={styles.searchContainer}>
                 <TextInput
                   style={styles.searchInput}
-                  placeholder="Search users by name or email..."
+                  placeholder="Search users..."
                   placeholderTextColor="#999"
                   value={searchQuery}
-                  onChangeText={handleSearchChange}
+                  onChangeText={setSearchQuery}
                 />
-                {isSearchingUsers && (
-                  <View style={styles.searchLoading}>
-                    <ActivityIndicator size="small" color="#E91E63" />
-                  </View>
-                )}
               </View>
               
               {/* Users List */}
@@ -438,30 +291,15 @@ export default function CreateRoomScreen() {
                 showsVerticalScrollIndicator={false}
                 ListEmptyComponent={
                   <View style={styles.emptyState}>
-                    {searchError ? (
-                      <>
-                        <Text style={styles.errorText}>❌ {searchError}</Text>
-                        <TouchableOpacity 
-                          style={styles.retryButton}
-                          onPress={() => searchUsers(searchQuery)}
-                        >
-                          <Text style={styles.retryButtonText}>Retry</Text>
-                        </TouchableOpacity>
-                      </>
-                    ) : (
-                      <Text style={styles.emptyStateText}>
-                        {searchQuery ? 'No users found matching your search' : 'No users available'}
-                      </Text>
-                    )}
+                    <Text style={styles.emptyStateText}>
+                      {searchQuery ? 'No users found' : 'No users available'}
+                    </Text>
                   </View>
                 }
               />
             </View>
           </View>
         </Modal>
-        
-        {/* Toast Component */}
-        <Toast />
       </SafeAreaView>
     </View>
   );
@@ -707,32 +545,6 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: 'white',
   },
-  createButtonDisabled: {
-    opacity: 0.7,
-  },
-  emojiContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  emojiButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 8,
-    backgroundColor: '#f8f9fa',
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 8,
-  },
-  emojiText: {
-    fontSize: 20,
-  },
-  emojiInput: {
-    flex: 1,
-    textAlign: 'center',
-    fontSize: 16,
-  },
   // Modal styles
   modalOverlay: {
     flex: 1,
@@ -852,34 +664,6 @@ const styles = StyleSheet.create({
   addButtonText: {
     color: 'white',
     fontSize: 16,
-    fontWeight: '600',
-  },
-  userLocation: {
-    fontSize: 11,
-    color: '#999',
-    marginTop: 2,
-  },
-  searchLoading: {
-    position: 'absolute',
-    right: 12,
-    top: '50%',
-    transform: [{ translateY: -10 }],
-  },
-  errorText: {
-    fontSize: 14,
-    color: '#d32f2f',
-    textAlign: 'center',
-    marginBottom: 12,
-  },
-  retryButton: {
-    backgroundColor: '#E91E63',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 6,
-  },
-  retryButtonText: {
-    color: 'white',
-    fontSize: 12,
     fontWeight: '600',
   },
 });

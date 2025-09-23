@@ -3,11 +3,12 @@ import { ThemedView } from '@/components/themed-view';
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useState } from 'react';
 import {
-    FlatList,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View
+  FlatList,
+  Image,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -19,7 +20,10 @@ interface WardrobeItem {
   addedBy: string;
   isPurchased: boolean;
   purchasedBy?: string;
+  purchasedByUsers: string[]; // Array of user IDs who purchased this item
   reactions: { userId: string; type: 'like' | 'love' | 'dislike' }[];
+  image?: string;
+  description?: string;
 }
 
 interface OutfitSuggestion {
@@ -30,6 +34,16 @@ interface OutfitSuggestion {
   aiConfidence: number;
 }
 
+// Mock room members data
+const roomMembers = [
+  { id: 'user1', name: 'Priya', avatar: '👩' },
+  { id: 'user2', name: 'Richa', avatar: '👩‍🦱' },
+  { id: 'user3', name: 'Neyati', avatar: '👩‍🦰' },
+  { id: 'user4', name: 'Sneha', avatar: '👩‍💼' },
+  { id: 'user5', name: 'Ananya', avatar: '👩‍🎨' },
+  { id: 'currentUser', name: 'You', avatar: '👤' },
+];
+
 const mockItems: WardrobeItem[] = [
   {
     id: '1',
@@ -37,11 +51,19 @@ const mockItems: WardrobeItem[] = [
     price: '₹4,999',
     category: 'Ethnic Wear',
     addedBy: 'AI Stylist',
-    isPurchased: false,
+    isPurchased: true,
+    purchasedBy: 'You',
+    purchasedByUsers: ['currentUser', 'user1', 'user2'],
     reactions: [
       { userId: 'user1', type: 'love' },
       { userId: 'user2', type: 'like' },
+      { userId: 'user3', type: 'love' },
+      { userId: 'user4', type: 'like' },
+      { userId: 'user5', type: 'love' },
+      { userId: 'currentUser', type: 'love' },
     ],
+    image: 'https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=300&h=400&fit=crop',
+    description: 'Elegant red silk saree with intricate golden border work',
   },
   {
     id: '2',
@@ -50,10 +72,16 @@ const mockItems: WardrobeItem[] = [
     category: 'Jewelry',
     addedBy: 'Priya',
     isPurchased: true,
-    purchasedBy: 'You',
+    purchasedBy: 'Priya',
+    purchasedByUsers: ['user1', 'user3', 'user4'],
     reactions: [
       { userId: 'user1', type: 'love' },
+      { userId: 'user2', type: 'love' },
+      { userId: 'user3', type: 'like' },
+      { userId: 'user5', type: 'love' },
     ],
+    image: 'https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?w=300&h=400&fit=crop',
+    description: 'Traditional gold jhumka earrings with intricate design',
   },
   {
     id: '3',
@@ -62,7 +90,70 @@ const mockItems: WardrobeItem[] = [
     category: 'Footwear',
     addedBy: 'You',
     isPurchased: false,
-    reactions: [],
+    purchasedByUsers: ['user2'],
+    reactions: [
+      { userId: 'user1', type: 'like' },
+      { userId: 'user2', type: 'love' },
+      { userId: 'user4', type: 'like' },
+    ],
+    image: 'https://images.unsplash.com/photo-1549298916-b41d501d3772?w=300&h=400&fit=crop',
+    description: 'Comfortable traditional mojari shoes for special occasions',
+  },
+  {
+    id: '4',
+    name: 'Designer Handbag',
+    price: '₹3,299',
+    category: 'Accessories',
+    addedBy: 'Richa',
+    isPurchased: true,
+    purchasedBy: 'Richa',
+    purchasedByUsers: ['user2', 'user5'],
+    reactions: [
+      { userId: 'user1', type: 'love' },
+      { userId: 'user2', type: 'love' },
+      { userId: 'user3', type: 'love' },
+      { userId: 'user4', type: 'love' },
+      { userId: 'user5', type: 'love' },
+      { userId: 'currentUser', type: 'like' },
+    ],
+    image: 'https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=300&h=400&fit=crop',
+    description: 'Stylish designer handbag perfect for any occasion',
+  },
+  {
+    id: '5',
+    name: 'Pearl Necklace Set',
+    price: '₹5,999',
+    category: 'Jewelry',
+    addedBy: 'Neyati',
+    isPurchased: false,
+    purchasedByUsers: [],
+    reactions: [
+      { userId: 'user1', type: 'like' },
+      { userId: 'user3', type: 'love' },
+      { userId: 'user4', type: 'like' },
+    ],
+    image: 'https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?w=300&h=400&fit=crop',
+    description: 'Classic pearl necklace set with matching earrings',
+  },
+  {
+    id: '6',
+    name: 'Silk Scarf',
+    price: '₹899',
+    category: 'Accessories',
+    addedBy: 'Sneha',
+    isPurchased: true,
+    purchasedBy: 'Sneha',
+    purchasedByUsers: ['user4', 'user1', 'user2', 'user3'],
+    reactions: [
+      { userId: 'user1', type: 'love' },
+      { userId: 'user2', type: 'love' },
+      { userId: 'user3', type: 'love' },
+      { userId: 'user4', type: 'love' },
+      { userId: 'user5', type: 'love' },
+      { userId: 'currentUser', type: 'love' },
+    ],
+    image: 'https://images.unsplash.com/photo-1594633312681-425c7b97ccd1?w=300&h=400&fit=crop',
+    description: 'Luxurious silk scarf with beautiful patterns',
   },
 ];
 
@@ -87,6 +178,35 @@ export default function WardrobeDetailScreen() {
   const { id } = useLocalSearchParams();
   const [activeTab, setActiveTab] = useState<'items' | 'outfits'>('items');
   const [items, setItems] = useState<WardrobeItem[]>(mockItems);
+  const [filterType, setFilterType] = useState<'all' | 'mostLiked' | 'mostBought'>('all');
+
+  // Helper function to get total likes for an item
+  const getTotalLikes = (item: WardrobeItem) => {
+    return item.reactions.filter(r => r.type === 'like' || r.type === 'love').length;
+  };
+
+  // Helper function to get total purchases for an item
+  const getTotalPurchases = (item: WardrobeItem) => {
+    return item.purchasedByUsers.length;
+  };
+
+  // Filter items based on selected filter
+  const getFilteredItems = () => {
+    switch (filterType) {
+      case 'mostLiked':
+        return [...items].sort((a, b) => getTotalLikes(b) - getTotalLikes(a));
+      case 'mostBought':
+        return [...items].sort((a, b) => getTotalPurchases(b) - getTotalPurchases(a));
+      default:
+        return items;
+    }
+  };
+
+  // Get user name by ID
+  const getUserName = (userId: string) => {
+    const user = roomMembers.find(member => member.id === userId);
+    return user ? user.name : 'Unknown User';
+  };
 
   const addReaction = (itemId: string, type: 'like' | 'love' | 'dislike') => {
     setItems(prevItems =>
@@ -110,23 +230,36 @@ export default function WardrobeDetailScreen() {
     <View style={styles.itemCard}>
       <View style={styles.itemHeader}>
         <View style={styles.itemImagePlaceholder}>
-          <Text style={styles.itemEmoji}>
-            {item.category === 'Ethnic Wear' ? '👗' : 
-             item.category === 'Jewelry' ? '💍' : '👠'}
-          </Text>
+          {item.image ? (
+            <Image source={{ uri: item.image }} style={styles.itemImage} />
+          ) : (
+            <Text style={styles.itemEmoji}>
+              {item.category === 'Ethnic Wear' ? '👗' : 
+               item.category === 'Jewelry' ? '💍' : 
+               item.category === 'Footwear' ? '👠' : 
+               item.category === 'Accessories' ? '👜' : '👕'}
+            </Text>
+          )}
         </View>
         <View style={styles.itemInfo}>
           <ThemedText style={styles.itemName}>{item.name}</ThemedText>
           <Text style={styles.itemPrice}>{item.price}</Text>
           <Text style={styles.itemCategory}>{item.category}</Text>
           <Text style={styles.addedBy}>Added by {item.addedBy}</Text>
+          
+          {/* Show purchase count */}
+          {item.purchasedByUsers.length > 0 && (
+            <View style={styles.purchaseInfo}>
+              <Text style={styles.purchaseText}>
+                🛒 {item.purchasedByUsers.length} room member{item.purchasedByUsers.length > 1 ? 's' : ''} bought this
+              </Text>
+              <Text style={styles.purchasedByNames}>
+                {item.purchasedByUsers.slice(0, 3).map(userId => getUserName(userId)).join(', ')}
+                {item.purchasedByUsers.length > 3 && ` +${item.purchasedByUsers.length - 3} more`}
+              </Text>
+            </View>
+          )}
         </View>
-        {item.isPurchased && (
-          <View style={styles.purchasedBadge}>
-            <Text style={styles.purchasedText}>✅ Purchased</Text>
-            <Text style={styles.purchasedBy}>by {item.purchasedBy}</Text>
-          </View>
-        )}
       </View>
 
       <View style={styles.itemActions}>
@@ -191,7 +324,7 @@ export default function WardrobeDetailScreen() {
   );
 
   return (
-    <ThemedView style={styles.container}>
+    <ThemedView style={[styles.container, { backgroundColor: '#f8f9fa' }]}>
       <SafeAreaView style={styles.container}>
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.back()}>
@@ -217,7 +350,7 @@ export default function WardrobeDetailScreen() {
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.tab, activeTab === 'outfits' && styles.activeTab]}
-            onPress={() => setActiveTab('outfits')}
+            onPress={() => router.push(`/wardrobe/ai-outfits?wardrobeId=${id}`)}
           >
             <Text style={[styles.tabText, activeTab === 'outfits' && styles.activeTabText]}>
               AI Outfits ({mockOutfits.length})
@@ -225,9 +358,38 @@ export default function WardrobeDetailScreen() {
           </TouchableOpacity>
         </View>
 
+        {activeTab === 'items' && (
+          <View style={styles.filterContainer}>
+            <TouchableOpacity
+              style={[styles.filterButton, filterType === 'all' && styles.activeFilterButton]}
+              onPress={() => setFilterType('all')}
+            >
+              <Text style={[styles.filterButtonText, filterType === 'all' && styles.activeFilterButtonText]}>
+                All Items
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.filterButton, filterType === 'mostLiked' && styles.activeFilterButton]}
+              onPress={() => setFilterType('mostLiked')}
+            >
+              <Text style={[styles.filterButtonText, filterType === 'mostLiked' && styles.activeFilterButtonText]}>
+                Most Liked
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.filterButton, filterType === 'mostBought' && styles.activeFilterButton]}
+              onPress={() => setFilterType('mostBought')}
+            >
+              <Text style={[styles.filterButtonText, filterType === 'mostBought' && styles.activeFilterButtonText]}>
+                Most Bought
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
         {activeTab === 'items' ? (
           <FlatList
-            data={items}
+            data={getFilteredItems()}
             renderItem={renderItem}
             keyExtractor={item => item.id}
             style={styles.itemsList}
@@ -319,6 +481,36 @@ const styles = StyleSheet.create({
     color: '#ff6b6b',
     fontWeight: '600',
   },
+  filterContainer: {
+    flexDirection: 'row',
+    backgroundColor: 'white',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e1e5e9',
+  },
+  filterButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    marginRight: 8,
+    borderRadius: 20,
+    backgroundColor: '#f0f0f0',
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+  },
+  activeFilterButton: {
+    backgroundColor: '#ff6b6b',
+    borderColor: '#ff6b6b',
+  },
+  filterButtonText: {
+    fontSize: 12,
+    color: '#666',
+    fontWeight: '500',
+  },
+  activeFilterButtonText: {
+    color: 'white',
+    fontWeight: '600',
+  },
   itemsList: {
     flex: 1,
   },
@@ -345,13 +537,19 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   itemImagePlaceholder: {
-    width: 60,
-    height: 80,
+    width: 80,
+    height: 100,
     backgroundColor: '#f0f0f0',
     borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
+    overflow: 'hidden',
+  },
+  itemImage: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
   },
   itemEmoji: {
     fontSize: 28,
@@ -360,25 +558,45 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   itemName: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '600',
     color: '#1a1a1a',
     marginBottom: 4,
+    lineHeight: 22,
   },
   itemPrice: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: 'bold',
     color: '#ff6b6b',
     marginBottom: 4,
   },
   itemCategory: {
-    fontSize: 14,
+    fontSize: 16,
     color: '#666',
     marginBottom: 2,
   },
   addedBy: {
-    fontSize: 12,
+    fontSize: 14,
     color: '#999',
+  },
+  purchaseInfo: {
+    marginTop: 4,
+    padding: 6,
+    backgroundColor: '#f8f9fa',
+    borderRadius: 6,
+    borderLeftWidth: 3,
+    borderLeftColor: '#4CAF50',
+  },
+  purchaseText: {
+    fontSize: 11,
+    color: '#4CAF50',
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  purchasedByNames: {
+    fontSize: 10,
+    color: '#666',
+    fontStyle: 'italic',
   },
   purchasedBadge: {
     alignItems: 'center',

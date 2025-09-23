@@ -3,254 +3,42 @@ import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  Animated,
-  Dimensions,
-  FlatList,
-  Modal,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View
+    Animated,
+    Dimensions,
+    FlatList,
+    Modal,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import AttendeeSessionHeader from '../components/session/AttendeeSessionHeader';
+import HostSessionHeader from '../components/session/HostSessionHeader';
+import SessionBottomControls from '../components/session/SessionBottomControls';
+import { useSession } from '../contexts/session-context';
+import { getActiveBanners } from '../data/banners';
+import { Category, mockCategories } from '../data/categories';
+import { getActivePlayMenuItems } from '../data/playMenuItems';
+import {
+    getProductsByCategory,
+    getTrendingProducts,
+    mockProducts,
+    Product,
+    searchProducts
+} from '../data/products';
 
 const { width: screenWidth } = Dimensions.get('window');
 
-interface Product {
-  id: string;
-  name: string;
-  brand: string;
-  price: string;
-  originalPrice?: string;
-  discount?: string;
-  rating: number;
-  image: string;
-  category: string;
-  isNew?: boolean;
-  isTrending?: boolean;
-}
-
-interface Category {
-  id: string;
-  name: string;
-  icon: string;
-  color: string;
-  isActive?: boolean;
-}
-
-// Banner data
-const banners = [
-  {
-    id: '1',
-    image: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=300&fit=crop',
-    title: 'The Best Men\'s Wear Collection',
-    discount: 'UP TO 70% OFF',
-    brand: '#SNITCH',
-    buttonText: 'Shop Now'
-  },
-  {
-    id: '2',
-    image: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=400&h=300&fit=crop',
-    title: 'Women\'s Fashion Week',
-    discount: 'UP TO 50% OFF',
-    brand: '#FASHION',
-    buttonText: 'Explore Now'
-  },
-  {
-    id: '3',
-    image: 'https://images.unsplash.com/photo-1549298916-b41d501d3772?w=400&h=300&fit=crop',
-    title: 'Footwear Collection',
-    discount: 'UP TO 60% OFF',
-    brand: '#SHOES',
-    buttonText: 'Shop Now'
-  },
-  {
-    id: '4',
-    image: 'https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=400&h=300&fit=crop',
-    title: 'Accessories Sale',
-    discount: 'UP TO 40% OFF',
-    brand: '#ACCESSORIES',
-    buttonText: 'Buy Now'
-  }
-];
-
-// Play menu data
-const playMenuItems = [
-  {
-    id: '1',
-    title: 'Fashion Room',
-    description: 'Discover your style with friends',
-    icon: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=100&h=100&fit=crop',
-    hasNewTag: true
-  },
-  {
-    id: '2',
-    title: 'Shop with Maya',
-    description: 'Your Personal shopping assistant',
-    icon: 'https://images.unsplash.com/photo-1512496015851-a90fb38cd796?w=100&h=100&fit=crop',
-    hasNewTag: false
-  },
-  {
-    id: '3',
-    title: 'My Stylist',
-    description: 'Outfit combinations for you',
-    icon: 'https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?w=100&h=100&fit=crop',
-    hasNewTag: false
-  },
-  {
-    id: '4',
-    title: 'Myntra Minis',
-    description: 'Swipe.Shop.Slay',
-    icon: 'https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=100&h=100&fit=crop',
-    hasNewTag: false
-  }
-];
-
-// Mock categories
-const categories: Category[] = [
-  { id: '1', name: 'Fashion', icon: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=100&h=100&fit=crop', color: '#E91E63', isActive: true },
-  { id: '2', name: 'Beauty', icon: 'https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?w=100&h=100&fit=crop&q=80', color: '#FF6B9D' },
-  { id: '3', name: 'Homeliving', icon: 'https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=100&h=100&fit=crop', color: '#4A90E2' },
-  { id: '4', name: 'Footwear', icon: 'https://images.unsplash.com/photo-1549298916-b41d501d3772?w=100&h=100&fit=crop', color: '#7ED321' },
-  { id: '5', name: 'Accessories', icon: 'https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=100&h=100&fit=crop', color: '#9C27B0' },
-];
-
-// Mock products data
-const mockProducts: Product[] = [
-  {
-    id: '1',
-    name: 'Floral Print Maxi Dress',
-    brand: 'W',
-    price: '₹1,299',
-    originalPrice: '₹2,599',
-    discount: '50% OFF',
-    rating: 4.2,
-    image: 'https://images.unsplash.com/photo-1595777457583-95e059d581b8?w=300&h=400&fit=crop',
-    category: 'Women',
-    isNew: true,
-  },
-  {
-    id: '2',
-    name: 'Denim Jacket',
-    brand: 'Roadster',
-    price: '₹1,899',
-    originalPrice: '₹2,999',
-    discount: '37% OFF',
-    rating: 4.5,
-    image: 'https://images.unsplash.com/photo-1551028719-00167b16eac5?w=300&h=400&fit=crop',
-    category: 'Women',
-    isTrending: true,
-  },
-  {
-    id: '3',
-    name: 'Cotton T-Shirt',
-    brand: 'H&M',
-    price: '₹599',
-    rating: 4.0,
-    image: 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=300&h=400&fit=crop',
-    category: 'Men',
-  },
-  {
-    id: '4',
-    name: 'Running Shoes',
-    brand: 'Nike',
-    price: '₹4,999',
-    originalPrice: '₹7,999',
-    discount: '38% OFF',
-    rating: 4.7,
-    image: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=300&h=400&fit=crop',
-    category: 'Sports',
-    isTrending: true,
-  },
-  {
-    id: '5',
-    name: 'Silk Saree',
-    brand: 'Sangria',
-    price: '₹3,999',
-    originalPrice: '₹5,999',
-    discount: '33% OFF',
-    rating: 4.3,
-    image: 'https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=300&h=400&fit=crop',
-    category: 'Women',
-  },
-  {
-    id: '6',
-    name: 'Kids T-Shirt',
-    brand: 'Gini & Jony',
-    price: '₹399',
-    rating: 4.1,
-    image: 'https://images.unsplash.com/photo-1503341504253-dff4815485f1?w=300&h=400&fit=crop',
-    category: 'Kids',
-  },
-  {
-    id: '7',
-    name: 'Lipstick Set',
-    brand: 'Maybelline',
-    price: '₹899',
-    originalPrice: '₹1,299',
-    discount: '31% OFF',
-    rating: 4.4,
-    image: 'https://images.unsplash.com/photo-1586495777744-4413f21062fa?w=300&h=400&fit=crop',
-    category: 'Beauty',
-  },
-  {
-    id: '8',
-    name: 'Cushion Covers',
-    brand: 'Home Centre',
-    price: '₹599',
-    rating: 4.2,
-    image: 'https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=300&h=400&fit=crop',
-    category: 'Home',
-  },
-  {
-    id: '9',
-    name: 'Leather Handbag',
-    brand: 'Hidesign',
-    price: '₹2,999',
-    originalPrice: '₹4,999',
-    discount: '40% OFF',
-    rating: 4.6,
-    image: 'https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=300&h=400&fit=crop',
-    category: 'Bags',
-    isNew: true,
-  },
-  {
-    id: '10',
-    name: 'High Heels',
-    brand: 'Metro',
-    price: '₹1,499',
-    originalPrice: '₹2,499',
-    discount: '40% OFF',
-    rating: 4.3,
-    image: 'https://images.unsplash.com/photo-1543163521-1bf539c55dd2?w=300&h=400&fit=crop',
-    category: 'Shoes',
-  },
-  {
-    id: '11',
-    name: 'Casual Sneakers',
-    brand: 'Adidas',
-    price: '₹3,999',
-    originalPrice: '₹5,999',
-    discount: '33% OFF',
-    rating: 4.5,
-    image: 'https://images.unsplash.com/photo-1549298916-b41d501d3772?w=300&h=400&fit=crop',
-    category: 'Shoes',
-    isTrending: true,
-  },
-  {
-    id: '12',
-    name: 'Crossbody Bag',
-    brand: 'Van Heusen',
-    price: '₹1,299',
-    rating: 4.1,
-    image: 'https://images.unsplash.com/photo-1584917860122-859af0e7a67b?w=300&h=400&fit=crop',
-    category: 'Bags',
-  },
-];
+// Get data from centralized data files
+const banners = getActiveBanners();
+const playMenuItems = getActivePlayMenuItems();
+const categories = mockCategories;
 
 export default function CatalogScreen() {
+  const { isInSession, isHost, sessionParticipants, presenterName, isMuted, toggleMute, endSession, sessionRoomId } = useSession();
   const [selectedCategory, setSelectedCategory] = useState('1');
   const [showExploreMenu, setShowExploreMenu] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -316,15 +104,14 @@ export default function CatalogScreen() {
     }
   }, [showPlayMenu]);
 
-  const filteredProducts = mockProducts.filter(product => {
-    const categoryMatch = selectedCategory === '1' || product.category === categories.find(cat => cat.id === selectedCategory)?.name;
-    const searchMatch = searchQuery === '' || 
-      product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      product.brand.toLowerCase().includes(searchQuery.toLowerCase());
-    return categoryMatch && searchMatch;
-  });
+  const filteredProducts = searchQuery 
+    ? searchProducts(searchQuery)
+    : selectedCategory === '1' 
+      ? mockProducts 
+      : getProductsByCategory(categories.find(cat => cat._id === selectedCategory)?.name || '');
 
   const displayProducts = filteredProducts;
+  const trendingProducts = getTrendingProducts(8);
 
   const renderCategory = ({ item }: { item: Category }) => (
     <TouchableOpacity
@@ -332,7 +119,7 @@ export default function CatalogScreen() {
         styles.categoryItem,
         item.isActive && styles.selectedCategory
       ]}
-      onPress={() => setSelectedCategory(item.id)}
+      onPress={() => setSelectedCategory(item._id)}
     >
       <View style={[
         styles.categoryIcon, 
@@ -350,7 +137,10 @@ export default function CatalogScreen() {
   );
 
   const renderProduct = ({ item }: { item: Product }) => (
-    <TouchableOpacity style={styles.productCard}>
+    <TouchableOpacity 
+      style={styles.productCard}
+        onPress={() => router.push(`/product/${item._id}` as any)}
+    >
       <View style={styles.productImageContainer}>
         <Image source={{ uri: item.image }} style={styles.productImage} />
         {item.isNew && (
@@ -363,9 +153,9 @@ export default function CatalogScreen() {
             <Text style={styles.trendingBadgeText}>🔥</Text>
           </View>
         )}
-        {item.discount && (
+        {item.discountPercentage > 0 && (
           <View style={styles.discountBadge}>
-            <Text style={styles.discountBadgeText}>{item.discount}</Text>
+            <Text style={styles.discountBadgeText}>{item.discountPercentage}% OFF</Text>
           </View>
         )}
       </View>
@@ -373,9 +163,9 @@ export default function CatalogScreen() {
         <Text style={styles.brandName}>{item.brand}</Text>
         <Text style={styles.productName} numberOfLines={2}>{item.name}</Text>
         <View style={styles.priceContainer}>
-          <Text style={styles.price}>{item.price}</Text>
-          {item.originalPrice && (
-            <Text style={styles.originalPrice}>{item.originalPrice}</Text>
+          <Text style={styles.price}>₹{item.price.toLocaleString()}</Text>
+          {item.originalPrice > item.price && (
+            <Text style={styles.originalPrice}>₹{item.originalPrice.toLocaleString()}</Text>
           )}
         </View>
         <View style={styles.ratingContainer}>
@@ -388,6 +178,27 @@ export default function CatalogScreen() {
   return (
     <View style={styles.container}>
       <SafeAreaView style={styles.container}>
+        {/* Session Header Components */}
+        {isInSession && isHost && (
+          <HostSessionHeader
+            participants={sessionParticipants}
+            presenterName={presenterName}
+            onNotificationPress={() => {}}
+            onLikePress={() => {}}
+            onParticipantsPress={() => {}}
+          />
+        )}
+        
+        {isInSession && !isHost && (
+          <AttendeeSessionHeader
+            participants={sessionParticipants}
+            isMuted={isMuted}
+            onBackToSession={() => router.push(`/room/${sessionRoomId || '1'}`)}
+            onToggleMute={toggleMute}
+            roomId={sessionRoomId || '1'}
+          />
+        )}
+        
         <ScrollView 
           style={styles.scrollContainer}
           showsVerticalScrollIndicator={false}
@@ -444,7 +255,7 @@ export default function CatalogScreen() {
             <FlatList
               data={categories}
               renderItem={renderCategory}
-              keyExtractor={item => item.id}
+              keyExtractor={item => item._id}
               horizontal
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.categoriesList}
@@ -483,7 +294,7 @@ export default function CatalogScreen() {
               }}
             >
               {banners.map((banner, index) => (
-                <View key={banner.id} style={styles.bannerSlide}>
+                <View key={banner._id} style={styles.bannerSlide}>
                   <View style={styles.bannerImageContainer}>
                     <Image 
                       source={{ uri: banner.image }} 
@@ -565,8 +376,12 @@ export default function CatalogScreen() {
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.mockCardsContainer}
             >
-              {mockProducts.slice(0, 8).map((product) => (
-                <TouchableOpacity key={product.id} style={styles.mockCard}>
+              {trendingProducts.map((product) => (
+                <TouchableOpacity 
+                  key={product._id} 
+                  style={styles.mockCard}
+                  onPress={() => router.push(`/product/${product._id}` as any)}
+                >
                   <View style={styles.mockCardImageContainer}>
                     <Image source={{ uri: product.image }} style={styles.mockCardImage} />
                     {product.isNew && (
@@ -574,9 +389,9 @@ export default function CatalogScreen() {
                         <Text style={styles.mockCardBadgeText}>NEW</Text>
                       </View>
                     )}
-                    {product.discount && (
+                    {product.discountPercentage > 0 && (
                       <View style={styles.mockCardDiscount}>
-                        <Text style={styles.mockCardDiscountText}>{product.discount}</Text>
+                        <Text style={styles.mockCardDiscountText}>{product.discountPercentage}% OFF</Text>
                       </View>
                     )}
                   </View>
@@ -584,9 +399,9 @@ export default function CatalogScreen() {
                     <Text style={styles.mockCardBrand}>{product.brand}</Text>
                     <Text style={styles.mockCardName} numberOfLines={2}>{product.name}</Text>
                     <View style={styles.mockCardPriceContainer}>
-                      <Text style={styles.mockCardPrice}>{product.price}</Text>
-                      {product.originalPrice && (
-                        <Text style={styles.mockCardOriginalPrice}>{product.originalPrice}</Text>
+                      <Text style={styles.mockCardPrice}>₹{product.price.toLocaleString()}</Text>
+                      {product.originalPrice > product.price && (
+                        <Text style={styles.mockCardOriginalPrice}>₹{product.originalPrice.toLocaleString()}</Text>
                       )}
                     </View>
                     <View style={styles.mockCardRating}>
@@ -603,7 +418,7 @@ export default function CatalogScreen() {
             <FlatList
               data={displayProducts}
               renderItem={renderProduct}
-              keyExtractor={item => item.id}
+              keyExtractor={item => item._id}
               numColumns={2}
               showsVerticalScrollIndicator={false}
               contentContainerStyle={styles.productsList}
@@ -733,6 +548,19 @@ export default function CatalogScreen() {
                   </View>
                   <Text style={styles.menuItemText}>Profile</Text>
                 </TouchableOpacity>
+
+                <TouchableOpacity 
+                  style={styles.menuItem}
+                  onPress={() => {
+                    setShowExploreMenu(false);
+                    router.push('/maya-demo');
+                  }}
+                >
+                  <View style={styles.menuItemIcon}>
+                    <Ionicons name="chatbubble" size={24} color="#8B5CF6" />
+                  </View>
+                  <Text style={styles.menuItemText}>Maya AI Demo</Text>
+                </TouchableOpacity>
               </View>
             </View>
           </TouchableOpacity>
@@ -757,10 +585,10 @@ export default function CatalogScreen() {
               <View style={styles.playMenuList}>
                 {playMenuItems.map((item) => (
                   <TouchableOpacity 
-                    key={item.id} 
+                    key={item._id} 
                     style={styles.playMenuItem}
                     onPress={() => {
-                      if (item.id === '1') {
+                      if (item._id === '1') {
                         // Navigate to fashion rooms screen
                         router.push('/(tabs)');
                         setShowPlayMenu(false);
@@ -780,7 +608,7 @@ export default function CatalogScreen() {
                       {item.hasNewTag && (
                         <View style={[
                           styles.playMenuNewTag,
-                          item.id === '1' && styles.playMenuNewTagGlow
+                          item._id === '1' && styles.playMenuNewTagGlow
                         ]}>
                           <Text style={styles.playMenuNewTagText}>New</Text>
                         </View>
@@ -798,6 +626,16 @@ export default function CatalogScreen() {
             </Animated.View>
           </TouchableOpacity>
         </Modal>
+        
+        {/* Session Bottom Controls - Only for Host */}
+        {isInSession && isHost && (
+          <SessionBottomControls
+            onScreenShare={() => {}}
+            onToggleMute={toggleMute}
+            onEndCall={endSession}
+            isMuted={isMuted}
+          />
+        )}
       </SafeAreaView>
     </View>
   );
@@ -943,17 +781,18 @@ const styles = StyleSheet.create({
   },
   productsList: {
     paddingVertical: 8,
+    paddingBottom: 20,
   },
   productCard: {
     flex: 1,
     backgroundColor: 'white',
-    borderRadius: 12,
-    margin: 6,
+    borderRadius: 8,
+    margin: 4,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 3,
+    shadowRadius: 4,
+    elevation: 2,
     borderWidth: 1,
     borderColor: '#f0f0f0',
   },
@@ -962,9 +801,9 @@ const styles = StyleSheet.create({
   },
   productImage: {
     width: '100%',
-    height: 200,
-    borderTopLeftRadius: 12,
-    borderTopRightRadius: 12,
+    height: 160,
+    borderTopLeftRadius: 8,
+    borderTopRightRadius: 8,
   },
   newBadge: {
     position: 'absolute',
@@ -1008,45 +847,49 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   productInfo: {
-    padding: 12,
+    padding: 8,
+    minHeight: 80,
+    justifyContent: 'space-between',
   },
   brandName: {
-    fontSize: 10,
+    fontSize: 8,
     color: '#999',
-    marginBottom: 4,
+    marginBottom: 2,
     fontWeight: '600',
     textTransform: 'uppercase',
     letterSpacing: 0.3,
   },
   productName: {
-    fontSize: 12,
+    fontSize: 10,
     color: '#1a1a1a',
     fontWeight: '600',
-    marginBottom: 6,
-    lineHeight: 16,
+    marginBottom: 4,
+    lineHeight: 13,
+    flex: 1,
   },
   priceContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 4,
+    marginBottom: 2,
   },
   price: {
-    fontSize: 14,
+    fontSize: 11,
     color: '#1a1a1a',
     fontWeight: 'bold',
-    marginRight: 6,
+    marginRight: 4,
   },
   originalPrice: {
-    fontSize: 10,
+    fontSize: 8,
     color: '#999',
     textDecorationLine: 'line-through',
   },
   ratingContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginTop: 'auto',
   },
   rating: {
-    fontSize: 10,
+    fontSize: 8,
     color: '#666',
     fontWeight: '500',
   },
@@ -1397,6 +1240,7 @@ const styles = StyleSheet.create({
   },
   mockCardsContainer: {
     paddingHorizontal: 16,
+    paddingBottom: 20,
   },
   mockCard: {
     width: 160,
@@ -1416,7 +1260,7 @@ const styles = StyleSheet.create({
   },
   mockCardImage: {
     width: '100%',
-    height: 120,
+    height: 150,
     borderTopLeftRadius: 8,
     borderTopRightRadius: 8,
   },
@@ -1449,45 +1293,49 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   mockCardInfo: {
-    padding: 8,
+    padding: 10,
+    minHeight: 110,
+    justifyContent: 'space-between',
   },
   mockCardBrand: {
-    fontSize: 9,
+    fontSize: 8,
     color: '#999',
-    marginBottom: 3,
+    marginBottom: 4,
     fontWeight: '600',
     textTransform: 'uppercase',
     letterSpacing: 0.3,
   },
   mockCardName: {
-    fontSize: 11,
+    fontSize: 10,
     color: '#1a1a1a',
     fontWeight: '600',
     marginBottom: 6,
     lineHeight: 14,
+    flex: 1,
   },
   mockCardPriceContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 4,
+    marginBottom: 2,
   },
   mockCardPrice: {
-    fontSize: 12,
+    fontSize: 11,
     color: '#1a1a1a',
     fontWeight: 'bold',
     marginRight: 4,
   },
   mockCardOriginalPrice: {
-    fontSize: 9,
+    fontSize: 8,
     color: '#999',
     textDecorationLine: 'line-through',
   },
   mockCardRating: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginTop: 'auto',
   },
   mockCardRatingText: {
-    fontSize: 9,
+    fontSize: 8,
     color: '#666',
     fontWeight: '500',
   },

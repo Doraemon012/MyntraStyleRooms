@@ -3,12 +3,12 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useState } from 'react';
 import {
-  FlatList,
-  Image,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    FlatList,
+    Image,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -18,7 +18,21 @@ interface WardrobeItem {
   price: string;
   image: string;
   isFavorited: boolean;
+  category: string;
+  addedBy: string;
+  purchasedByUsers: string[];
+  reactions: { userId: string; type: 'like' | 'love' | 'dislike' }[];
 }
+
+// Mock room members data
+const roomMembers = [
+  { id: 'user1', name: 'Priya', avatar: '👩' },
+  { id: 'user2', name: 'Richa', avatar: '👩‍🦱' },
+  { id: 'user3', name: 'Neyati', avatar: '👩‍🦰' },
+  { id: 'user4', name: 'Sneha', avatar: '👩‍💼' },
+  { id: 'user5', name: 'Ananya', avatar: '👩‍🎨' },
+  { id: 'currentUser', name: 'You', avatar: '👤' },
+];
 
 const wardrobeItems: WardrobeItem[] = [
   {
@@ -27,6 +41,16 @@ const wardrobeItems: WardrobeItem[] = [
     price: '₹1,999',
     image: 'https://images.unsplash.com/photo-1594633313593-bab3825d0caf?w=200&h=300&fit=crop',
     isFavorited: false,
+    category: 'Outerwear',
+    addedBy: 'AI Stylist',
+    purchasedByUsers: ['user1', 'user2', 'user3'],
+    reactions: [
+      { userId: 'user1', type: 'love' },
+      { userId: 'user2', type: 'like' },
+      { userId: 'user3', type: 'love' },
+      { userId: 'user4', type: 'like' },
+      { userId: 'user5', type: 'love' },
+    ],
   },
   {
     id: '2',
@@ -34,6 +58,17 @@ const wardrobeItems: WardrobeItem[] = [
     price: '₹1,199',
     image: 'https://images.unsplash.com/photo-1515372039744-b8f02a3ae446?w=200&h=300&fit=crop',
     isFavorited: false,
+    category: 'Dresses',
+    addedBy: 'Priya',
+    purchasedByUsers: ['user1', 'user4'],
+    reactions: [
+      { userId: 'user1', type: 'love' },
+      { userId: 'user2', type: 'love' },
+      { userId: 'user3', type: 'like' },
+      { userId: 'user4', type: 'love' },
+      { userId: 'user5', type: 'like' },
+      { userId: 'currentUser', type: 'love' },
+    ],
   },
   {
     id: '3',
@@ -41,6 +76,17 @@ const wardrobeItems: WardrobeItem[] = [
     price: '₹599',
     image: 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=200&h=300&fit=crop',
     isFavorited: false,
+    category: 'Tops',
+    addedBy: 'You',
+    purchasedByUsers: ['user2', 'user3', 'user4', 'user5'],
+    reactions: [
+      { userId: 'user1', type: 'like' },
+      { userId: 'user2', type: 'love' },
+      { userId: 'user3', type: 'love' },
+      { userId: 'user4', type: 'love' },
+      { userId: 'user5', type: 'love' },
+      { userId: 'currentUser', type: 'like' },
+    ],
   },
   {
     id: '4',
@@ -48,41 +94,118 @@ const wardrobeItems: WardrobeItem[] = [
     price: '₹1,799',
     image: 'https://images.unsplash.com/photo-1586790170083-2f9ceadc732d?w=200&h=300&fit=crop',
     isFavorited: false,
+    category: 'Dresses',
+    addedBy: 'Richa',
+    purchasedByUsers: ['user1'],
+    reactions: [
+      { userId: 'user1', type: 'love' },
+      { userId: 'user2', type: 'like' },
+      { userId: 'user3', type: 'like' },
+    ],
   },
   {
     id: '5',
-    name: 'Ribbed Top',
-    price: '₹599',
+    name: 'Designer Blouse',
+    price: '₹899',
     image: 'https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?w=200&h=300&fit=crop',
     isFavorited: false,
+    category: 'Tops',
+    addedBy: 'Neyati',
+    purchasedByUsers: ['user2', 'user3', 'user4', 'user5', 'currentUser'],
+    reactions: [
+      { userId: 'user1', type: 'love' },
+      { userId: 'user2', type: 'love' },
+      { userId: 'user3', type: 'love' },
+      { userId: 'user4', type: 'love' },
+      { userId: 'user5', type: 'love' },
+      { userId: 'currentUser', type: 'love' },
+    ],
   },
   {
     id: '6',
-    name: 'Cocktail Dress',
-    price: '₹1,799',
+    name: 'Evening Gown',
+    price: '₹2,499',
     image: 'https://images.unsplash.com/photo-1594633312681-425c7b97ccd1?w=200&h=300&fit=crop',
     isFavorited: false,
+    category: 'Dresses',
+    addedBy: 'Sneha',
+    purchasedByUsers: ['user1', 'user2'],
+    reactions: [
+      { userId: 'user1', type: 'love' },
+      { userId: 'user2', type: 'love' },
+      { userId: 'user3', type: 'like' },
+      { userId: 'user4', type: 'love' },
+    ],
   },
   {
     id: '7',
-    name: 'Ribbed Top',
-    price: '₹599',
+    name: 'Casual T-Shirt',
+    price: '₹399',
     image: 'https://images.unsplash.com/photo-1583391733956-6c78276477e2?w=200&h=300&fit=crop',
     isFavorited: false,
+    category: 'Tops',
+    addedBy: 'Ananya',
+    purchasedByUsers: ['user1', 'user2', 'user3', 'user4', 'user5', 'currentUser'],
+    reactions: [
+      { userId: 'user1', type: 'like' },
+      { userId: 'user2', type: 'like' },
+      { userId: 'user3', type: 'like' },
+      { userId: 'user4', type: 'like' },
+      { userId: 'user5', type: 'like' },
+      { userId: 'currentUser', type: 'like' },
+    ],
   },
   {
     id: '8',
-    name: 'Cocktail Dress',
-    price: '₹1,799',
+    name: 'Formal Blazer',
+    price: '₹3,299',
     image: 'https://images.unsplash.com/photo-1596755094514-f87e34085b2c?w=200&h=300&fit=crop',
     isFavorited: false,
+    category: 'Outerwear',
+    addedBy: 'AI Stylist',
+    purchasedByUsers: ['user2', 'user4'],
+    reactions: [
+      { userId: 'user1', type: 'love' },
+      { userId: 'user2', type: 'love' },
+      { userId: 'user3', type: 'like' },
+      { userId: 'user4', type: 'love' },
+      { userId: 'user5', type: 'like' },
+    ],
   },
 ];
 
 export default function WardrobeItemsScreen() {
   const { categoryId, categoryName } = useLocalSearchParams();
   const [items, setItems] = useState<WardrobeItem[]>(wardrobeItems);
-  const [activeFilter, setActiveFilter] = useState('All');
+  const [activeFilter, setActiveFilter] = useState<'All' | 'Most liked' | 'Most bought'>('All');
+
+  // Helper function to get total likes for an item
+  const getTotalLikes = (item: WardrobeItem) => {
+    return item.reactions.filter(r => r.type === 'like' || r.type === 'love').length;
+  };
+
+  // Helper function to get total purchases for an item
+  const getTotalPurchases = (item: WardrobeItem) => {
+    return item.purchasedByUsers.length;
+  };
+
+  // Filter items based on selected filter
+  const getFilteredItems = () => {
+    switch (activeFilter) {
+      case 'Most liked':
+        return [...items].sort((a, b) => getTotalLikes(b) - getTotalLikes(a));
+      case 'Most bought':
+        return [...items].sort((a, b) => getTotalPurchases(b) - getTotalPurchases(a));
+      default:
+        return items;
+    }
+  };
+
+  // Get user name by ID
+  const getUserName = (userId: string) => {
+    const user = roomMembers.find(member => member.id === userId);
+    return user ? user.name : 'Unknown User';
+  };
 
   // Use the passed category name or default to "Striped Crop Shirts"
   const displayName = categoryName || 'Striped Crop Shirts';
@@ -117,11 +240,37 @@ export default function WardrobeItemsScreen() {
           </View>
         </LinearGradient>
       </View>
+      
+      {/* Enhanced item info */}
+      <View style={styles.itemInfo}>
+        <Text style={styles.itemCategory}>{item.category}</Text>
+        <Text style={styles.addedBy}>Added by {item.addedBy}</Text>
+        
+        {/* Show purchase count */}
+        {item.purchasedByUsers.length > 0 && (
+          <View style={styles.purchaseInfo}>
+            <Text style={styles.purchaseText}>
+              🛒 {item.purchasedByUsers.length} room member{item.purchasedByUsers.length > 1 ? 's' : ''} bought this
+            </Text>
+            <Text style={styles.purchasedByNames}>
+              {item.purchasedByUsers.slice(0, 2).map(userId => getUserName(userId)).join(', ')}
+              {item.purchasedByUsers.length > 2 && ` +${item.purchasedByUsers.length - 2} more`}
+            </Text>
+          </View>
+        )}
+        
+        {/* Show like count */}
+        <View style={styles.likeInfo}>
+          <Text style={styles.likeText}>
+            ❤️ {getTotalLikes(item)} room member{getTotalLikes(item) > 1 ? 's' : ''} liked this
+          </Text>
+        </View>
+      </View>
     </View>
   );
 
   return (
-    <ThemedView style={styles.container}>
+    <ThemedView style={[styles.container, { backgroundColor: '#f8f8f8' }]}>
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.back()}>
@@ -131,14 +280,17 @@ export default function WardrobeItemsScreen() {
             <Text style={styles.title}>{displayName}</Text>
             <Text style={styles.itemCount}>121+ Items</Text>
           </View>
-          <View style={styles.filterButton}>
+          <TouchableOpacity 
+            style={styles.filterButton}
+            onPress={() => router.push(`/wardrobe/ai-outfits?wardrobeId=${categoryId}`)}
+          >
             <Text style={styles.filterIcon}>⚙</Text>
             <Text style={styles.filterText}>AI Powered</Text>
-          </View>
+          </TouchableOpacity>
         </View>
 
         <View style={styles.filterTabs}>
-          {['All', 'Most liked', 'Most bought'].map((filter) => {
+          {(['All', 'Most liked', 'Most bought'] as const).map((filter) => {
             const isActive = activeFilter === filter;
             return (
               <TouchableOpacity key={filter} onPress={() => setActiveFilter(filter)}>
@@ -162,7 +314,7 @@ export default function WardrobeItemsScreen() {
         </View>
 
         <FlatList
-          data={items}
+          data={getFilteredItems()}
           renderItem={renderItem}
           keyExtractor={(item) => item.id}
           numColumns={2}
@@ -284,6 +436,48 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.08,
     shadowRadius: 3,
     elevation: 2,
+  },
+  itemInfo: {
+    padding: 8,
+  },
+  itemCategory: {
+    fontSize: 10,
+    color: '#666',
+    marginBottom: 2,
+    textTransform: 'uppercase',
+    fontWeight: '500',
+  },
+  addedBy: {
+    fontSize: 9,
+    color: '#999',
+    marginBottom: 4,
+  },
+  purchaseInfo: {
+    marginTop: 4,
+    padding: 4,
+    backgroundColor: '#f8f9fa',
+    borderRadius: 4,
+    borderLeftWidth: 2,
+    borderLeftColor: '#4CAF50',
+  },
+  purchaseText: {
+    fontSize: 8,
+    color: '#4CAF50',
+    fontWeight: '600',
+    marginBottom: 1,
+  },
+  purchasedByNames: {
+    fontSize: 7,
+    color: '#666',
+    fontStyle: 'italic',
+  },
+  likeInfo: {
+    marginTop: 2,
+  },
+  likeText: {
+    fontSize: 8,
+    color: '#E91E63',
+    fontWeight: '500',
   },
   imageContainer: {
     position: 'relative',
