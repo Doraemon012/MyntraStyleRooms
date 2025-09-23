@@ -6,7 +6,8 @@ const getApiUrl = () => {
   
   // For development, try multiple endpoints in order of preference
   const endpoints = [
-    'http://192.168.2.1:5000/api',  // Current network IP
+    'http://10.87.19.218:5000/api', // Current network IP
+    'http://192.168.2.1:5000/api',  // Alternative network IP
     'http://10.10.31.251:5000/api', // Alternative network IP
     'http://localhost:5000/api',    // Localhost fallback
   ];
@@ -40,4 +41,26 @@ export const testConnection = async (url: string): Promise<boolean> => {
     console.log(`❌ Connection test failed for ${url}:`, error);
     return false;
   }
+};
+
+// Auto-detect working API endpoint
+export const detectWorkingEndpoint = async (): Promise<string> => {
+  const endpoints = [
+    'http://10.87.19.218:5000/api', // Current network IP
+    'http://192.168.2.1:5000/api',  // Alternative network IP
+    'http://10.10.31.251:5000/api', // Alternative network IP
+    'http://localhost:5000/api',    // Localhost fallback
+  ];
+
+  for (const endpoint of endpoints) {
+    console.log(`🔍 Testing connection to ${endpoint}...`);
+    const isWorking = await testConnection(endpoint);
+    if (isWorking) {
+      console.log(`✅ Found working endpoint: ${endpoint}`);
+      return endpoint;
+    }
+  }
+  
+  console.log('❌ No working endpoints found');
+  return endpoints[0]; // Return first as fallback
 };
