@@ -68,55 +68,67 @@ mongoose.connect(process.env.MONGODB_URI, {
   useNewUrlParser: true,
   useUnifiedTopology: true,
 })
-.then(() => console.log('✅ MongoDB connected successfully'))
-.catch(err => console.error('❌ MongoDB connection error:', err));
+.then(() => {
+  console.log('✅ MongoDB connected successfully');
+  console.log('🗄️  Database:', process.env.MONGODB_URI.split('@')[1]?.split('/')[0] || 'Unknown');
+  console.log('📊 Database name: myntra-fashion');
+})
+.catch(err => {
+  console.error('❌ MongoDB connection error:', err);
+  process.exit(1);
+});
 
 // Socket.io connection handling
 io.on('connection', (socket) => {
-  console.log('👤 User connected:', socket.id);
+  console.log('\n� === NEW SOCKET CONNECTION ===');
+  console.log('�👤 Socket ID:', socket.id);
+  console.log('📅 Connected at:', new Date().toISOString());
 
   // Join room
   socket.on('join-room', (roomId) => {
     socket.join(roomId);
-    console.log(`👤 User ${socket.id} joined room ${roomId}`);
+    console.log(`🏠 Socket ${socket.id} joined room ${roomId}`);
   });
 
   // Leave room
   socket.on('leave-room', (roomId) => {
     socket.leave(roomId);
-    console.log(`👤 User ${socket.id} left room ${roomId}`);
+    console.log(`� Socket ${socket.id} left room ${roomId}`);
   });
 
   // Send message
   socket.on('send-message', (data) => {
+    console.log(`💬 Message sent in room ${data.roomId} by ${socket.id}`);
     socket.to(data.roomId).emit('new-message', data);
   });
 
   // Join call session
   socket.on('join-call', (callId) => {
     socket.join(`call-${callId}`);
-    console.log(`👤 User ${socket.id} joined call ${callId}`);
+    console.log(`� Socket ${socket.id} joined call ${callId}`);
   });
 
   // Leave call session
   socket.on('leave-call', (callId) => {
     socket.leave(`call-${callId}`);
-    console.log(`👤 User ${socket.id} left call ${callId}`);
+    console.log(`� Socket ${socket.id} left call ${callId}`);
   });
 
   // Join user-specific room for notifications
   socket.on('join-user', (userId) => {
     socket.join(`user-${userId}`);
-    console.log(`👤 User ${socket.id} joined user room ${userId}`);
+    console.log(`👤 Socket ${socket.id} joined user room ${userId}`);
   });
 
   // Voice call signaling
   socket.on('call-signal', (data) => {
+    console.log(`📡 Call signal from ${socket.id} to ${data.targetUserId}`);
     socket.to(data.targetUserId).emit('call-signal', data);
   });
 
   // Real-time browsing sync (enhanced)
   socket.on('call:sync-browse', (data) => {
+    console.log(`🔄 Browse sync in call ${data.callId} by user ${data.userId}`);
     socket.to(`call-${data.callId}`).emit('call:browse-update', {
       userId: data.userId,
       productId: data.productId,
@@ -134,17 +146,19 @@ io.on('connection', (socket) => {
 
   // Cart updates
   socket.on('call:cart-update', (data) => {
+    console.log(`🛒 Cart update in call ${data.callId}`);
     socket.to(`call-${data.callId}`).emit('call:cart-notification', data);
   });
 
   // Control changes
   socket.on('call:control-changed', (data) => {
+    console.log(`🎮 Control changed in call ${data.callId}`);
     socket.to(`call-${data.callId}`).emit('call:control-update', data);
   });
 
   // Disconnect
   socket.on('disconnect', () => {
-    console.log('👤 User disconnected:', socket.id);
+    console.log(`� Socket ${socket.id} disconnected at ${new Date().toISOString()}`);
   });
 });
 

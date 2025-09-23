@@ -124,25 +124,46 @@ roomSchema.virtual('getUserRole').get(function() {
   };
 });
 
-// Pre-save middleware to add owner as member
+// Pre-save middleware to add owner as member and log
 roomSchema.pre('save', function(next) {
   if (this.isNew) {
+    console.log('💾 [Room Model] Creating new room:', this.name);
+    console.log('👤 [Room Model] Owner ID:', this.owner);
+    
     // Add owner as first member with Owner role
     this.members.unshift({
       userId: this.owner,
       role: 'Owner',
       joinedAt: new Date()
     });
+    
+    console.log('✅ [Room Model] Added owner as first member');
+  } else {
+    console.log('💾 [Room Model] Updating existing room:', this.name);
   }
   next();
 });
 
-// Instance method to add member
+// Post-save middleware for logging
+roomSchema.post('save', function(doc) {
+  if (this.wasNew) {
+    console.log('✅ [Room Model] Room saved successfully:', {
+      id: doc._id,
+      name: doc.name,
+      memberCount: doc.members.length
+    });
+  }
+});
+
+// Instance method to add member with logging
 roomSchema.methods.addMember = function(userId, role = 'Contributor') {
+  console.log('👥 [Room Model] Adding member:', userId, 'with role:', role);
+  
   // Check if user is already a member
   const existingMember = this.members.find(member => member.userId.toString() === userId.toString());
   
   if (existingMember) {
+    console.log('❌ [Room Model] User already a member:', userId);
     throw new Error('User is already a member of this room');
   }
 
@@ -152,33 +173,46 @@ roomSchema.methods.addMember = function(userId, role = 'Contributor') {
     joinedAt: new Date()
   });
 
+  console.log('✅ [Room Model] Member added, new count:', this.members.length);
   return this.save();
 };
 
-// Instance method to remove member
+// Instance method to remove member with logging
 roomSchema.methods.removeMember = function(userId) {
+  console.log('👥 [Room Model] Removing member:', userId);
+  
   // Cannot remove owner
   if (this.owner.toString() === userId.toString()) {
+    console.log('❌ [Room Model] Cannot remove owner:', userId);
     throw new Error('Cannot remove room owner');
   }
 
+  const initialCount = this.members.length;
   this.members = this.members.filter(member => member.userId.toString() !== userId.toString());
+  
+  console.log('✅ [Room Model] Member removed, count:', initialCount, '->', this.members.length);
   return this.save();
 };
 
-// Instance method to update member role
+// Instance method to update member role with logging
 roomSchema.methods.updateMemberRole = function(userId, newRole) {
+  console.log('🎭 [Room Model] Updating member role:', userId, 'to', newRole);
+  
   // Cannot change owner role
   if (this.owner.toString() === userId.toString()) {
+    console.log('❌ [Room Model] Cannot change owner role:', userId);
     throw new Error('Cannot change owner role');
   }
 
   const member = this.members.find(member => member.userId.toString() === userId.toString());
   if (!member) {
+    console.log('❌ [Room Model] User not a member:', userId);
     throw new Error('User is not a member of this room');
   }
 
+  const oldRole = member.role;
   member.role = newRole;
+  console.log('✅ [Room Model] Role updated:', oldRole, '->', newRole);
   return this.save();
 };
 

@@ -10,21 +10,33 @@ const router = express.Router();
 // @access  Private
 router.get('/', authenticateToken, async (req, res) => {
   try {
+    console.log('\n📋 === FETCHING USER ROOMS ===');
+    console.log('👤 User:', req.user.name, `(${req.user.email})`);
+    
     const { page = 1, limit = 10, search } = req.query;
     const userId = req.user._id;
+
+    console.log('🔍 Query params:', { page, limit, search: search || 'none' });
 
     let rooms;
     
     if (search) {
+      console.log('🔎 Searching rooms with term:', search);
       rooms = await Room.searchRooms(search, userId);
     } else {
+      console.log('📂 Getting all user rooms');
       rooms = await Room.findByUser(userId);
     }
 
+    console.log('✅ Found', rooms.length, 'rooms');
+    
     // Pagination
     const startIndex = (page - 1) * limit;
     const endIndex = page * limit;
     const paginatedRooms = rooms.slice(startIndex, endIndex);
+
+    console.log('📄 Returning', paginatedRooms.length, 'rooms (page', page, ')');
+    console.log('📋 === ROOMS FETCH COMPLETE ===\n');
 
     res.json({
       status: 'success',
@@ -40,7 +52,11 @@ router.get('/', authenticateToken, async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Get rooms error:', error);
+    console.error('\n❌ === ROOMS FETCH FAILED ===');
+    console.error('👤 User:', req.user?.name || 'Unknown');
+    console.error('🚨 Error:', error);
+    console.error('❌ === ROOMS FETCH FAILED ===\n');
+    
     res.status(500).json({
       status: 'error',
       message: 'Server error'
@@ -53,16 +69,26 @@ router.get('/', authenticateToken, async (req, res) => {
 // @access  Private
 router.get('/:roomId', authenticateToken, checkRoomPermission('Viewer'), async (req, res) => {
   try {
+    console.log('\n🏠 === FETCHING SINGLE ROOM ===');
+    console.log('🏠 Room ID:', req.params.roomId);
+    console.log('👤 Requested by:', req.user.name);
+    console.log('🎭 User Role:', req.userRole);
+
     const room = await Room.findById(req.params.roomId)
       .populate('owner', 'name email profileImage')
       .populate('members.userId', 'name email profileImage');
 
     if (!room) {
+      console.log('❌ Room not found:', req.params.roomId);
       return res.status(404).json({
         status: 'error',
         message: 'Room not found'
       });
     }
+
+    console.log('✅ Room found:', room.name);
+    console.log('📊 Member count:', room.memberCount);
+    console.log('🏠 === ROOM FETCH COMPLETE ===\n');
 
     res.json({
       status: 'success',
@@ -72,7 +98,12 @@ router.get('/:roomId', authenticateToken, checkRoomPermission('Viewer'), async (
       }
     });
   } catch (error) {
-    console.error('Get room error:', error);
+    console.error('\n❌ === SINGLE ROOM FETCH FAILED ===');
+    console.error('🏠 Room ID:', req.params.roomId);
+    console.error('👤 Requested by:', req.user?.name || 'Unknown');
+    console.error('🚨 Error:', error);
+    console.error('❌ === SINGLE ROOM FETCH FAILED ===\n');
+    
     res.status(500).json({
       status: 'error',
       message: 'Server error'
@@ -97,10 +128,18 @@ router.post('/', authenticateToken, [
     .isLength({ max: 200 })
     .withMessage('Description cannot be more than 200 characters')
 ], async (req, res) => {
+  const startTime = Date.now();
+  
   try {
+    console.log('\n🏠 === ROOM CREATION REQUEST ===');
+    console.log('📅 Timestamp:', new Date().toISOString());
+    console.log('👤 User:', req.user.name, `(${req.user.email})`);
+    console.log('📝 Request Body:', JSON.stringify(req.body, null, 2));
+    
     // Check for validation errors
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
+      console.log('❌ Validation failed:', errors.array());
       return res.status(400).json({
         status: 'error',
         message: 'Validation failed',
@@ -110,6 +149,15 @@ router.post('/', authenticateToken, [
 
     const { name, emoji, description, isPrivate = false, members = [] } = req.body;
     const ownerId = req.user._id;
+
+    console.log('✅ Validation passed');
+    console.log('🏠 Creating room with:');
+    console.log('  - Name:', name);
+    console.log('  - Emoji:', emoji);
+    console.log('  - Description:', description || 'No description');
+    console.log('  - Private:', isPrivate);
+    console.log('  - Owner ID:', ownerId);
+    console.log('  - Initial Members:', members.length);
 
     // Create room
     const room = new Room({
@@ -124,14 +172,30 @@ router.post('/', authenticateToken, [
       }))
     });
 
+    console.log('💾 Saving room to database...');
     await room.save();
+    console.log('✅ Room saved with ID:', room._id);
 
     // Update user stats
+    console.log('📊 Updating user stats...');
     await req.user.updateStats('roomsCreated');
+    console.log('✅ User stats updated');
 
     // Populate the room data
+    console.log('🔄 Populating room data...');
     await room.populate('owner', 'name email profileImage');
     await room.populate('members.userId', 'name email profileImage');
+    console.log('✅ Room data populated');
+
+    const duration = Date.now() - startTime;
+    console.log('⏱️ Room creation completed in:', duration + 'ms');
+    console.log('🎉 Room created successfully:', {
+      id: room._id,
+      name: room.name,
+      memberCount: room.memberCount,
+      owner: room.owner.name
+    });
+    console.log('🏠 === ROOM CREATION COMPLETE ===\n');
 
     res.status(201).json({
       status: 'success',
@@ -141,7 +205,15 @@ router.post('/', authenticateToken, [
       }
     });
   } catch (error) {
-    console.error('Create room error:', error);
+    const duration = Date.now() - startTime;
+    console.error('\n❌ === ROOM CREATION FAILED ===');
+    console.error('📅 Timestamp:', new Date().toISOString());
+    console.error('👤 User:', req.user?.name || 'Unknown', `(${req.user?.email || 'Unknown'})`);
+    console.error('⏱️ Failed after:', duration + 'ms');
+    console.error('🚨 Error Details:', error);
+    console.error('📋 Stack Trace:', error.stack);
+    console.error('❌ === ROOM CREATION FAILED ===\n');
+    
     res.status(500).json({
       status: 'error',
       message: 'Server error'
@@ -212,18 +284,32 @@ router.put('/:id', authenticateToken, checkRoomPermission('Editor'), [
 // @access  Private (Owner only)
 router.delete('/:id', authenticateToken, checkRoomPermission('Owner'), async (req, res) => {
   try {
+    console.log('\n🗑️ === DELETING ROOM ===');
+    console.log('🏠 Room ID:', req.params.id);
+    console.log('👤 Requested by:', req.user.name);
+    
     const room = req.room;
+    console.log('🏠 Room to delete:', room.name);
+    console.log('📊 Members:', room.memberCount);
 
     // Soft delete - set isActive to false
     room.isActive = false;
     await room.save();
+
+    console.log('✅ Room soft deleted successfully');
+    console.log('🗑️ === ROOM DELETION COMPLETE ===\n');
 
     res.json({
       status: 'success',
       message: 'Room deleted successfully'
     });
   } catch (error) {
-    console.error('Delete room error:', error);
+    console.error('\n❌ === ROOM DELETION FAILED ===');
+    console.error('🏠 Room ID:', req.params.id);
+    console.error('👤 Requested by:', req.user?.name || 'Unknown');
+    console.error('🚨 Error:', error);
+    console.error('❌ === ROOM DELETION FAILED ===\n');
+    
     res.status(500).json({
       status: 'error',
       message: 'Server error'
@@ -244,9 +330,16 @@ router.post('/:roomId/members', authenticateToken, checkRoomPermission('Editor')
     .withMessage('Invalid role')
 ], async (req, res) => {
   try {
+    console.log('\n👥 === ADDING MEMBER TO ROOM ===');
+    console.log('🏠 Room ID:', req.params.roomId);
+    console.log('👤 Requested by:', req.user.name);
+    console.log('➕ Adding user:', req.body.userId);
+    console.log('🎭 Role:', req.body.role || 'Contributor');
+
     // Check for validation errors
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
+      console.log('❌ Validation failed:', errors.array());
       return res.status(400).json({
         status: 'error',
         message: 'Validation failed',
@@ -260,18 +353,25 @@ router.post('/:roomId/members', authenticateToken, checkRoomPermission('Editor')
     // Check if user exists
     const user = await User.findById(userId);
     if (!user) {
+      console.log('❌ User not found:', userId);
       return res.status(404).json({
         status: 'error',
         message: 'User not found'
       });
     }
 
+    console.log('✅ User found:', user.name, `(${user.email})`);
+
     // Add member to room
     await room.addMember(userId, role);
+    console.log('✅ Member added successfully');
 
     // Populate the room data
     await room.populate('owner', 'name email profileImage');
     await room.populate('members.userId', 'name email profileImage');
+
+    console.log('📊 Room now has', room.memberCount, 'members');
+    console.log('👥 === MEMBER ADDITION COMPLETE ===\n');
 
     res.json({
       status: 'success',
@@ -281,6 +381,12 @@ router.post('/:roomId/members', authenticateToken, checkRoomPermission('Editor')
       }
     });
   } catch (error) {
+    console.error('\n❌ === MEMBER ADDITION FAILED ===');
+    console.error('🏠 Room ID:', req.params.roomId);
+    console.error('👤 Requested by:', req.user?.name || 'Unknown');
+    console.error('🚨 Error:', error.message);
+    console.error('❌ === MEMBER ADDITION FAILED ===\n');
+    
     if (error.message === 'User is already a member of this room') {
       return res.status(400).json({
         status: 'error',
@@ -288,7 +394,6 @@ router.post('/:roomId/members', authenticateToken, checkRoomPermission('Editor')
       });
     }
     
-    console.error('Add member error:', error);
     res.status(500).json({
       status: 'error',
       message: 'Server error'
