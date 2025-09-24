@@ -166,7 +166,7 @@ export const playMenuAPI = {
   getById: (id: string) => apiCall<any>(`/play-menu/${id}`),
 };
 
-// User API calls (for future use)
+// User API calls
 export const userAPI = {
   // Get user profile
   getProfile: () => apiCall<any>('/user/profile'),
@@ -176,6 +176,22 @@ export const userAPI = {
     method: 'PUT',
     body: JSON.stringify(data),
   }),
+  
+  // Get all users (for adding to rooms) - uses search endpoint
+  getAll: (params?: {
+    search?: string;
+    page?: number;
+    limit?: number;
+  }) => {
+    const queryParams = new URLSearchParams();
+    if (params?.search) queryParams.append('q', params.search);
+    if (params?.limit) queryParams.append('limit', params.limit.toString());
+    
+    return apiCall<any>(`/users/search?${queryParams.toString()}`);
+  },
+  
+  // Search users
+  search: (query: string) => apiCall<any>(`/users/search?q=${encodeURIComponent(query)}`),
   
   // Get user's wishlist
   getWishlist: () => apiCall<any>('/user/wishlist'),
@@ -348,6 +364,113 @@ export const authAPI = {
     }),
 };
 
+// Room API calls
+export const roomAPI = {
+  // Get all rooms for current user
+  getAll: (params?: {
+    page?: number;
+    limit?: number;
+    search?: string;
+  }) => {
+    const queryParams = new URLSearchParams();
+    if (params?.page) queryParams.append('page', params.page.toString());
+    if (params?.limit) queryParams.append('limit', params.limit.toString());
+    if (params?.search) queryParams.append('search', params.search);
+    
+    return apiCall<any>(`/rooms?${queryParams.toString()}`);
+  },
+  
+  // Get single room by ID
+  getById: (roomId: string) => apiCall<any>(`/rooms/${roomId}`),
+  
+  // Create a new room
+  create: (roomData: {
+    name: string;
+    emoji: string;
+    description?: string;
+    isPrivate?: boolean;
+    members?: Array<{
+      userId: string;
+      role?: 'Editor' | 'Contributor' | 'Viewer';
+    }>;
+  }) => apiCall<any>('/rooms', {
+    method: 'POST',
+    body: JSON.stringify(roomData),
+  }),
+  
+  // Update room
+  update: (roomId: string, roomData: {
+    name?: string;
+    emoji?: string;
+    description?: string;
+    isPrivate?: boolean;
+    settings?: any;
+  }) => apiCall<any>(`/rooms/${roomId}`, {
+    method: 'PUT',
+    body: JSON.stringify(roomData),
+  }),
+  
+  // Delete room
+  delete: (roomId: string) => apiCall<any>(`/rooms/${roomId}`, {
+    method: 'DELETE',
+  }),
+  
+  // Add member to room
+  addMember: (roomId: string, memberData: {
+    userId: string;
+    role?: 'Editor' | 'Contributor' | 'Viewer';
+  }) => apiCall<any>(`/rooms/${roomId}/members`, {
+    method: 'POST',
+    body: JSON.stringify(memberData),
+  }),
+  
+  // Update member role
+  updateMemberRole: (roomId: string, memberId: string, role: 'Editor' | 'Contributor' | 'Viewer') => 
+    apiCall<any>(`/rooms/${roomId}/members/${memberId}`, {
+      method: 'PUT',
+      body: JSON.stringify({ role }),
+    }),
+  
+  // Remove member from room
+  removeMember: (roomId: string, memberId: string) => 
+    apiCall<any>(`/rooms/${roomId}/members/${memberId}`, {
+      method: 'DELETE',
+    }),
+  
+  // Join room (for public rooms)
+  join: (roomId: string) => apiCall<any>(`/rooms/${roomId}/join`, {
+    method: 'POST',
+  }),
+  
+  // Leave room
+  leave: (roomId: string) => apiCall<any>(`/rooms/${roomId}/leave`, {
+    method: 'POST',
+  }),
+  
+  // Toggle AI stylist on/off
+  toggleAI: (roomId: string, aiEnabled: boolean) => 
+    apiCall<any>(`/rooms/${roomId}/ai-toggle`, {
+      method: 'PUT',
+      body: JSON.stringify({ aiEnabled }),
+    }),
+  
+  // Generate invitation link
+  generateInvitation: (roomId: string, options?: {
+    role?: 'Editor' | 'Contributor' | 'Viewer';
+    expiresInHours?: number;
+  }) => apiCall<any>(`/rooms/${roomId}/generate-invitation`, {
+    method: 'POST',
+    body: JSON.stringify(options || {}),
+  }),
+  
+  // Join room via invitation
+  joinViaInvitation: (roomId: string, token: string) => 
+    apiCall<any>(`/rooms/${roomId}/join-invitation`, {
+      method: 'POST',
+      body: JSON.stringify({ token }),
+    }),
+};
+
 // Export all APIs
 export default {
   auth: authAPI,
@@ -359,4 +482,5 @@ export default {
   cart: cartAPI,
   order: orderAPI,
   review: reviewAPI,
+  room: roomAPI,
 };

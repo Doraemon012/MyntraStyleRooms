@@ -1,9 +1,12 @@
+import { roomAPI, userAPI } from '@/services/api';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   FlatList,
+  Image,
   Modal,
   ScrollView,
   StyleSheet,
@@ -15,14 +18,14 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 interface User {
-  id: string;
+  _id: string;
   name: string;
   email: string;
-  avatar?: string;
+  profileImage?: string;
 }
 
 interface RoomMember {
-  id: string;
+  _id: string;
   name: string;
   email: string;
   role: 'Owner' | 'Editor' | 'Contributor' | 'Viewer';
@@ -30,14 +33,14 @@ interface RoomMember {
 
 // Mock users data
 const mockUsers: User[] = [
-  { id: '1', name: 'Richa Sharma', email: 'richa@email.com', avatar: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face' },
-  { id: '2', name: 'Priya Patel', email: 'priya@email.com', avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face' },
-  { id: '3', name: 'Sarah Johnson', email: 'sarah@email.com', avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150&h=150&fit=crop&crop=face' },
-  { id: '4', name: 'Aisha Khan', email: 'aisha@email.com', avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&h=150&fit=crop&crop=face' },
-  { id: '5', name: 'Emma Wilson', email: 'emma@email.com', avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&h=150&fit=crop&crop=face' },
-  { id: '6', name: 'Sofia Rodriguez', email: 'sofia@email.com', avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop&crop=face' },
-  { id: '7', name: 'Maya Chen', email: 'maya@email.com', avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&h=150&fit=crop&crop=face' },
-  { id: '8', name: 'Zara Ahmed', email: 'zara@email.com', avatar: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=150&h=150&fit=crop&crop=face' },
+  { _id: '1', name: 'Richa Sharma', email: 'richa@email.com', profileImage: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face' },
+  { _id: '2', name: 'Priya Patel', email: 'priya@email.com', profileImage: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face' },
+  { _id: '3', name: 'Sarah Johnson', email: 'sarah@email.com', profileImage: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150&h=150&fit=crop&crop=face' },
+  { _id: '4', name: 'Aisha Khan', email: 'aisha@email.com', profileImage: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&h=150&fit=crop&crop=face' },
+  { _id: '5', name: 'Emma Wilson', email: 'emma@email.com', profileImage: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&h=150&fit=crop&crop=face' },
+  { _id: '6', name: 'Sofia Rodriguez', email: 'sofia@email.com', profileImage: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop&crop=face' },
+  { _id: '7', name: 'Maya Chen', email: 'maya@email.com', profileImage: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&h=150&fit=crop&crop=face' },
+  { _id: '8', name: 'Zara Ahmed', email: 'zara@email.com', profileImage: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=150&h=150&fit=crop&crop=face' },
 ];
 
 export default function CreateRoomScreen() {
@@ -49,10 +52,51 @@ export default function CreateRoomScreen() {
   const [showUserModal, setShowUserModal] = useState(false);
   const [invitationLink, setInvitationLink] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [users, setUsers] = useState<User[]>([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
+
+  // Fetch users from API
+  const fetchUsers = async (search?: string) => {
+    try {
+      setLoadingUsers(true);
+      console.log('🔍 Fetching users with search:', search || searchQuery);
+      
+      const response = await userAPI.getAll({ 
+        search: search || searchQuery,
+        limit: 50 
+      });
+      
+      console.log('📡 Users API response:', response);
+      
+      if (response.status === 'success') {
+        // Backend returns users with 'id' field, convert to '_id' for consistency
+        const usersData = (response.data.users || []).map((user: any) => ({
+          _id: user.id,
+          name: user.name,
+          email: user.email,
+          profileImage: user.profileImage,
+          location: user.location
+        }));
+        console.log('✅ Processed users data:', usersData);
+        setUsers(usersData);
+      } else {
+        // Fallback to mock data if API fails
+        console.log('❌ API failed, using mock users');
+        setUsers(mockUsers);
+      }
+    } catch (error) {
+      console.error('❌ Error fetching users:', error);
+      // Fallback to mock data
+      setUsers(mockUsers);
+    } finally {
+      setLoadingUsers(false);
+    }
+  };
 
   const addMember = (user: User) => {
     const newMember: RoomMember = {
-      id: user.id,
+      _id: user._id,
       name: user.name,
       email: user.email,
       role: 'Contributor',
@@ -61,12 +105,12 @@ export default function CreateRoomScreen() {
   };
 
   const removeMember = (id: string) => {
-    setMembers(members.filter(member => member.id !== id));
+    setMembers(members.filter(member => member._id !== id));
   };
 
   const updateMemberRole = (id: string, role: RoomMember['role']) => {
     setMembers(members.map(member => 
-      member.id === id ? { ...member, role } : member
+      member._id === id ? { ...member, role } : member
     ));
   };
 
@@ -78,26 +122,67 @@ export default function CreateRoomScreen() {
     return link;
   };
 
-  const createRoom = () => {
+  const createRoom = async () => {
     if (!roomName.trim()) {
       Alert.alert('Error', 'Please enter a room name');
       return;
     }
 
-    // Generate invitation link
-    const link = generateInvitationLink();
+    try {
+      setLoading(true);
+      
+      const roomData = {
+        name: roomName.trim(),
+        emoji: '👗', // Default emoji
+        description: description.trim() || undefined,
+        isPrivate,
+        members: members.map(member => ({
+          userId: member._id,
+          role: member.role as 'Editor' | 'Contributor' | 'Viewer'
+        }))
+      };
 
-    // Here you would typically make an API call to create the room
-    console.log('Room created:', roomName);
-    console.log('Invitation link:', link);
-    
-    // Navigate back directly
-    router.back();
+      const response = await roomAPI.create(roomData);
+      
+      if (response.status === 'success') {
+        Alert.alert(
+          'Success', 
+          'Room created successfully!',
+          [
+            {
+              text: 'OK',
+              onPress: () => {
+                // Navigate back to refresh the room list
+                router.back();
+                // The room list will refresh automatically due to useFocusEffect
+              }
+            }
+          ]
+        );
+      } else {
+        throw new Error(response.message || 'Failed to create room');
+      }
+    } catch (error) {
+      console.error('Error creating room:', error);
+      Alert.alert('Error', 'Failed to create room. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
+  // Load users on component mount
+  useEffect(() => {
+    fetchUsers();
+  }, []);
 
-  const filteredUsers = mockUsers.filter(user => 
-    !members.some(member => member.id === user.id) &&
+  // Handle search
+  const handleUserSearch = (query: string) => {
+    setSearchQuery(query);
+    fetchUsers(query);
+  };
+
+  const filteredUsers = users.filter(user => 
+    !members.some(member => member._id === user._id) &&
     (user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
      user.email.toLowerCase().includes(searchQuery.toLowerCase()))
   );
@@ -108,7 +193,11 @@ export default function CreateRoomScreen() {
       onPress={() => addMember(item)}
     >
       <View style={styles.userAvatar}>
-        <Text style={styles.userInitial}>{item.name.charAt(0).toUpperCase()}</Text>
+        {item.profileImage ? (
+          <Image source={{ uri: item.profileImage }} style={styles.userAvatarImage} />
+        ) : (
+          <Text style={styles.userInitial}>{item.name.charAt(0).toUpperCase()}</Text>
+        )}
       </View>
       <View style={styles.userDetails}>
         <Text style={styles.userName}>{item.name}</Text>
@@ -210,7 +299,7 @@ export default function CreateRoomScreen() {
             {members.length > 0 ? (
               <View style={styles.membersList}>
                 {members.map((member, index) => (
-                  <View key={member.id} style={styles.memberItem}>
+                  <View key={member._id} style={styles.memberItem}>
                     <View style={styles.memberAvatar}>
                       <Text style={styles.memberInitial}>{member.name.charAt(0)}</Text>
                     </View>
@@ -220,7 +309,7 @@ export default function CreateRoomScreen() {
                     </View>
                     <TouchableOpacity 
                       style={styles.removeMemberButton}
-                      onPress={() => removeMember(member.id)}
+                      onPress={() => removeMember(member._id)}
                     >
                       <Text style={styles.removeMemberText}>×</Text>
                     </TouchableOpacity>
@@ -235,14 +324,18 @@ export default function CreateRoomScreen() {
 
         {/* Bottom Actions */}
         <View style={styles.bottomActions}>
-          <TouchableOpacity onPress={createRoom}>
+          <TouchableOpacity onPress={createRoom} disabled={loading}>
             <LinearGradient
-              colors={['#E91E63', '#FF6B35']}
+              colors={loading ? ['#ccc', '#999'] : ['#E91E63', '#FF6B35']}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={styles.createButton}
             >
-              <Text style={styles.createButtonText}>Create</Text>
+              {loading ? (
+                <ActivityIndicator size="small" color="white" />
+              ) : (
+                <Text style={styles.createButtonText}>Create</Text>
+              )}
             </LinearGradient>
           </TouchableOpacity>
         </View>
@@ -278,25 +371,32 @@ export default function CreateRoomScreen() {
                   placeholder="Search users..."
                   placeholderTextColor="#999"
                   value={searchQuery}
-                  onChangeText={setSearchQuery}
+                  onChangeText={handleUserSearch}
                 />
               </View>
               
               {/* Users List */}
-              <FlatList
-                data={filteredUsers}
-                renderItem={renderUser}
-                keyExtractor={item => item.id}
-                style={styles.usersList}
-                showsVerticalScrollIndicator={false}
-                ListEmptyComponent={
-                  <View style={styles.emptyState}>
-                    <Text style={styles.emptyStateText}>
-                      {searchQuery ? 'No users found' : 'No users available'}
-                    </Text>
-                  </View>
-                }
-              />
+              {loadingUsers ? (
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator size="small" color="#E91E63" />
+                  <Text style={styles.loadingText}>Loading users...</Text>
+                </View>
+              ) : (
+                <FlatList
+                  data={filteredUsers}
+                  renderItem={renderUser}
+                  keyExtractor={item => item._id}
+                  style={styles.usersList}
+                  showsVerticalScrollIndicator={false}
+                  ListEmptyComponent={
+                    <View style={styles.emptyState}>
+                      <Text style={styles.emptyStateText}>
+                        {searchQuery ? 'No users found' : 'No users available'}
+                      </Text>
+                    </View>
+                  }
+                />
+              )}
             </View>
           </View>
         </Modal>
@@ -615,6 +715,17 @@ const styles = StyleSheet.create({
     color: '#999',
     textAlign: 'center',
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 20,
+  },
+  loadingText: {
+    marginTop: 8,
+    fontSize: 14,
+    color: '#666',
+  },
   userItem: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -639,6 +750,11 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 14,
     fontWeight: '600',
+  },
+  userAvatarImage: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
   },
   userDetails: {
     flex: 1,

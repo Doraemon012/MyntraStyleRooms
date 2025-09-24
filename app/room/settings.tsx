@@ -1,7 +1,9 @@
+import { roomAPI, userAPI } from '@/services/api';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
+    ActivityIndicator,
     Alert,
     Clipboard,
     FlatList,
@@ -17,14 +19,14 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 interface User {
-  id: string;
+  _id: string;
   name: string;
   email: string;
-  avatar?: string;
+  profileImage?: string;
 }
 
 interface RoomMember {
-  id: string;
+  _id: string;
   name: string;
   email: string;
   role: 'Owner' | 'Editor' | 'Contributor' | 'Viewer';
@@ -32,31 +34,74 @@ interface RoomMember {
 
 // Mock users data
 const mockUsers: User[] = [
-  { id: '1', name: 'Richa Sharma', email: 'richa@email.com', avatar: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face' },
-  { id: '2', name: 'Priya Patel', email: 'priya@email.com', avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face' },
-  { id: '3', name: 'Sarah Johnson', email: 'sarah@email.com', avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150&h=150&fit=crop&crop=face' },
-  { id: '4', name: 'Aisha Khan', email: 'aisha@email.com', avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&h=150&fit=crop&crop=face' },
-  { id: '5', name: 'Emma Wilson', email: 'emma@email.com', avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&h=150&fit=crop&crop=face' },
-  { id: '6', name: 'Sofia Rodriguez', email: 'sofia@email.com', avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop&crop=face' },
-  { id: '7', name: 'Maya Chen', email: 'maya@email.com', avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&h=150&fit=crop&crop=face' },
-  { id: '8', name: 'Zara Ahmed', email: 'zara@email.com', avatar: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=150&h=150&fit=crop&crop=face' },
+  { _id: '1', name: 'Richa Sharma', email: 'richa@email.com', profileImage: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face' },
+  { _id: '2', name: 'Priya Patel', email: 'priya@email.com', profileImage: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face' },
+  { _id: '3', name: 'Sarah Johnson', email: 'sarah@email.com', profileImage: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150&h=150&fit=crop&crop=face' },
+  { _id: '4', name: 'Aisha Khan', email: 'aisha@email.com', profileImage: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&h=150&fit=crop&crop=face' },
+  { _id: '5', name: 'Emma Wilson', email: 'emma@email.com', profileImage: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&h=150&fit=crop&crop=face' },
+  { _id: '6', name: 'Sofia Rodriguez', email: 'sofia@email.com', profileImage: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop&crop=face' },
+  { _id: '7', name: 'Maya Chen', email: 'maya@email.com', profileImage: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&h=150&fit=crop&crop=face' },
+  { _id: '8', name: 'Zara Ahmed', email: 'zara@email.com', profileImage: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=150&h=150&fit=crop&crop=face' },
 ];
 
 export default function RoomSettingsScreen() {
   const { id } = useLocalSearchParams();
   
-  const [roomName, setRoomName] = useState('Family Wedding Outfits');
-  const [description, setDescription] = useState('Planning outfits for the upcoming family wedding celebration');
+  const [roomName, setRoomName] = useState('');
+  const [description, setDescription] = useState('');
   const [isPrivate, setIsPrivate] = useState(false);
   const [aiEnabled, setAiEnabled] = useState(true);
   const [members, setMembers] = useState<RoomMember[]>([]);
   const [showUserModal, setShowUserModal] = useState(false);
-  const [invitationLink, setInvitationLink] = useState('XXXX-XXX-XXXX');
+  const [invitationLink, setInvitationLink] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [room, setRoom] = useState<any>(null);
+  const [users, setUsers] = useState<User[]>([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
+
+  // Fetch users from API
+  const fetchUsers = async (search?: string) => {
+    try {
+      setLoadingUsers(true);
+      console.log('🔍 Fetching users with search:', search || searchQuery);
+      
+      const response = await userAPI.getAll({ 
+        search: search || searchQuery,
+        limit: 50 
+      });
+      
+      console.log('📡 Users API response:', response);
+      
+      if (response.status === 'success') {
+        // Backend returns users with 'id' field, convert to '_id' for consistency
+        const usersData = (response.data.users || []).map((user: any) => ({
+          _id: user.id,
+          name: user.name,
+          email: user.email,
+          profileImage: user.profileImage,
+          location: user.location
+        }));
+        console.log('✅ Processed users data:', usersData);
+        setUsers(usersData);
+      } else {
+        // Fallback to mock data if API fails
+        console.log('❌ API failed, using mock users');
+        setUsers(mockUsers);
+      }
+    } catch (error) {
+      console.error('❌ Error fetching users:', error);
+      // Fallback to mock data
+      setUsers(mockUsers);
+    } finally {
+      setLoadingUsers(false);
+    }
+  };
 
   const addMember = (user: User) => {
     const newMember: RoomMember = {
-      id: user.id,
+      _id: user._id,
       name: user.name,
       email: user.email,
       role: 'Contributor',
@@ -65,12 +110,12 @@ export default function RoomSettingsScreen() {
   };
 
   const removeMember = (id: string) => {
-    setMembers(members.filter(member => member.id !== id));
+    setMembers(members.filter(member => member._id !== id));
   };
 
   const updateMemberRole = (id: string, role: RoomMember['role']) => {
     setMembers(members.map(member => 
-      member.id === id ? { ...member, role } : member
+      member._id === id ? { ...member, role } : member
     ));
   };
 
@@ -83,15 +128,121 @@ export default function RoomSettingsScreen() {
     }
   };
 
-  const saveSettings = () => {
-    // Here you would typically make an API call to save the room settings
-    console.log('Room settings saved:', { roomName, description, isPrivate, aiEnabled, members });
-    Alert.alert('Success', 'Room settings saved successfully');
-    router.back();
+  // Fetch room data
+  const fetchRoomData = async () => {
+    if (!id) return;
+    
+    try {
+      setLoading(true);
+      const response = await roomAPI.getById(id as string);
+      
+      if (response.status === 'success') {
+        const roomData = response.data.room;
+        setRoom(roomData);
+        setRoomName(roomData.name || '');
+        setDescription(roomData.description || '');
+        setIsPrivate(roomData.isPrivate || false);
+        setAiEnabled(roomData.settings?.aiEnabled ?? true);
+        
+        // Convert members to local format
+        const roomMembers = roomData.members?.map((member: any) => ({
+          _id: member.userId._id,
+          name: member.userId.name,
+          email: member.userId.email,
+          role: member.role
+        })) || [];
+        setMembers(roomMembers);
+      } else {
+        throw new Error(response.message || 'Failed to fetch room data');
+      }
+    } catch (error) {
+      console.error('Error fetching room data:', error);
+      Alert.alert('Error', 'Failed to load room settings. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const filteredUsers = mockUsers.filter(user => 
-    !members.some(member => member.id === user.id) &&
+  // Load room data on mount
+  useEffect(() => {
+    fetchRoomData();
+    fetchUsers();
+  }, [id]);
+
+  const saveSettings = async () => {
+    if (!id) return;
+    
+    try {
+      setSaving(true);
+      
+      const updateData = {
+        name: roomName.trim(),
+        description: description.trim() || undefined,
+        isPrivate,
+        settings: {
+          aiEnabled
+        }
+      };
+
+      const response = await roomAPI.update(id as string, updateData);
+      
+      if (response.status === 'success') {
+        // Update local room state
+        setRoom(prevRoom => ({
+          ...prevRoom,
+          ...updateData,
+          settings: {
+            ...prevRoom?.settings,
+            ...updateData.settings
+          }
+        }));
+        
+        Alert.alert('Success', 'Room settings saved successfully', [
+          {
+            text: 'OK',
+            onPress: () => router.back()
+          }
+        ]);
+      } else {
+        throw new Error(response.message || 'Failed to save room settings');
+      }
+    } catch (error) {
+      console.error('Error saving room settings:', error);
+      Alert.alert('Error', 'Failed to save room settings. Please try again.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const generateInvitationLink = async () => {
+    if (!id) return;
+    
+    try {
+      const response = await roomAPI.generateInvitation(id as string, {
+        role: 'Contributor',
+        expiresInHours: 24
+      });
+      
+      if (response.status === 'success') {
+        setInvitationLink(response.data.invitationLink);
+        Alert.alert('Success', 'Invitation link generated successfully!');
+      } else {
+        throw new Error(response.message || 'Failed to generate invitation link');
+      }
+    } catch (error) {
+      console.error('Error generating invitation link:', error);
+      Alert.alert('Error', 'Failed to generate invitation link. Please try again.');
+    }
+  };
+
+  // Handle search
+  const handleUserSearch = (query: string) => {
+    setSearchQuery(query);
+    fetchUsers(query);
+  };
+
+  const filteredUsers = users.filter(user => 
+    !members.some(member => member._id === user._id) &&
     (user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
      user.email.toLowerCase().includes(searchQuery.toLowerCase()))
   );
@@ -102,7 +253,11 @@ export default function RoomSettingsScreen() {
       onPress={() => addMember(item)}
     >
       <View style={styles.userAvatar}>
-        <Text style={styles.userInitial}>{item.name.charAt(0).toUpperCase()}</Text>
+        {item.profileImage ? (
+          <Image source={{ uri: item.profileImage }} style={styles.userAvatarImage} />
+        ) : (
+          <Text style={styles.userInitial}>{item.name.charAt(0).toUpperCase()}</Text>
+        )}
       </View>
       <View style={styles.userDetails}>
         <Text style={styles.userName}>{item.name}</Text>
@@ -114,6 +269,19 @@ export default function RoomSettingsScreen() {
     </TouchableOpacity>
   );
 
+  if (loading) {
+    return (
+      <View style={styles.container}>
+        <SafeAreaView style={styles.container}>
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#E91E63" />
+            <Text style={styles.loadingText}>Loading room settings...</Text>
+          </View>
+        </SafeAreaView>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       <SafeAreaView style={styles.container}>
@@ -123,12 +291,16 @@ export default function RoomSettingsScreen() {
             <Text style={styles.backButton}>‹</Text>
           </TouchableOpacity>
           <Text style={styles.title}>Room Settings</Text>
-           <TouchableOpacity onPress={saveSettings} style={styles.editButtonContainer}>
-             <Image 
-               source={require('@/assets/images/okay_icon.png')} 
-               style={styles.editButtonIcon}
-               resizeMode="contain"
-             />
+           <TouchableOpacity onPress={saveSettings} disabled={saving} style={styles.editButtonContainer}>
+             {saving ? (
+               <ActivityIndicator size="small" color="#E91E63" />
+             ) : (
+               <Image 
+                 source={require('@/assets/images/okay_icon.png')} 
+                 style={styles.editButtonIcon}
+                 resizeMode="contain"
+               />
+             )}
            </TouchableOpacity>
         </View>
 
@@ -141,12 +313,12 @@ export default function RoomSettingsScreen() {
                 style={styles.copyLinkInput}
                 value={invitationLink}
                 editable={false}
-                placeholder="XXXX-XXX-XXXX"
+                placeholder="Generate invitation link"
                 placeholderTextColor="#999"
               />
-               <TouchableOpacity onPress={copyInvitationLink} style={styles.copyButton}>
-                 <Ionicons name="link" size={16} color="#666" />
-               </TouchableOpacity>
+              <TouchableOpacity onPress={invitationLink ? copyInvitationLink : generateInvitationLink} style={styles.copyButton}>
+                <Ionicons name={invitationLink ? "copy" : "link"} size={16} color="#666" />
+              </TouchableOpacity>
             </View>
           </View>
 
@@ -227,7 +399,7 @@ export default function RoomSettingsScreen() {
             {members.length > 0 ? (
               <View style={styles.membersList}>
                 {members.map((member, index) => (
-                  <View key={member.id} style={styles.memberItem}>
+                  <View key={member._id} style={styles.memberItem}>
                     <View style={styles.memberAvatar}>
                       <Text style={styles.memberInitial}>{member.name.charAt(0)}</Text>
                     </View>
@@ -237,7 +409,7 @@ export default function RoomSettingsScreen() {
                     </View>
                     <TouchableOpacity 
                       style={styles.removeMemberButton}
-                      onPress={() => removeMember(member.id)}
+                      onPress={() => removeMember(member._id)}
                     >
                       <Text style={styles.removeMemberText}>×</Text>
                     </TouchableOpacity>
@@ -281,25 +453,32 @@ export default function RoomSettingsScreen() {
                   placeholder="Search users..."
                   placeholderTextColor="#999"
                   value={searchQuery}
-                  onChangeText={setSearchQuery}
+                  onChangeText={handleUserSearch}
                 />
               </View>
               
               {/* Users List */}
-              <FlatList
-                data={filteredUsers}
-                renderItem={renderUser}
-                keyExtractor={item => item.id}
-                style={styles.usersList}
-                showsVerticalScrollIndicator={false}
-                ListEmptyComponent={
-                  <View style={styles.emptyState}>
-                    <Text style={styles.emptyStateText}>
-                      {searchQuery ? 'No users found' : 'No users available'}
-                    </Text>
-                  </View>
-                }
-              />
+              {loadingUsers ? (
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator size="small" color="#E91E63" />
+                  <Text style={styles.loadingText}>Loading users...</Text>
+                </View>
+              ) : (
+                <FlatList
+                  data={filteredUsers}
+                  renderItem={renderUser}
+                  keyExtractor={item => item._id}
+                  style={styles.usersList}
+                  showsVerticalScrollIndicator={false}
+                  ListEmptyComponent={
+                    <View style={styles.emptyState}>
+                      <Text style={styles.emptyStateText}>
+                        {searchQuery ? 'No users found' : 'No users available'}
+                      </Text>
+                    </View>
+                  }
+                />
+              )}
             </View>
           </View>
         </Modal>
@@ -607,6 +786,17 @@ const styles = StyleSheet.create({
     color: '#999',
     textAlign: 'center',
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 20,
+  },
+  loadingText: {
+    marginTop: 8,
+    fontSize: 14,
+    color: '#666',
+  },
   userItem: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -631,6 +821,11 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 14,
     fontWeight: '600',
+  },
+  userAvatarImage: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
   },
   userDetails: {
     flex: 1,
@@ -657,5 +852,16 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 16,
     fontWeight: '600',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'white',
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#666',
   },
 });

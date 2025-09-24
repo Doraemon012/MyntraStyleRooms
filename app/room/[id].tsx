@@ -1,6 +1,8 @@
 import MayaChat from '@/components/maya-chat';
 import { ThemedView } from '@/components/themed-view';
 import MayaTheme from '@/constants/maya-theme';
+import { roomAPI } from '@/services/api';
+import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
@@ -206,50 +208,16 @@ export default function RoomChatScreen() {
     try {
       setLoading(true);
       
-      // For development, we'll use mock data directly to avoid network errors
-      // In production, you would uncomment the API call below
+      const response = await roomAPI.getById(id as string);
       
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Use mock data directly for now
-      const mockRoomData = mockRooms[id as string];
-      if (mockRoomData) {
-        setRoom({
-          _id: id as string,
-          name: mockRoomData.name,
-          emoji: getRoomEmoji(id as string),
-          members: generateMockMembers(mockRoomData.memberCount - 1),
-          owner: { _id: '1', name: 'Room Owner', email: 'owner@example.com' },
-          isPrivate: false,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        });
+      if (response.status === 'success') {
+        setRoom(response.data.room);
       } else {
-        setRoom(null);
+        throw new Error(response.message || 'Failed to fetch room data');
       }
-      
-      /* 
-      // Uncomment this section when your backend is running
-      const API_BASE_URL = 'http://localhost:5000/api';
-      const response = await fetch(`${API_BASE_URL}/rooms/${id}`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          // 'Authorization': `Bearer ${authToken}` // Add when auth is implemented
-        },
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        setRoom(data.data.room);
-      } else {
-        throw new Error(`API Error: ${response.status}`);
-      }
-      */
       
     } catch (error) {
-      console.log('Using mock data for room:', id);
+      console.error('Error fetching room data:', error);
       // Fallback to mock data
       const mockRoomData = mockRooms[id as string];
       if (mockRoomData) {
@@ -301,6 +269,13 @@ export default function RoomChatScreen() {
   useEffect(() => {
     fetchRoomData();
   }, [id]);
+
+  // Refresh room data when screen comes into focus (e.g., returning from settings)
+  useFocusEffect(
+    React.useCallback(() => {
+      fetchRoomData();
+    }, [id])
+  );
 
   const sendMessage = () => {
     if (inputText.trim()) {

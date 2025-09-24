@@ -90,33 +90,57 @@
 // });
 
 
+import { roomAPI } from '@/services/api';
 import { DancingScript_400Regular, DancingScript_700Bold, useFonts } from '@expo-google-fonts/dancing-script';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View
+    ActivityIndicator,
+    Alert,
+    RefreshControl,
+    ScrollView,
+    StatusBar,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 interface Room {
-  id: string;
+  _id: string;
   name: string;
-  lastMessage: string;
+  lastMessage?: string;
   memberCount: number;
   status: 'joined' | 'invited' | 'accepted';
   lastActivity: string;
   invitedBy?: string;
   memberAvatars: string[];
   acceptedAt?: Date;
+  emoji?: string;
+  description?: string;
+  isPrivate?: boolean;
+  owner?: {
+    _id: string;
+    name: string;
+    email: string;
+    profileImage?: string;
+  };
+  members?: Array<{
+    userId: {
+      _id: string;
+      name: string;
+      email: string;
+      profileImage?: string;
+    };
+    role: 'Owner' | 'Editor' | 'Contributor' | 'Viewer';
+    joinedAt: string;
+  }>;
 }
 
 const mockRooms: Room[] = [
@@ -197,32 +221,159 @@ const mockRooms: Room[] = [
 export default function HomeScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState<'all' | 'joined' | 'invited'>('all');
-  const [rooms, setRooms] = useState<Room[]>(mockRooms);
+  const [rooms, setRooms] = useState<Room[]>([]);
   const [invitationLink, setInvitationLink] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   
   let [fontsLoaded] = useFonts({
     DancingScript_400Regular,
     DancingScript_700Bold,
   });
 
-  if (!fontsLoaded) {
-    return null;
-  }
+  // Fetch rooms from API
+  const fetchRooms = async (search?: string) => {
+    try {
+      setLoading(true);
+      const response = await roomAPI.getAll({ 
+        search: search || searchQuery,
+        limit: 50 
+      });
+      
+      if (response.status === 'success') {
+        const roomsData = response.data.rooms.map((room: any) => ({
+          _id: room._id,
+          name: room.name,
+          lastMessage: room.lastMessage || 'No messages yet',
+          memberCount: room.memberCount || room.members?.length || 0,
+          status: 'joined' as const, // All rooms from API are joined
+          lastActivity: formatLastActivity(room.lastActivity || room.updatedAt),
+          memberAvatars: generateMemberAvatars(room.members || []),
+          emoji: room.emoji || '👗',
+          description: room.description,
+          isPrivate: room.isPrivate,
+          owner: room.owner,
+          members: room.members
+        }));
+        setRooms(roomsData);
+      } else {
+        // Fallback to mock data if API fails
+        console.log('API failed, using mock data');
+        setRooms(mockRooms);
+      }
+    } catch (error) {
+      console.error('Error fetching rooms:', error);
+      // Fallback to mock data
+      setRooms(mockRooms);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
 
-  const handleAcceptInvitation = (roomId: string) => {
-    setRooms(prevRooms => 
-      prevRooms.map(room => 
-        room.id === roomId 
-          ? { ...room, status: 'accepted' as const, invitedBy: undefined, acceptedAt: new Date() }
-          : room
-      )
-    );
+  // Format last activity time
+  const formatLastActivity = (dateString: string): string => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60));
+    
+    if (diffInMinutes < 1) return 'Just now';
+    if (diffInMinutes < 60) return `${diffInMinutes} mins ago`;
+    if (diffInMinutes < 1440) return `${Math.floor(diffInMinutes / 60)} hours ago`;
+    return `${Math.floor(diffInMinutes / 1440)} days ago`;
+  };
+
+  // Generate member avatars from room members
+  const generateMemberAvatars = (members: any[]): string[] => {
+    return members.slice(0, 3).map((member, index) => {
+      // Use actual profile image if available
+      if (member.userId?.profileImage) {
+        return member.userId.profileImage;
+      }
+      
+      // Fallback to default avatar based on member index for consistency
+      const defaultAvatars = [
+        'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face',
+        'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face',
+        'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150&h=150&fit=crop&crop=face'
+      ];
+      
+      return defaultAvatars[index] || defaultAvatars[0];
+    });
+  };
+
+  // Load rooms on component mount
+  useEffect(() => {
+    fetchRooms();
+  }, []);
+
+  // Refresh rooms when screen comes into focus (e.g., returning from settings)
+  useFocusEffect(
+    React.useCallback(() => {
+      fetchRooms();
+    }, [])
+  );
+
+  // Handle search
+  const handleSearch = (query: string) => {
+    setSearchQuery(query);
+    fetchRooms(query);
+  };
+
+  // Handle refresh
+  const handleRefresh = () => {
+    setRefreshing(true);
+    fetchRooms();
+  };
+
+  const handleAcceptInvitation = async (roomId: string) => {
+    try {
+      await roomAPI.join(roomId);
+      setRooms(prevRooms => 
+        prevRooms.map(room => 
+          room._id === roomId 
+            ? { ...room, status: 'accepted' as const, invitedBy: undefined, acceptedAt: new Date() }
+            : room
+        )
+      );
+      Alert.alert('Success', 'Successfully joined the room!');
+    } catch (error) {
+      console.error('Error joining room:', error);
+      Alert.alert('Error', 'Failed to join room. Please try again.');
+    }
   };
 
   const handleDeclineInvitation = (roomId: string) => {
     setRooms(prevRooms => 
-      prevRooms.filter(room => room.id !== roomId)
+      prevRooms.filter(room => room._id !== roomId)
     );
+  };
+
+  const handleJoinRoom = async () => {
+    if (!invitationLink.trim()) {
+      Alert.alert('Error', 'Please enter an invitation link');
+      return;
+    }
+
+    try {
+      // Extract room ID and token from invitation link
+      const url = new URL(invitationLink);
+      const roomId = url.searchParams.get('roomId');
+      const token = url.searchParams.get('token');
+
+      if (!roomId || !token) {
+        Alert.alert('Error', 'Invalid invitation link');
+        return;
+      }
+
+      await roomAPI.joinViaInvitation(roomId, token);
+      Alert.alert('Success', 'Successfully joined the room!');
+      setInvitationLink('');
+      fetchRooms(); // Refresh rooms list
+    } catch (error) {
+      console.error('Error joining room via invitation:', error);
+      Alert.alert('Error', 'Failed to join room. The invitation link may be invalid or expired.');
+    }
   };
 
   const filteredRooms = rooms.filter(room => {
@@ -250,6 +401,31 @@ export default function HomeScreen() {
     
     return 0;
   });
+
+  // Check if fonts are loaded after all hooks
+  if (!fontsLoaded) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <StatusBar barStyle="dark-content" backgroundColor="white" />
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#E91E63" />
+          <Text style={styles.loadingText}>Loading fonts...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <StatusBar barStyle="dark-content" backgroundColor="white" />
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#E91E63" />
+          <Text style={styles.loadingText}>Loading rooms...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   const renderRoom = ({ item }: { item: Room }) => (
     <View style={styles.roomCard}>
@@ -318,7 +494,7 @@ export default function HomeScreen() {
              style={styles.searchInput}
               placeholder="Search rooms"
              value={searchQuery}
-             onChangeText={setSearchQuery}
+             onChangeText={handleSearch}
              placeholderTextColor="#999"
            />
           </View>
@@ -365,15 +541,7 @@ export default function HomeScreen() {
             />
             <TouchableOpacity 
               style={styles.joinRoomButton}
-              onPress={() => {
-                if (invitationLink.trim()) {
-                  // Handle join room functionality
-                  console.log('Joining room with link:', invitationLink);
-                  // You can add logic here to process invitation links
-                  // For now, just clear the input
-                  setInvitationLink('');
-                }
-              }}
+              onPress={handleJoinRoom}
             >
               <Ionicons name="arrow-forward" size={12} color="white" />
             </TouchableOpacity>
@@ -381,19 +549,31 @@ export default function HomeScreen() {
         </LinearGradient>
 
         {/* Rooms List */}
-        <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+        <ScrollView 
+          style={styles.scrollView} 
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+              tintColor="#E91E63"
+            />
+          }
+        >
           {filteredRooms.map((item) => (
             <TouchableOpacity 
-              key={item.id} 
+              key={item._id} 
               style={styles.roomCard}
-              onPress={() => router.push(`/room/${item.id}`)}
+              onPress={() => router.push(`/room/${item._id}`)}
             >
               {item.status === 'invited' && (
                 <Text style={styles.invitedText}>{item.invitedBy} invited you to:</Text>
               )}
               <View style={styles.roomHeader}>
                 <View style={styles.roomInfo}>
-                  <Text style={styles.roomName}>{item.name}</Text>
+                  <Text style={styles.roomName}>
+                    {item.emoji && `${item.emoji} `}{item.name}
+                  </Text>
                   <View style={styles.memberSection}>
                     <View style={styles.avatarGroup}>
                       {item.memberAvatars.slice(0, 3).map((avatar, index) => (
@@ -403,8 +583,13 @@ export default function HomeScreen() {
                           style={[styles.avatar, { marginLeft: index > 0 ? -8 : 0 }]}
                         />
                       ))}
+                      {item.memberCount > 3 && (
+                        <View style={[styles.avatar, styles.avatarOverflow, { marginLeft: -8 }]}>
+                          <Text style={styles.avatarOverflowText}>+{item.memberCount - 3}</Text>
+                        </View>
+                      )}
                     </View>
-                    <Text style={styles.memberCount}>{item.memberCount}+ members</Text>
+                    <Text style={styles.memberCount}>{item.memberCount} members</Text>
                   </View>
                   <Text style={styles.lastMessage}>{item.lastMessage}</Text>
                 </View>
@@ -415,7 +600,7 @@ export default function HomeScreen() {
                         style={styles.acceptButton}
                         onPress={(e) => {
                           e.stopPropagation();
-                          handleAcceptInvitation(item.id);
+                          handleAcceptInvitation(item._id);
                         }}
                       >
                         <Ionicons 
@@ -428,7 +613,7 @@ export default function HomeScreen() {
                         style={styles.declineButton}
                         onPress={(e) => {
                           e.stopPropagation();
-                          handleDeclineInvitation(item.id);
+                          handleDeclineInvitation(item._id);
                         }}
                       >
                         <Ionicons 
@@ -668,6 +853,16 @@ const styles = StyleSheet.create({
   avatar6: {
     backgroundColor: '#FF9800',
   },
+  avatarOverflow: {
+    backgroundColor: '#E91E63',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarOverflowText: {
+    color: 'white',
+    fontSize: 8,
+    fontWeight: '600',
+  },
   memberCount: {
     fontSize: 11,
     color: '#666',
@@ -714,6 +909,17 @@ const styles = StyleSheet.create({
     borderColor: '#F44336',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'white',
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#666',
   },
 
 });
