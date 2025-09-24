@@ -1,33 +1,93 @@
 // API service for easy backend integration
 // This file contains all the API calls that will be used to fetch data from MongoDB
 
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000/api';
+// API Configuration with fallbacks
+const getApiBaseUrl = () => {
+  if (process.env.EXPO_PUBLIC_API_URL) {
+    return process.env.EXPO_PUBLIC_API_URL;
+  }
+  
+  // Try different IP addresses based on the environment
+  const possibleUrls = [
+    'http://172.27.35.178:5000/api', // Current system IP
+    'http://172.20.10.2:5000/api',   // Common mobile network IP
+    'http://192.168.1.100:5000/api', // Alternative local network IP
+    'http://10.0.2.2:5000/api',      // Android emulator localhost
+    'http://localhost:5000/api',      // Web/local development
+  ];
+  
+  return possibleUrls[0]; // Default to the first one
+};
+
+const API_BASE_URL = getApiBaseUrl();
 
 // Generic API call function
 async function apiCall<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const url = `${API_BASE_URL}${endpoint}`;
   
+  // Get token from storage for authenticated requests
+  const token = await getStoredToken();
+  
   const defaultOptions: RequestInit = {
     headers: {
       'Content-Type': 'application/json',
+      ...(token && { 'Authorization': `Bearer ${token}` }),
       ...options.headers,
     },
     ...options,
   };
 
+  console.log(`🌐 Making API call to: ${url}`);
+  console.log(`🔑 Token present: ${!!token}`);
+
   try {
     const response = await fetch(url, defaultOptions);
     
+    console.log(`📡 Response status: ${response.status}`);
+    
     if (!response.ok) {
-      throw new Error(`API call failed: ${response.status} ${response.statusText}`);
+      const errorData = await response.json().catch(() => ({}));
+      console.error('❌ API Error:', errorData);
+      throw new Error(errorData.message || `API call failed: ${response.status} ${response.statusText}`);
     }
     
-    return await response.json();
+    const data = await response.json();
+    console.log(`✅ API Success: ${endpoint}`);
+    return data;
   } catch (error) {
-    console.error('API call error:', error);
+    console.error('❌ API call error:', error);
+    console.error('🔗 URL attempted:', url);
     throw error;
   }
 }
+
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+// Token management functions
+const getStoredToken = async (): Promise<string | null> => {
+  try {
+    return await AsyncStorage.getItem('auth_token');
+  } catch (error) {
+    console.error('Error getting stored token:', error);
+    return null;
+  }
+};
+
+const setStoredToken = async (token: string): Promise<void> => {
+  try {
+    await AsyncStorage.setItem('auth_token', token);
+  } catch (error) {
+    console.error('Error storing token:', error);
+  }
+};
+
+const removeStoredToken = async (): Promise<void> => {
+  try {
+    await AsyncStorage.removeItem('auth_token');
+  } catch (error) {
+    console.error('Error removing token:', error);
+  }
+};
 
 // Product API calls
 export const productAPI = {
@@ -205,8 +265,92 @@ export const reviewAPI = {
   }),
 };
 
+// Authentication API calls
+export const authAPI = {
+  // Register new user
+  register: async (userData: {
+    name: string;
+    email: string;
+    password: string;
+    location?: string;
+  }) => {
+    const response = await apiCall<any>('/auth/register', {
+      method: 'POST',
+      body: JSON.stringify(userData),
+    });
+    
+    if (response.status === 'success' && response.data.token) {
+      await setStoredToken(response.data.token);
+    }
+    
+    return response;
+  },
+  
+  // Login user
+  login: async (credentials: {
+    email: string;
+    password: string;
+  }) => {
+    const response = await apiCall<any>('/auth/login', {
+      method: 'POST',
+      body: JSON.stringify(credentials),
+    });
+    
+    if (response.status === 'success' && response.data.token) {
+      await setStoredToken(response.data.token);
+    }
+    
+    return response;
+  },
+  
+  // Logout user
+  logout: async () => {
+    try {
+      await apiCall<any>('/auth/logout', {
+        method: 'POST',
+      });
+    } catch (error) {
+      console.error('Logout error:', error);
+    } finally {
+      await removeStoredToken();
+    }
+  },
+  
+  // Get current user
+  getCurrentUser: () => apiCall<any>('/auth/me'),
+  
+  // Refresh token
+  refreshToken: async (refreshToken: string) => {
+    const response = await apiCall<any>('/auth/refresh', {
+      method: 'POST',
+      body: JSON.stringify({ refreshToken }),
+    });
+    
+    if (response.status === 'success' && response.data.token) {
+      await setStoredToken(response.data.token);
+    }
+    
+    return response;
+  },
+  
+  // Forgot password
+  forgotPassword: (email: string) => 
+    apiCall<any>('/auth/forgot-password', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    }),
+  
+  // Reset password
+  resetPassword: (token: string, password: string) => 
+    apiCall<any>('/auth/reset-password', {
+      method: 'POST',
+      body: JSON.stringify({ token, password }),
+    }),
+};
+
 // Export all APIs
 export default {
+  auth: authAPI,
   product: productAPI,
   category: categoryAPI,
   banner: bannerAPI,

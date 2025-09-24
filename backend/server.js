@@ -11,13 +11,131 @@ const app = express();
 const server = require('http').createServer(app);
 const io = require('socket.io')(server, {
   cors: {
-    origin: process.env.SOCKET_CORS_ORIGIN || "http://localhost:3000",
-    methods: ["GET", "POST"]
-  }
+    origin: [
+      process.env.SOCKET_CORS_ORIGIN || "http://localhost:3000",
+      "http://172.20.10.2:3000",
+      "http://localhost:8081",
+      "exp://172.20.10.2:8081",
+      "exp://localhost:8081"
+    ],
+    methods: ["GET", "POST"],
+    credentials: true
+  },
+  transports: ['websocket', 'polling'],
+  pingTimeout: 60000,
+  pingInterval: 25000,
+  upgradeTimeout: 10000,
+  allowEIO3: true,
+  compression: true,
+  maxHttpBufferSize: 1e6
 });
 
 // Attach Socket.io to app for use in routes
 app.set('io', io);
+
+// Socket.io authentication middleware
+io.use(async (socket, next) => {
+  try {
+    const token = socket.handshake.auth.token;
+    const userId = socket.handshake.auth.userId;
+    
+    if (!token) {
+      return next(new Error('Authentication token required'));
+    }
+    
+    // Verify JWT token
+    const jwt = require('jsonwebtoken');
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    
+    if (decoded.id !== userId) {
+      return next(new Error('Token user mismatch'));
+    }
+    
+    // Attach user info to socket
+    socket.userId = userId;
+    socket.userName = socket.handshake.auth.userName;
+    
+    console.log(`🔌 Socket authenticated for user: ${socket.userName} (${userId})`);
+    next();
+  } catch (error) {
+    console.error('❌ Socket authentication error:', error.message);
+    next(new Error('Authentication failed'));
+  }
+});
+
+// Socket.io connection handling
+io.on('connection', (socket) => {
+  console.log(`🔌 User connected: ${socket.userName} (${socket.userId})`);
+  
+  // Store typing timeouts for cleanup
+  const typingTimeouts = new Map();
+  
+  // Handle joining rooms
+  socket.on('join-room', (roomId) => {
+    console.log(`🚪 User ${socket.userName} joining room: ${roomId}`);
+    socket.join(roomId);
+    socket.emit('room-joined', roomId);
+  });
+  
+  // Handle leaving rooms
+  socket.on('leave-room', (roomId) => {
+    console.log(`🚪 User ${socket.userName} leaving room: ${roomId}`);
+    socket.leave(roomId);
+    socket.emit('room-left', roomId);
+  });
+
+  // Handle typing indicators with automatic timeout
+  socket.on('typing-start', (data) => {
+    // Clear existing timeout for this room
+    if (typingTimeouts.has(data.roomId)) {
+      clearTimeout(typingTimeouts.get(data.roomId));
+    }
+    
+    // Emit typing start
+    socket.to(data.roomId).emit('typing-start', {
+      userId: socket.userId,
+      userName: socket.userName,
+      roomId: data.roomId
+    });
+    
+    // Set timeout to automatically stop typing after 3 seconds
+    const timeout = setTimeout(() => {
+      socket.to(data.roomId).emit('typing-stop', {
+        userId: socket.userId,
+        userName: socket.userName,
+        roomId: data.roomId
+      });
+      typingTimeouts.delete(data.roomId);
+    }, 3000);
+    
+    typingTimeouts.set(data.roomId, timeout);
+  });
+
+  socket.on('typing-stop', (data) => {
+    // Clear timeout and emit stop
+    if (typingTimeouts.has(data.roomId)) {
+      clearTimeout(typingTimeouts.get(data.roomId));
+      typingTimeouts.delete(data.roomId);
+    }
+    
+    socket.to(data.roomId).emit('typing-stop', {
+      userId: socket.userId,
+      userName: socket.userName,
+      roomId: data.roomId
+    });
+  });
+  
+  // Handle disconnection
+  socket.on('disconnect', (reason) => {
+    console.log(`🔌 User disconnected: ${socket.userName} (${socket.userId}) - ${reason}`);
+    
+    // Clear all typing timeouts
+    typingTimeouts.forEach((timeout) => {
+      clearTimeout(timeout);
+    });
+    typingTimeouts.clear();
+  });
+});
 
 // Import routes
 const authRoutes = require('./routes/auth');
@@ -38,19 +156,26 @@ const { authenticateToken } = require('./middleware/auth');
 app.use(helmet());
 app.use(compression());
 
-// Rate limiting
-const limiter = rateLimit({
-  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 minutes
-  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100, // limit each IP to 100 requests per windowMs
-  message: 'Too many requests from this IP, please try again later.'
-});
-app.use('/api/', limiter);
+// Rate limiting - DISABLED FOR DEVELOPMENT
+// const limiter = rateLimit({
+//   windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 minutes
+//   max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100, // limit each IP to 100 requests per windowMs
+//   message: 'Too many requests from this IP, please try again later.'
+// });
+// app.use('/api/', limiter);
 
 // CORS configuration
 app.use(cors({
   origin: process.env.NODE_ENV === 'production' 
     ? ['https://yourdomain.com'] 
-    : ['http://localhost:3000', 'http://localhost:19006'],
+    : [
+        'http://localhost:3000', 
+        'http://localhost:19006',
+        'http://172.20.10.2:3000',
+        'http://172.20.10.2:19006',
+        'exp://172.20.10.2:19000',
+        'exp://localhost:19000'
+      ],
   credentials: true
 }));
 
@@ -63,12 +188,20 @@ if (process.env.NODE_ENV === 'development') {
   app.use(morgan('dev'));
 }
 
-// Database connection
-mongoose.connect(process.env.MONGODB_URI, {
+// Database connection - FORCE MYNTRA FASHION DATABASE
+const mongoUri = process.env.MONGODB_URI;
+// Ensure we're using the myntra-fashion database
+const mongoUriWithDb = mongoUri.includes('myntra-fashion') 
+  ? mongoUri 
+  : mongoUri.replace('mongodb.net/', 'mongodb.net/myntra-fashion');
+
+console.log('🔗 Connecting to Myntra Fashion Database:', mongoUriWithDb);
+
+mongoose.connect(mongoUriWithDb, {
   useNewUrlParser: true,
   useUnifiedTopology: true,
 })
-.then(() => console.log('✅ MongoDB connected successfully'))
+.then(() => console.log('✅ Connected to MYNTRA FASHION DATABASE successfully'))
 .catch(err => console.error('❌ MongoDB connection error:', err));
 
 // Socket.io connection handling
@@ -182,10 +315,11 @@ app.use(errorHandler);
 
 const PORT = process.env.PORT || 5000;
 
-server.listen(PORT, () => {
+server.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`📱 Environment: ${process.env.NODE_ENV}`);
   console.log(`🔗 API Base URL: http://localhost:${PORT}/api`);
+  console.log(`🌐 Server accessible on all network interfaces`);
 });
 
 module.exports = { app, server, io };

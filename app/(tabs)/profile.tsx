@@ -1,14 +1,16 @@
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { useAuth } from '@/contexts/auth-context';
 import { router } from 'expo-router';
 import React, { useState } from 'react';
 import {
-  ScrollView,
-  StyleSheet,
-  Switch,
-  Text,
-  TouchableOpacity,
-  View
+    Alert,
+    ScrollView,
+    StyleSheet,
+    Switch,
+    Text,
+    TouchableOpacity,
+    View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -36,6 +38,7 @@ const profileStats: ProfileStat[] = [
 export default function ProfileScreen() {
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [aiRecommendationsEnabled, setAiRecommendationsEnabled] = useState(true);
+  const { user, logout } = useAuth();
 
   const menuItems: MenuItem[] = [
     { 
@@ -99,6 +102,26 @@ export default function ProfileScreen() {
     }
   };
 
+  const handleLogout = () => {
+    Alert.alert(
+      'Sign Out',
+      'Are you sure you want to sign out?',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Sign Out',
+          style: 'destructive',
+          onPress: async () => {
+            await logout();
+          },
+        },
+      ]
+    );
+  };
+
   const renderMenuItem = (item: MenuItem) => (
     <TouchableOpacity 
       key={item.id} 
@@ -135,32 +158,58 @@ export default function ProfileScreen() {
                 <Text style={styles.editImageIcon}>📷</Text>
               </TouchableOpacity>
             </View>
-            <ThemedText style={styles.userName}>Destiny</ThemedText>
-            <Text style={styles.userEmail}>destiny@email.com</Text>
-            <Text style={styles.userLocation}>📍 Delhi</Text>
+            <ThemedText style={styles.userName}>{user?.name || 'User'}</ThemedText>
+            <Text style={styles.userEmail}>{user?.email || 'user@email.com'}</Text>
+            <Text style={styles.userLocation}>📍 {user?.location || 'Location not set'}</Text>
           </View>
 
           <View style={styles.statsContainer}>
             <View style={styles.statsRow}>
-              {profileStats.map(renderStat)}
+              <View style={styles.statCard}>
+                <Text style={styles.statValue}>{user?.stats?.roomsCreated || 0}</Text>
+                <Text style={styles.statLabel}>Rooms Created</Text>
+              </View>
+              <View style={styles.statCard}>
+                <Text style={styles.statValue}>{user?.stats?.wardrobesOwned || 0}</Text>
+                <Text style={styles.statLabel}>Wardrobes</Text>
+              </View>
+              <View style={styles.statCard}>
+                <Text style={styles.statValue}>{user?.stats?.itemsPurchased || 0}</Text>
+                <Text style={styles.statLabel}>Items Purchased</Text>
+              </View>
+              <View style={styles.statCard}>
+                <Text style={styles.statValue}>{user?.stats?.styleScore || 0}</Text>
+                <Text style={styles.statLabel}>Style Score</Text>
+              </View>
             </View>
           </View>
 
           <View style={styles.badgesSection}>
             <ThemedText style={styles.sectionTitle}>Style Badges</ThemedText>
             <View style={styles.badgesRow}>
-              <View style={styles.badge}>
-                <Text style={styles.badgeEmoji}>🌟</Text>
-                <Text style={styles.badgeText}>Trendsetter</Text>
-              </View>
-              <View style={styles.badge}>
-                <Text style={styles.badgeEmoji}>👗</Text>
-                <Text style={styles.badgeText}>Ethnic Expert</Text>
-              </View>
-              <View style={styles.badge}>
-                <Text style={styles.badgeEmoji}>🛍️</Text>
-                <Text style={styles.badgeText}>Early Adopter</Text>
-              </View>
+              {user?.badges && user.badges.length > 0 ? (
+                user.badges.slice(0, 3).map((badge, index) => (
+                  <View key={index} style={styles.badge}>
+                    <Text style={styles.badgeEmoji}>
+                      {badge === 'trendsetter' ? '🌟' : 
+                       badge === 'ethnic-expert' ? '👗' : 
+                       badge === 'early-adopter' ? '🛍️' : 
+                       badge === 'style-guru' ? '✨' : 
+                       badge === 'shopping-pro' ? '🛒' : '🏆'}
+                    </Text>
+                    <Text style={styles.badgeText}>
+                      {badge.split('-').map(word => 
+                        word.charAt(0).toUpperCase() + word.slice(1)
+                      ).join(' ')}
+                    </Text>
+                  </View>
+                ))
+              ) : (
+                <View style={styles.badge}>
+                  <Text style={styles.badgeEmoji}>🎯</Text>
+                  <Text style={styles.badgeText}>No badges yet</Text>
+                </View>
+              )}
             </View>
           </View>
 
@@ -169,7 +218,7 @@ export default function ProfileScreen() {
             {menuItems.map(renderMenuItem)}
           </View>
 
-          <TouchableOpacity style={styles.signOutButton}>
+          <TouchableOpacity style={styles.signOutButton} onPress={handleLogout}>
             <Text style={styles.signOutText}>Sign Out</Text>
           </TouchableOpacity>
 
