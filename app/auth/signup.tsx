@@ -1,4 +1,4 @@
-import { LinearGradient } from 'expo-linear-gradient';
+import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
@@ -63,7 +63,7 @@ export default function SignupScreen() {
       
       if (result.success) {
         Alert.alert('Success', 'Account created successfully!', [
-          { text: 'OK', onPress: () => router.replace('/(tabs)') }
+          { text: 'OK', onPress: () => router.replace('/catalog') }
         ]);
       } else {
         Alert.alert('Error', result.message || 'Registration failed');
@@ -80,17 +80,22 @@ export default function SignupScreen() {
   };
 
   return (
-    <LinearGradient
-      colors={['#667eea', '#764ba2']}
-      style={styles.container}
-    >
+    <View style={styles.container}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardAvoidingView}
       >
         <ScrollView contentContainerStyle={styles.scrollContainer}>
           <View style={styles.formContainer}>
-            <Text style={styles.title}>Join Myntra Collective</Text>
+            {/* Myntra Icon at top of form */}
+            <View style={styles.iconContainer}>
+              <Image 
+                source={require('@/assets/images/icon.webp')} 
+                style={styles.formIcon}
+                contentFit="contain"
+              />
+            </View>
+            <Text style={styles.title}>Join Myntra</Text>
             <Text style={styles.subtitle}>Create your account to get started</Text>
 
             <View style={styles.inputContainer}>
@@ -187,13 +192,23 @@ export default function SignupScreen() {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
-    </LinearGradient>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#ffffff',
+  },
+  iconContainer: {
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  formIcon: {
+    width: 60,
+    height: 60,
+    opacity: 0.8,
   },
   keyboardAvoidingView: {
     flex: 1,
@@ -201,99 +216,104 @@ const styles = StyleSheet.create({
   scrollContainer: {
     flexGrow: 1,
     justifyContent: 'center',
-    padding: 20,
+    padding: 16,
   },
   formContainer: {
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    borderRadius: 20,
-    padding: 30,
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
-      height: 10,
+      height: 2,
     },
-    shadowOpacity: 0.25,
-    shadowRadius: 20,
-    elevation: 10,
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+    zIndex: 1,
   },
   title: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#333',
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1a1a1a',
     textAlign: 'center',
-    marginBottom: 8,
+    marginBottom: 4,
   },
   subtitle: {
-    fontSize: 16,
+    fontSize: 11,
     color: '#666',
     textAlign: 'center',
-    marginBottom: 40,
-  },
-  inputContainer: {
     marginBottom: 20,
   },
+  inputContainer: {
+    marginBottom: 12,
+  },
   label: {
-    fontSize: 16,
+    fontSize: 10,
     fontWeight: '600',
-    color: '#333',
-    marginBottom: 8,
+    color: '#1a1a1a',
+    marginBottom: 3,
   },
   input: {
     borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 12,
-    padding: 16,
-    fontSize: 16,
+    borderColor: '#E0E0E0',
+    borderRadius: 6,
+    padding: 8,
+    fontSize: 12,
     backgroundColor: '#fff',
-    color: '#333',
+    color: '#1a1a1a',
+    height: 36,
   },
   signupButton: {
-    backgroundColor: '#667eea',
-    borderRadius: 12,
-    padding: 16,
+    backgroundColor: '#E91E63',
+    borderRadius: 6,
+    padding: 8,
     alignItems: 'center',
-    marginTop: 10,
-    shadowColor: '#667eea',
+    marginTop: 4,
+    height: 36,
+    shadowColor: '#E91E63',
     shadowOffset: {
       width: 0,
-      height: 4,
+      height: 1,
     },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
   },
   signupButtonDisabled: {
     opacity: 0.7,
   },
   signupButtonText: {
     color: '#fff',
-    fontSize: 18,
-    fontWeight: 'bold',
+    fontSize: 12,
+    fontWeight: '600',
   },
   divider: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginVertical: 30,
+    marginVertical: 12,
   },
   dividerLine: {
     flex: 1,
     height: 1,
-    backgroundColor: '#ddd',
+    backgroundColor: '#E0E0E0',
   },
   dividerText: {
-    marginHorizontal: 20,
+    marginHorizontal: 10,
     color: '#666',
-    fontSize: 14,
+    fontSize: 10,
   },
   loginButton: {
     alignItems: 'center',
   },
   loginButtonText: {
-    fontSize: 16,
+    fontSize: 12,
     color: '#666',
   },
   loginLink: {
-    color: '#667eea',
-    fontWeight: 'bold',
+    color: '#E91E63',
+    fontWeight: '600',
   },
 });

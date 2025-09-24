@@ -33,10 +33,10 @@ function AppContent() {
             <Stack.Screen name="auth/login" options={{ headerShown: false }} />
           ) : (
             // Main app screens
-            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+            <Stack.Screen name="catalog" options={{ headerShown: false }} />
           )}
           <Stack.Screen name="auth/signup" options={{ headerShown: false }} />
-          <Stack.Screen name="catalog" options={{ headerShown: false }} />
+          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="wardrobes" options={{ headerShown: false }} />
           <Stack.Screen name="product/[id]" options={{ headerShown: false }} />
           <Stack.Screen name="room/create" options={{ headerShown: false }} />
