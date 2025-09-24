@@ -113,7 +113,10 @@ export default function VirtualProductCard({
     
     setAddingToWardrobe(true);
     try {
-      const response = await wardrobeApi.addToWardrobe(token, wardrobeId, product);
+      const response = await wardrobeApi.addToWardrobe(token, wardrobeId, product.id, {
+        notes: `Added from product browsing`,
+        priority: 'medium'
+      });
       if (response.status === 'success') {
         Alert.alert('Success', 'Product added to wardrobe!');
         setShowWardrobeModal(false);

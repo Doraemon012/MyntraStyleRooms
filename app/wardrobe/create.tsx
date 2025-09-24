@@ -1,97 +1,204 @@
+import { useSession } from '@/contexts/session-context';
+import { roomAPI, userAPI } from '@/services/api';
+import { wardrobeApi } from '@/services/wardrobeApi';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
-  Alert,
-  FlatList,
-  Modal,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View
+    ActivityIndicator,
+    Alert,
+    FlatList,
+    Modal,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 interface User {
-  id: string;
+  _id: string;
   name: string;
   email: string;
-  avatar?: string;
+  profileImage?: string;
 }
 
 interface WardrobeMember {
-  id: string;
+  userId: string;
   name: string;
   email: string;
-  role: 'Editor' | 'Viewer';
+  profileImage?: string;
+  role: 'Editor' | 'Contributor' | 'Viewer';
 }
-
-// Mock users data (in real app, this would come from room members)
-const mockUsers: User[] = [
-  { id: '1', name: 'Richa Sharma', email: 'richa@email.com', avatar: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face' },
-  { id: '2', name: 'Priya Patel', email: 'priya@email.com', avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face' },
-  { id: '3', name: 'Sarah Johnson', email: 'sarah@email.com', avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150&h=150&fit=crop&crop=face' },
-  { id: '4', name: 'Aisha Khan', email: 'aisha@email.com', avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&h=150&fit=crop&crop=face' },
-  { id: '5', name: 'Emma Wilson', email: 'emma@email.com', avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&h=150&fit=crop&crop=face' },
-  { id: '6', name: 'Sofia Rodriguez', email: 'sofia@email.com', avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop&crop=face' },
-  { id: '7', name: 'Maya Chen', email: 'maya@email.com', avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&h=150&fit=crop&crop=face' },
-  { id: '8', name: 'Zara Ahmed', email: 'zara@email.com', avatar: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=150&h=150&fit=crop&crop=face' },
-];
 
 
 export default function CreateWardrobeScreen() {
+  const { sessionRoomId } = useSession();
   const [wardrobeName, setWardrobeName] = useState('');
   const [description, setDescription] = useState('');
   const [isPrivate, setIsPrivate] = useState(false);
   const [members, setMembers] = useState<WardrobeMember[]>([]);
   const [showUserModal, setShowUserModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [users, setUsers] = useState<User[]>([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
+
+  useEffect(() => {
+    loadUsers();
+  }, []);
+
+  const loadUsers = async () => {
+    setLoadingUsers(true);
+    try {
+      const token = await AsyncStorage.getItem('auth_token');
+      if (!token) {
+        Alert.alert('Error', 'Please log in to view users');
+        setLoadingUsers(false);
+        return;
+      }
+
+      let response;
+      if (sessionRoomId) {
+        // Get users from the current room
+        console.log('Loading users from room:', sessionRoomId);
+        response = await roomAPI.getById(sessionRoomId);
+        if (response.status === 'success' && response.data) {
+          // Extract users from room members
+          const roomMembers = response.data.room.members || [];
+          const users = roomMembers.map((member: any) => ({
+            _id: member.userId._id || member.userId,
+            name: member.userId.name || member.name,
+            email: member.userId.email || member.email,
+            profileImage: member.userId.profileImage || member.profileImage
+          }));
+          setUsers(users);
+          console.log(`Loaded ${users.length} users from room`);
+        } else {
+          console.log('Failed to load room, falling back to all users');
+          // Fallback to all users if room loading fails
+          response = await userAPI.getAll({ limit: 50 });
+          if (response.status === 'success' && response.data) {
+            setUsers(response.data.users);
+            console.log(`Loaded ${response.data.users.length} users from fallback`);
+          }
+        }
+      } else {
+        // Fallback: get all users if no room context
+        console.log('No room context, loading all users');
+        response = await userAPI.getAll({ limit: 50 });
+        if (response.status === 'success' && response.data) {
+          setUsers(response.data.users);
+          console.log(`Loaded ${response.data.users.length} users from all users`);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading users:', error);
+      Alert.alert('Error', 'Failed to load users');
+    } finally {
+      setLoadingUsers(false);
+    }
+  };
 
   const addMember = (user: User) => {
     const newMember: WardrobeMember = {
-      id: user.id,
+      userId: user._id,
       name: user.name,
       email: user.email,
+      profileImage: user.profileImage,
       role: 'Editor',
     };
     setMembers([...members, newMember]);
+    // Close the modal after adding a member
+    setShowUserModal(false);
+    setSearchQuery('');
   };
 
-  const removeMember = (id: string) => {
-    setMembers(members.filter(member => member.id !== id));
+  const addAllRoomMembers = () => {
+    if (sessionRoomId && users.length > 0) {
+      const newMembers: WardrobeMember[] = users
+        .filter(user => !members.some(member => member.userId === user._id))
+        .map(user => ({
+          userId: user._id,
+          name: user.name,
+          email: user.email,
+          profileImage: user.profileImage,
+          role: 'Editor' as const,
+        }));
+      setMembers([...members, ...newMembers]);
+      // Close the modal after adding all members
+      setShowUserModal(false);
+      setSearchQuery('');
+    }
   };
 
-  const updateMemberRole = (id: string, role: WardrobeMember['role']) => {
+  const removeMember = (userId: string) => {
+    setMembers(members.filter(member => member.userId !== userId));
+  };
+
+  const updateMemberRole = (userId: string, role: WardrobeMember['role']) => {
     setMembers(members.map(member => 
-      member.id === id ? { ...member, role } : member
+      member.userId === userId ? { ...member, role } : member
     ));
   };
 
-  const filteredUsers = mockUsers.filter(user => 
-    !members.some(member => member.id === user.id) &&
+  const filteredUsers = users.filter(user => 
+    !members.some(member => member.userId === user._id) &&
     (user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
      user.email.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
 
-  const createWardrobe = () => {
+  const createWardrobe = async () => {
     if (!wardrobeName.trim()) {
       Alert.alert('Error', 'Please enter a wardrobe name');
       return;
     }
 
-    Alert.alert(
-      'Success',
-      'Wardrobe created successfully!',
-      [
-        {
-          text: 'OK',
-          onPress: () => router.back(),
-        },
-      ]
-    );
+    setLoading(true);
+    try {
+      const token = await AsyncStorage.getItem('auth_token');
+      if (!token) {
+        Alert.alert('Error', 'Please log in to create a wardrobe');
+        setLoading(false);
+        return;
+      }
+
+      const response = await wardrobeApi.createWardrobe(token, {
+        name: wardrobeName,
+        emoji: '👗', // Default emoji
+        description: description || undefined,
+        isPrivate,
+        members: members.map(member => ({
+          userId: member.userId,
+          role: member.role as 'Editor' | 'Contributor' | 'Viewer'
+        }))
+      });
+
+      if (response.status === 'success') {
+        // Show success message and navigate back
+        Alert.alert(
+          'Success',
+          'Wardrobe created successfully!',
+          [
+            {
+              text: 'OK',
+              onPress: () => router.back(),
+            },
+          ]
+        );
+      } else {
+        Alert.alert('Error', response.message || 'Failed to create wardrobe');
+      }
+    } catch (error) {
+      console.error('Create wardrobe error:', error);
+      Alert.alert('Error', 'Failed to create wardrobe');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const renderUser = ({ item }: { item: User }) => (
@@ -152,6 +259,7 @@ export default function CreateWardrobeScreen() {
               </View>
 
 
+
               <View style={styles.inputGroup}>
                 <View style={styles.privacyToggle}>
                   <View>
@@ -179,20 +287,31 @@ export default function CreateWardrobeScreen() {
               </Text>
             </View>
             
-            <TouchableOpacity 
-              style={styles.selectUsersButton}
-              onPress={() => setShowUserModal(true)}
-            >
-              <Text style={styles.selectUsersText}>Select Members to Make Editors</Text>
-              <Text style={styles.dropdownIcon}>▼</Text>
-            </TouchableOpacity>
+            <View style={styles.buttonRow}>
+              <TouchableOpacity 
+                style={styles.selectUsersButton}
+                onPress={() => setShowUserModal(true)}
+              >
+                <Text style={styles.selectUsersText}>Select Members to Make Editors</Text>
+                <Text style={styles.dropdownIcon}>▼</Text>
+              </TouchableOpacity>
+              
+              {sessionRoomId && users.length > 0 && (
+                <TouchableOpacity 
+                  style={styles.addAllButton}
+                  onPress={addAllRoomMembers}
+                >
+                  <Text style={styles.addAllText}>Add All Room Members</Text>
+                </TouchableOpacity>
+              )}
+            </View>
 
             {/* Members List */}
             {members.length > 0 ? (
               <View style={styles.membersList}>
                 <Text style={styles.membersCount}>{members.length} editor(s) selected</Text>
                 {members.map((member, index) => (
-                  <View key={member.id} style={styles.memberItem}>
+                  <View key={`member-${member.userId}-${index}`} style={styles.memberItem}>
                     <View style={styles.memberAvatar}>
                       <Text style={styles.memberInitial}>{member.name.charAt(0)}</Text>
                     </View>
@@ -203,7 +322,7 @@ export default function CreateWardrobeScreen() {
                     <View style={styles.memberActions}>
                       <TouchableOpacity
                         style={[styles.roleButton, member.role === 'Editor' && styles.activeRole]}
-                        onPress={() => updateMemberRole(member.id, 'Editor')}
+                        onPress={() => updateMemberRole(member.userId, 'Editor')}
                       >
                         <Text style={[styles.roleText, member.role === 'Editor' && styles.activeRoleText]}>
                           Editor
@@ -211,7 +330,7 @@ export default function CreateWardrobeScreen() {
                       </TouchableOpacity>
                       <TouchableOpacity
                         style={[styles.roleButton, member.role === 'Viewer' && styles.activeRole]}
-                        onPress={() => updateMemberRole(member.id, 'Viewer')}
+                        onPress={() => updateMemberRole(member.userId, 'Viewer')}
                       >
                         <Text style={[styles.roleText, member.role === 'Viewer' && styles.activeRoleText]}>
                           Viewer
@@ -220,7 +339,7 @@ export default function CreateWardrobeScreen() {
                     </View>
                     <TouchableOpacity 
                       style={styles.removeMemberButton}
-                      onPress={() => removeMember(member.id)}
+                      onPress={() => removeMember(member.userId)}
                     >
                       <Text style={styles.removeMemberText}>×</Text>
                     </TouchableOpacity>
@@ -235,14 +354,18 @@ export default function CreateWardrobeScreen() {
         </ScrollView>
 
         <View style={styles.bottomActions}>
-          <TouchableOpacity onPress={createWardrobe}>
+          <TouchableOpacity onPress={createWardrobe} disabled={loading}>
             <LinearGradient
               colors={['#E91E63', '#FF6B35']}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
-              style={styles.createButton}
+              style={[styles.createButton, loading && styles.createButtonDisabled]}
             >
-              <Text style={styles.createButtonText}>Create Wardrobe</Text>
+              {loading ? (
+                <ActivityIndicator color="white" size="small" />
+              ) : (
+                <Text style={styles.createButtonText}>Create Wardrobe</Text>
+              )}
             </LinearGradient>
           </TouchableOpacity>
         </View>
@@ -283,20 +406,27 @@ export default function CreateWardrobeScreen() {
               </View>
               
               {/* Users List */}
-              <FlatList
-                data={filteredUsers}
-                renderItem={renderUser}
-                keyExtractor={item => item.id}
-                style={styles.usersList}
-                showsVerticalScrollIndicator={false}
-                ListEmptyComponent={
-                  <View style={styles.emptyState}>
-                    <Text style={styles.emptyStateText}>
-                      {searchQuery ? 'No users found' : 'No users available'}
-                    </Text>
-                  </View>
-                }
-              />
+              {loadingUsers ? (
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator size="large" color="#E91E63" />
+                  <Text style={styles.loadingText}>Loading users...</Text>
+                </View>
+              ) : (
+                <FlatList
+                  data={filteredUsers}
+                  renderItem={renderUser}
+                  keyExtractor={item => item._id}
+                  style={styles.usersList}
+                  showsVerticalScrollIndicator={false}
+                  ListEmptyComponent={
+                    <View style={styles.emptyState}>
+                      <Text style={styles.emptyStateText}>
+                        {searchQuery ? 'No users found' : 'No users available'}
+                      </Text>
+                    </View>
+                  }
+                />
+              )}
             </View>
           </View>
         </Modal>
@@ -415,6 +545,7 @@ const styles = StyleSheet.create({
     lineHeight: 16,
   },
   selectUsersButton: {
+    flex: 1,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -424,7 +555,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 12,
     backgroundColor: '#f8f9fa',
-    marginBottom: 12,
   },
   selectUsersText: {
     fontSize: 12,
@@ -561,6 +691,28 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: 'white',
   },
+  createButtonDisabled: {
+    opacity: 0.6,
+  },
+  pickerContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    borderRadius: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: '#f8f9fa',
+  },
+  pickerText: {
+    fontSize: 12,
+    color: '#1a1a1a',
+  },
+  pickerArrow: {
+    fontSize: 12,
+    color: '#999',
+  },
   // Modal styles
   modalOverlay: {
     flex: 1,
@@ -680,6 +832,36 @@ const styles = StyleSheet.create({
   addButtonText: {
     color: 'white',
     fontSize: 16,
+    fontWeight: '600',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
+    color: '#666',
+  },
+  buttonRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 16,
+  },
+  addAllButton: {
+    flex: 1,
+    backgroundColor: '#4CAF50',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  addAllText: {
+    color: 'white',
+    fontSize: 14,
     fontWeight: '600',
   },
 });
