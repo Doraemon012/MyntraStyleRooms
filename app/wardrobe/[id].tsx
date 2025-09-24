@@ -196,6 +196,10 @@ export default function WardrobeDetailScreen() {
       const wardrobeResponse = await wardrobeApi.getWardrobe(token, id as string);
       if (wardrobeResponse.status === 'success' && wardrobeResponse.data) {
         setWardrobe(wardrobeResponse.data.wardrobe);
+      } else {
+        Alert.alert('Error', 'Wardrobe not found or you do not have permission to view it');
+        router.back();
+        return;
       }
 
       // Load wardrobe items
@@ -206,10 +210,14 @@ export default function WardrobeDetailScreen() {
       });
       if (itemsResponse.status === 'success' && itemsResponse.data) {
         setItems(itemsResponse.data.items);
+      } else {
+        // If items fail to load, just show empty array
+        setItems([]);
       }
     } catch (error) {
       console.error('Error loading wardrobe data:', error);
       Alert.alert('Error', 'Failed to load wardrobe data');
+      router.back();
     } finally {
       setLoading(false);
     }

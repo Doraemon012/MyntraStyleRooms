@@ -223,7 +223,13 @@ export default function WardrobesScreen() {
     const renderWardrobeItem = ({ item }: { item: WardrobeItem }) => (
         <TouchableOpacity 
             style={styles.wardrobeItemImage}
-            onPress={() => router.push(`/wardrobe/${item.wardrobeId}`)}
+            onPress={() => {
+                if (item.wardrobeId) {
+                    router.push(`/wardrobe/${item.wardrobeId}`);
+                } else {
+                    console.warn('No wardrobe ID found for item:', item);
+                }
+            }}
         >
             {item.image ? (
                 <Image 
@@ -239,7 +245,11 @@ export default function WardrobesScreen() {
 
     const handleViewAll = (categoryId: string, categoryName: string) => {
         // Navigate to the wardrobe detail page
-        router.push(`/wardrobe/${categoryId}`);
+        if (categoryId) {
+            router.push(`/wardrobe/${categoryId}`);
+        } else {
+            console.warn('No category ID found for:', categoryName);
+        }
     };
 
     const renderWardrobeCategory = ({ item, index }: { item: WardrobeCategory; index: number }) => {

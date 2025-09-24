@@ -198,8 +198,12 @@ const mongoUriWithDb = mongoUri.includes('myntra-fashion')
 console.log('🔗 Connecting to Myntra Fashion Database:', mongoUriWithDb);
 
 mongoose.connect(mongoUriWithDb, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
+  maxPoolSize: 10, // Maintain up to 10 socket connections
+  serverSelectionTimeoutMS: 5000, // Keep trying to send operations for 5 seconds
+  socketTimeoutMS: 45000, // Close sockets after 45 seconds of inactivity
+  connectTimeoutMS: 10000, // Give up initial connection after 10 seconds
+  retryWrites: true,
+  w: 'majority'
 })
 .then(() => console.log('✅ Connected to MYNTRA FASHION DATABASE successfully'))
 .catch(err => console.error('❌ MongoDB connection error:', err));

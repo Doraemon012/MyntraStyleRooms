@@ -12,7 +12,9 @@ import {
     TouchableOpacity,
     View
 } from 'react-native';
-import { Wardrobe, wardrobeApi } from '../services/wardrobeApi';
+import { useSession } from '../contexts/session-context';
+import { wardrobeApi } from '../services/wardrobeApi';
+import WardrobeSelector from './WardrobeSelector';
 
 interface ProductData {
   name: string;
@@ -34,6 +36,7 @@ interface ProductData {
 interface VirtualProductCardProps {
   product: ProductData;
   onAddToWardrobe?: (product: ProductData) => void;
+  onSendToChat?: (product: ProductData) => void;
   onShowMore?: (product: ProductData) => void;
   showReactions?: boolean;
   reactions?: {
@@ -58,6 +61,7 @@ interface VirtualProductCardProps {
 export default function VirtualProductCard({
   product,
   onAddToWardrobe,
+  onSendToChat,
   onShowMore,
   showReactions = true,
   reactions,
@@ -69,15 +73,15 @@ export default function VirtualProductCard({
   const [selectedColor, setSelectedColor] = useState<string | null>(null);
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
   const [addingToWardrobe, setAddingToWardrobe] = useState(false);
-  const [showWardrobeModal, setShowWardrobeModal] = useState(false);
-  const [wardrobes, setWardrobes] = useState<Wardrobe[]>([]);
-  const [loadingWardrobes, setLoadingWardrobes] = useState(false);
+  const [showWardrobeSelector, setShowWardrobeSelector] = useState(false);
+  const [sendingToChat, setSendingToChat] = useState(false);
+  
+  const { isInSession, sessionRoomId } = useSession();
 
   const handleAddToWardrobe = async () => {
     if (token && userId) {
       // Show wardrobe selection modal
-      await loadWardrobes();
-      setShowWardrobeModal(true);
+      setShowWardrobeSelector(true);
     } else if (onAddToWardrobe) {
       setAddingToWardrobe(true);
       try {
@@ -91,35 +95,19 @@ export default function VirtualProductCard({
     }
   };
 
-  const loadWardrobes = async () => {
-    if (!token) return;
-    
-    setLoadingWardrobes(true);
-    try {
-      const response = await wardrobeApi.getWardrobes(token);
-      if (response.status === 'success' && response.data) {
-        setWardrobes(response.data.wardrobes);
-      }
-    } catch (error) {
-      console.error('Error loading wardrobes:', error);
-      Alert.alert('Error', 'Failed to load wardrobes');
-    } finally {
-      setLoadingWardrobes(false);
-    }
-  };
+  const handleWardrobeSelect = async (wardrobeId: string) => {
+    if (!token || !userId) return;
 
-  const addToSpecificWardrobe = async (wardrobeId: string) => {
-    if (!token) return;
-    
     setAddingToWardrobe(true);
     try {
-      const response = await wardrobeApi.addToWardrobe(token, wardrobeId, product.id, {
-        notes: `Added from product browsing`,
+      const response = await wardrobeApi.addToWardrobe(token, wardrobeId, product.productId || '', {
+        notes: `Added from virtual product card`,
         priority: 'medium'
       });
+
       if (response.status === 'success') {
         Alert.alert('Success', 'Product added to wardrobe!');
-        setShowWardrobeModal(false);
+        setShowWardrobeSelector(false);
       } else {
         Alert.alert('Error', response.message || 'Failed to add product to wardrobe');
       }
@@ -130,6 +118,32 @@ export default function VirtualProductCard({
       setAddingToWardrobe(false);
     }
   };
+
+  const handleSendToChat = async () => {
+    if (!isInSession || !sessionRoomId) {
+      Alert.alert('Error', 'You need to be in a live session to send products to chat');
+      return;
+    }
+
+    if (onSendToChat) {
+      onSendToChat(product);
+    } else {
+      setSendingToChat(true);
+      try {
+        // Here you would implement the chat API call
+        // For now, we'll simulate it
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        Alert.alert('Success', 'Product sent to chat!');
+      } catch (error) {
+        console.error('Error sending to chat:', error);
+        Alert.alert('Error', 'Failed to send product to chat');
+      } finally {
+        setSendingToChat(false);
+      }
+    }
+  };
+
 
   const renderStars = (rating: number) => {
     const stars = [];
@@ -253,6 +267,20 @@ export default function VirtualProductCard({
               )}
             </TouchableOpacity>
           </LinearGradient>
+          
+          <TouchableOpacity 
+            style={[styles.chatBtn, (!isInSession || !sessionRoomId) && styles.chatBtnDisabled]}
+            onPress={handleSendToChat}
+            disabled={sendingToChat || !isInSession || !sessionRoomId}
+          >
+            {sendingToChat ? (
+              <ActivityIndicator size="small" color={isInSession && sessionRoomId ? "#4CAF50" : "#999"} />
+            ) : (
+              <Text style={[styles.chatBtnText, (!isInSession || !sessionRoomId) && styles.chatBtnTextDisabled]}>
+                Send to Chat
+              </Text>
+            )}
+          </TouchableOpacity>
           
           <TouchableOpacity 
             style={styles.showMoreBtn}
@@ -447,67 +475,15 @@ export default function VirtualProductCard({
         </View>
       </Modal>
 
-      {/* Wardrobe Selection Modal */}
-      <Modal
-        visible={showWardrobeModal}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setShowWardrobeModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.wardrobeModal}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Add to Wardrobe</Text>
-              <TouchableOpacity onPress={() => setShowWardrobeModal(false)}>
-                <Ionicons name="close" size={24} color="#666" />
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.selectedProductInfo}>
-              <Text style={styles.selectedProductName}>{product.name}</Text>
-              <Text style={styles.selectedProductPrice}>{product.price}</Text>
-            </View>
-
-            <Text style={styles.sectionTitle}>Choose Wardrobe</Text>
-            
-            {loadingWardrobes ? (
-              <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color="#E91E63" />
-                <Text style={styles.loadingText}>Loading wardrobes...</Text>
-              </View>
-            ) : (
-              <ScrollView style={styles.wardrobeList}>
-                {wardrobes.map((wardrobe) => (
-                  <TouchableOpacity
-                    key={wardrobe._id}
-                    style={styles.wardrobeOption}
-                    onPress={() => addToSpecificWardrobe(wardrobe._id)}
-                    disabled={addingToWardrobe}
-                  >
-                    <View style={styles.wardrobeEmoji}>
-                      {wardrobe.occasionType === 'Party' ? '🎉' :
-                       wardrobe.occasionType === 'Casual' ? '👕' :
-                       wardrobe.occasionType === 'Formal' ? '👔' :
-                       wardrobe.occasionType === 'Ethnic' ? '👘' : '👗'}
-                    </View>
-                    <View style={styles.wardrobeInfo}>
-                      <Text style={styles.wardrobeName}>{wardrobe.name}</Text>
-                      <Text style={styles.wardrobeCount}>
-                        {wardrobe.itemCount} items • {wardrobe.occasionType}
-                      </Text>
-                    </View>
-                    <Text style={styles.addIcon}>+</Text>
-                  </TouchableOpacity>
-                ))}
-                
-                <TouchableOpacity style={styles.createNewWardrobe}>
-                  <Text style={styles.createNewText}>Create New Wardrobe</Text>
-                </TouchableOpacity>
-              </ScrollView>
-            )}
-          </View>
-        </View>
-      </Modal>
+      {/* Wardrobe Selector Modal */}
+      <WardrobeSelector
+        visible={showWardrobeSelector}
+        onClose={() => setShowWardrobeSelector(false)}
+        onSelect={handleWardrobeSelect}
+        productName={product.name}
+        productPrice={product.price}
+        loading={addingToWardrobe}
+      />
     </>
   );
 }
@@ -947,5 +923,28 @@ const styles = StyleSheet.create({
     marginTop: 8,
     fontSize: 14,
     color: '#666',
+  },
+  chatBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    backgroundColor: '#4CAF50',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginHorizontal: 4,
+  },
+  chatBtnDisabled: {
+    backgroundColor: '#f5f5f5',
+    borderWidth: 1,
+    borderColor: '#ddd',
+  },
+  chatBtnText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: 'white',
+  },
+  chatBtnTextDisabled: {
+    color: '#999',
   },
 });
