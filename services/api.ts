@@ -9,7 +9,9 @@ const getApiBaseUrl = () => {
   
   // Try different IP addresses based on the environment
   const possibleUrls = [
-    'http://172.27.35.178:5000/api', // Current system IP
+    'http://10.84.92.165:5000/api',  // Current system IP (Wi-Fi)
+    'http://192.168.56.1:5000/api',  // Ethernet adapter IP
+    'http://172.27.35.178:5000/api', // Previous IP (fallback)
     'http://172.20.10.2:5000/api',   // Common mobile network IP
     'http://192.168.1.100:5000/api', // Alternative local network IP
     'http://10.0.2.2:5000/api',      // Android emulator localhost

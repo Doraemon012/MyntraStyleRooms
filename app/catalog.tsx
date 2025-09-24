@@ -1,33 +1,35 @@
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
 import {
-    Animated,
-    Dimensions,
-    FlatList,
-    Modal,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
+  Animated,
+  Dimensions,
+  FlatList,
+  Modal,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AttendeeSessionHeader from '../components/session/AttendeeSessionHeader';
 import HostSessionHeader from '../components/session/HostSessionHeader';
 import SessionBottomControls from '../components/session/SessionBottomControls';
+import { useAuth } from '../contexts/auth-context';
 import { useSession } from '../contexts/session-context';
 import { getActiveBanners } from '../data/banners';
 import { Category, mockCategories } from '../data/categories';
 import { getActivePlayMenuItems } from '../data/playMenuItems';
 import {
-    getProductsByCategory,
-    getTrendingProducts,
-    mockProducts,
-    Product,
-    searchProducts
+  getProductsByCategory,
+  getTrendingProducts,
+  mockProducts,
+  Product,
+  searchProducts
 } from '../data/products';
 
 const { width: screenWidth } = Dimensions.get('window');
@@ -39,6 +41,7 @@ const categories = mockCategories;
 
 export default function CatalogScreen() {
   const { isInSession, isHost, sessionParticipants, presenterName, isMuted, toggleMute, endSession, sessionRoomId } = useSession();
+  const { logout } = useAuth();
   const [selectedCategory, setSelectedCategory] = useState('1');
   const [showExploreMenu, setShowExploreMenu] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -112,6 +115,28 @@ export default function CatalogScreen() {
 
   const displayProducts = filteredProducts;
   const trendingProducts = getTrendingProducts(8);
+
+  // Handle logout
+  const handleLogout = async () => {
+    try {
+      // Call the logout function (it will clear the token)
+      await logout();
+      
+      // Force navigation to login screen
+      router.replace('/auth/login');
+      
+    } catch (error) {
+      console.error('Logout error:', error);
+      
+      // Even if there's an error, try to clear the token and redirect
+      try {
+        await AsyncStorage.removeItem('auth_token');
+        router.replace('/auth/login');
+      } catch (clearError) {
+        console.error('Emergency logout failed:', clearError);
+      }
+    }
+  };
 
   const renderCategory = ({ item }: { item: Category }) => (
     <TouchableOpacity
@@ -226,6 +251,12 @@ export default function CatalogScreen() {
               </TouchableOpacity>
               <TouchableOpacity style={styles.headerButton}>
                 <Ionicons name="person-outline" size={20} color="#000" />
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.headerButton}
+                onPress={handleLogout}
+              >
+                <Ionicons name="log-out-outline" size={20} color="#E91E63" />
               </TouchableOpacity>
             </View>
           </View>
