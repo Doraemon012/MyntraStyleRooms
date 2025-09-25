@@ -1,6 +1,8 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Image } from 'expo-image';
 import React, { useRef, useState } from 'react';
 import {
+  Alert,
   Dimensions,
   FlatList,
   KeyboardAvoidingView,
@@ -11,10 +13,12 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  View,
+  View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { wardrobeApi } from '../services/wardrobeApi';
 import { IconSymbol } from './ui/icon-symbol';
+import WardrobeSelector from './WardrobeSelector';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -61,6 +65,8 @@ const MayaChat: React.FC<MayaChatProps> = ({
   const [inputText, setInputText] = useState('');
   const [showProductModal, setShowProductModal] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<any>(null);
+  const [showWardrobeSelector, setShowWardrobeSelector] = useState(false);
+  const [addingToWardrobe, setAddingToWardrobe] = useState(false);
   const flatListRef = useRef<FlatList>(null);
 
   const mayaAvatar = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&h=150&fit=crop&crop=face';
@@ -79,6 +85,46 @@ const MayaChat: React.FC<MayaChatProps> = ({
     if (action === 'view_items') {
       setSelectedProduct(productData);
       setShowProductModal(true);
+    } else if (action === 'add_to_wardrobe') {
+      setSelectedProduct(productData);
+      setShowWardrobeSelector(true);
+    }
+  };
+
+  const handleWardrobeSelect = async (wardrobeId: string) => {
+    if (!selectedProduct) return;
+
+    setAddingToWardrobe(true);
+    try {
+      const token = await AsyncStorage.getItem('auth_token');
+      if (!token) {
+        Alert.alert('Error', 'Please log in to add products to wardrobe');
+        return;
+      }
+
+      const productId = selectedProduct.productId || selectedProduct.id || selectedProduct._id;
+      if (!productId) {
+        Alert.alert('Error', 'Product ID not found. Cannot add to wardrobe.');
+        return;
+      }
+
+      const response = await wardrobeApi.addToWardrobe(token, wardrobeId, productId, {
+        notes: `Added from chat`,
+        priority: 'medium'
+      });
+
+      if (response.status === 'success') {
+        Alert.alert('Success', 'Product added to wardrobe!');
+        setShowWardrobeSelector(false);
+        setSelectedProduct(null);
+      } else {
+        Alert.alert('Error', response.message || 'Failed to add product to wardrobe');
+      }
+    } catch (error) {
+      console.error('Error adding to wardrobe:', error);
+      Alert.alert('Error', 'Failed to add product to wardrobe');
+    } finally {
+      setAddingToWardrobe(false);
     }
   };
 
@@ -298,6 +344,16 @@ const MayaChat: React.FC<MayaChatProps> = ({
             </View>
           </View>
         </Modal>
+
+        {/* Wardrobe Selector Modal */}
+        <WardrobeSelector
+          visible={showWardrobeSelector}
+          onClose={() => setShowWardrobeSelector(false)}
+          onSelect={handleWardrobeSelect}
+          productName={selectedProduct?.name}
+          productPrice={selectedProduct?.price ? `₹${selectedProduct.price.toLocaleString()}` : undefined}
+          loading={addingToWardrobe}
+        />
       </SafeAreaView>
     {/* </View> */}
     </KeyboardAvoidingView>

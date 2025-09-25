@@ -1,30 +1,22 @@
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { Wardrobe, wardrobeApi, WardrobeItem } from '@/services/wardrobeApi';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router, useLocalSearchParams } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
-  FlatList,
-  Image,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View
+    ActivityIndicator,
+    Alert,
+    FlatList,
+    Image,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-interface WardrobeItem {
-  id: string;
-  name: string;
-  price: string;
-  category: string;
-  addedBy: string;
-  isPurchased: boolean;
-  purchasedBy?: string;
-  purchasedByUsers: string[]; // Array of user IDs who purchased this item
-  reactions: { userId: string; type: 'like' | 'love' | 'dislike' }[];
-  image?: string;
-  description?: string;
-}
+// Remove the duplicate interface since we're importing it from wardrobeApi
 
 interface OutfitSuggestion {
   id: string;
@@ -177,8 +169,59 @@ const mockOutfits: OutfitSuggestion[] = [
 export default function WardrobeDetailScreen() {
   const { id } = useLocalSearchParams();
   const [activeTab, setActiveTab] = useState<'items' | 'outfits'>('items');
-  const [items, setItems] = useState<WardrobeItem[]>(mockItems);
+  const [items, setItems] = useState<WardrobeItem[]>([]);
+  const [wardrobe, setWardrobe] = useState<Wardrobe | null>(null);
+  const [loading, setLoading] = useState(true);
   const [filterType, setFilterType] = useState<'all' | 'mostLiked' | 'mostBought'>('all');
+
+  useEffect(() => {
+    if (id) {
+      loadWardrobeData();
+    }
+  }, [id]);
+
+  const loadWardrobeData = async () => {
+    if (!id) return;
+    
+    setLoading(true);
+    try {
+      const token = await AsyncStorage.getItem('auth_token');
+      if (!token) {
+        Alert.alert('Error', 'Please log in to view wardrobe');
+        setLoading(false);
+        return;
+      }
+
+      // Load wardrobe details
+      const wardrobeResponse = await wardrobeApi.getWardrobe(token, id as string);
+      if (wardrobeResponse.status === 'success' && wardrobeResponse.data) {
+        setWardrobe(wardrobeResponse.data.wardrobe);
+      } else {
+        Alert.alert('Error', 'Wardrobe not found or you do not have permission to view it');
+        router.back();
+        return;
+      }
+
+      // Load wardrobe items
+      const itemsResponse = await wardrobeApi.getWardrobeItems(token, id as string, {
+        limit: 50,
+        sortBy: 'addedAt',
+        sortOrder: 'desc'
+      });
+      if (itemsResponse.status === 'success' && itemsResponse.data) {
+        setItems(itemsResponse.data.items);
+      } else {
+        // If items fail to load, just show empty array
+        setItems([]);
+      }
+    } catch (error) {
+      console.error('Error loading wardrobe data:', error);
+      Alert.alert('Error', 'Failed to load wardrobe data');
+      router.back();
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Helper function to get total likes for an item
   const getTotalLikes = (item: WardrobeItem) => {
@@ -187,7 +230,7 @@ export default function WardrobeDetailScreen() {
 
   // Helper function to get total purchases for an item
   const getTotalPurchases = (item: WardrobeItem) => {
-    return item.purchasedByUsers.length;
+    return item.reactions.filter(r => r.type === 'purchased').length;
   };
 
   // Filter items based on selected filter
@@ -208,54 +251,57 @@ export default function WardrobeDetailScreen() {
     return user ? user.name : 'Unknown User';
   };
 
-  const addReaction = (itemId: string, type: 'like' | 'love' | 'dislike') => {
-    setItems(prevItems =>
-      prevItems.map(item => {
-        if (item.id === itemId) {
-          const existingReaction = item.reactions.find(r => r.userId === 'currentUser');
-          let newReactions = item.reactions.filter(r => r.userId !== 'currentUser');
-          
-          if (!existingReaction || existingReaction.type !== type) {
-            newReactions.push({ userId: 'currentUser', type });
-          }
-          
-          return { ...item, reactions: newReactions };
-        }
-        return item;
-      })
-    );
+  const addReaction = async (itemId: string, type: 'like' | 'love' | 'dislike') => {
+    if (!id) return;
+    
+    try {
+      const token = await AsyncStorage.getItem('auth_token');
+      if (!token) {
+        Alert.alert('Error', 'Please log in to add reactions');
+        return;
+      }
+
+      const response = await wardrobeApi.addReaction(token, id as string, itemId, type);
+      if (response.status === 'success' && response.data) {
+        // Update the item in the local state
+        setItems(prevItems =>
+          prevItems.map(item => 
+            item._id === itemId ? response.data!.item : item
+          )
+        );
+      }
+    } catch (error) {
+      console.error('Error adding reaction:', error);
+      Alert.alert('Error', 'Failed to add reaction');
+    }
   };
 
   const renderItem = ({ item }: { item: WardrobeItem }) => (
     <View style={styles.itemCard}>
       <View style={styles.itemHeader}>
         <View style={styles.itemImagePlaceholder}>
-          {item.image ? (
-            <Image source={{ uri: item.image }} style={styles.itemImage} />
+          {item.productId.image ? (
+            <Image source={{ uri: item.productId.image }} style={styles.itemImage} />
           ) : (
             <Text style={styles.itemEmoji}>
-              {item.category === 'Ethnic Wear' ? '👗' : 
-               item.category === 'Jewelry' ? '💍' : 
-               item.category === 'Footwear' ? '👠' : 
-               item.category === 'Accessories' ? '👜' : '👕'}
+              {item.productId.category === 'Ethnic Wear' ? '👗' : 
+               item.productId.category === 'Jewelry' ? '💍' : 
+               item.productId.category === 'Footwear' ? '👠' : 
+               item.productId.category === 'Accessories' ? '👜' : '👕'}
             </Text>
           )}
         </View>
         <View style={styles.itemInfo}>
-          <ThemedText style={styles.itemName}>{item.name}</ThemedText>
-          <Text style={styles.itemPrice}>{item.price}</Text>
-          <Text style={styles.itemCategory}>{item.category}</Text>
-          <Text style={styles.addedBy}>Added by {item.addedBy}</Text>
+          <ThemedText style={styles.itemName}>{item.productId.name}</ThemedText>
+          <Text style={styles.itemPrice}>₹{item.productId.price}</Text>
+          <Text style={styles.itemCategory}>{item.productId.category}</Text>
+          <Text style={styles.addedBy}>Added by {item.addedBy.name}</Text>
           
           {/* Show purchase count */}
-          {item.purchasedByUsers.length > 0 && (
+          {item.isPurchased && (
             <View style={styles.purchaseInfo}>
               <Text style={styles.purchaseText}>
-                🛒 {item.purchasedByUsers.length} room member{item.purchasedByUsers.length > 1 ? 's' : ''} bought this
-              </Text>
-              <Text style={styles.purchasedByNames}>
-                {item.purchasedByUsers.slice(0, 3).map(userId => getUserName(userId)).join(', ')}
-                {item.purchasedByUsers.length > 3 && ` +${item.purchasedByUsers.length - 3} more`}
+                🛒 Purchased by {item.purchasedBy?.name || 'Someone'}
               </Text>
             </View>
           )}
@@ -266,7 +312,7 @@ export default function WardrobeDetailScreen() {
         <View style={styles.reactions}>
           <TouchableOpacity
             style={styles.reactionButton}
-            onPress={() => addReaction(item.id, 'like')}
+            onPress={() => addReaction(item._id, 'like')}
           >
             <Text style={styles.reactionIcon}>👍</Text>
             <Text style={styles.reactionCount}>
@@ -276,7 +322,7 @@ export default function WardrobeDetailScreen() {
           
           <TouchableOpacity
             style={styles.reactionButton}
-            onPress={() => addReaction(item.id, 'love')}
+            onPress={() => addReaction(item._id, 'love')}
           >
             <Text style={styles.reactionIcon}>❤️</Text>
             <Text style={styles.reactionCount}>
@@ -323,6 +369,19 @@ export default function WardrobeDetailScreen() {
     </View>
   );
 
+  if (loading) {
+    return (
+      <ThemedView style={[styles.container, { backgroundColor: '#f8f9fa' }]}>
+        <SafeAreaView style={styles.container}>
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#ff6b6b" />
+            <Text style={styles.loadingText}>Loading wardrobe...</Text>
+          </View>
+        </SafeAreaView>
+      </ThemedView>
+    );
+  }
+
   return (
     <ThemedView style={[styles.container, { backgroundColor: '#f8f9fa' }]}>
       <SafeAreaView style={styles.container}>
@@ -331,8 +390,12 @@ export default function WardrobeDetailScreen() {
             <Text style={styles.backButton}>←</Text>
           </TouchableOpacity>
           <View style={styles.wardrobeInfo}>
-            <ThemedText style={styles.wardrobeName}>Family Wedding 👰</ThemedText>
-            <Text style={styles.memberInfo}>5 members • Owner: You</Text>
+            <ThemedText style={styles.wardrobeName}>
+              {wardrobe?.name || 'Wardrobe'} {wardrobe?.emoji || '👗'}
+            </ThemedText>
+            <Text style={styles.memberInfo}>
+              {wardrobe?.memberCount || 0} members • Owner: {wardrobe?.owner.name || 'Unknown'}
+            </Text>
           </View>
           <TouchableOpacity style={styles.menuButton}>
             <Text style={styles.menuText}>⋯</Text>
@@ -345,7 +408,7 @@ export default function WardrobeDetailScreen() {
             onPress={() => setActiveTab('items')}
           >
             <Text style={[styles.tabText, activeTab === 'items' && styles.activeTabText]}>
-              Items ({mockItems.length})
+              Items ({items.length})
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
@@ -424,6 +487,16 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f8f9fa',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#666',
   },
   header: {
     flexDirection: 'row',

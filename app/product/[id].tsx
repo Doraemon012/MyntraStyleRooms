@@ -3,6 +3,8 @@ import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useState, useRef } from 'react';
 import {
+  ActivityIndicator,
+  Alert,
   Animated,
   Dimensions,
   FlatList,
@@ -16,13 +18,17 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { getProductById, getSimilarProducts, getYouMayAlsoLike, Product } from '../../data/products';
+import WardrobeSelector from '../../components/WardrobeSelector';
+import { useSession } from '../../contexts/session-context';
+import { wardrobeApi } from '../../services/wardrobeApi';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
 export default function ProductDetailScreen() {
   const params = useLocalSearchParams();
   const id = params.id as string;
-  
+  const { sessionRoomId, isInSession } = useSession();
   
   // Add error handling for missing id
   if (!id) {
@@ -58,6 +64,11 @@ export default function ProductDetailScreen() {
   const [isWishlisted, setIsWishlisted] = useState(false);
   const [quantity, setQuantity] = useState(1);
   
+  // Wardrobe and Chat functionality
+  const [showWardrobeSelector, setShowWardrobeSelector] = useState(false);
+  const [addingToWardrobe, setAddingToWardrobe] = useState(false);
+  const [sendingToChat, setSendingToChat] = useState(false);
+  
   const scrollViewRef = useRef<ScrollView>(null);
   const imageScrollRef = useRef<ScrollView>(null);
 
@@ -68,6 +79,61 @@ export default function ProductDetailScreen() {
     const contentOffset = event.nativeEvent.contentOffset.x;
     const index = Math.round(contentOffset / screenWidth);
     setCurrentImageIndex(index);
+  };
+
+  // Wardrobe functionality
+  const handleAddToWardrobe = () => {
+    setShowWardrobeSelector(true);
+  };
+
+  const handleWardrobeSelect = async (wardrobeId: string) => {
+    setAddingToWardrobe(true);
+    try {
+      const token = await AsyncStorage.getItem('auth_token');
+      if (!token) {
+        Alert.alert('Error', 'Please log in to add products to wardrobe');
+        return;
+      }
+
+      const response = await wardrobeApi.addToWardrobe(token, wardrobeId, product._id, {
+        notes: `Added from product screen`,
+        priority: 'medium'
+      });
+
+      if (response.status === 'success') {
+        Alert.alert('Success', 'Product added to wardrobe!');
+        setShowWardrobeSelector(false);
+      } else {
+        Alert.alert('Error', response.message || 'Failed to add product to wardrobe');
+      }
+    } catch (error) {
+      console.error('Error adding to wardrobe:', error);
+      Alert.alert('Error', 'Failed to add product to wardrobe');
+    } finally {
+      setAddingToWardrobe(false);
+    }
+  };
+
+  // Chat functionality
+  const handleSendToChat = async () => {
+    if (!isInSession || !sessionRoomId) {
+      Alert.alert('Error', 'You need to be in a live session to send products to chat');
+      return;
+    }
+
+    setSendingToChat(true);
+    try {
+      // Here you would implement the chat API call
+      // For now, we'll simulate it
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      Alert.alert('Success', 'Product sent to chat!');
+    } catch (error) {
+      console.error('Error sending to chat:', error);
+      Alert.alert('Error', 'Failed to send product to chat');
+    } finally {
+      setSendingToChat(false);
+    }
   };
 
   const renderProductImage = ({ item, index }: { item: string; index: number }) => (
@@ -311,6 +377,45 @@ export default function ProductDetailScreen() {
               </TouchableOpacity>
             </View>
 
+            {/* Wardrobe and Chat Actions */}
+            <View style={styles.wardrobeChatActions}>
+              <TouchableOpacity 
+                style={styles.wardrobeButton}
+                onPress={handleAddToWardrobe}
+                disabled={addingToWardrobe}
+              >
+                {addingToWardrobe ? (
+                  <ActivityIndicator size="small" color="#E91E63" />
+                ) : (
+                  <Ionicons name="shirt-outline" size={20} color="#E91E63" />
+                )}
+                <Text style={styles.wardrobeButtonText}>Add to Wardrobe</Text>
+              </TouchableOpacity>
+              
+              {isInSession && sessionRoomId ? (
+                <TouchableOpacity 
+                  style={styles.chatButton}
+                  onPress={handleSendToChat}
+                  disabled={sendingToChat}
+                >
+                  {sendingToChat ? (
+                    <ActivityIndicator size="small" color="#4CAF50" />
+                  ) : (
+                    <Ionicons name="chatbubble-outline" size={20} color="#4CAF50" />
+                  )}
+                  <Text style={styles.chatButtonText}>Send to Chat</Text>
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity 
+                  style={styles.chatButtonDisabled}
+                  onPress={() => Alert.alert('Info', 'Join a live session to send products to chat')}
+                >
+                  <Ionicons name="chatbubble-outline" size={20} color="#999" />
+                  <Text style={styles.chatButtonTextDisabled}>Send to Chat</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+
             {/* Delivery & Services */}
             <View style={styles.deliverySection}>
               <Text style={styles.sectionTitle}>Delivery & Services</Text>
@@ -473,6 +578,16 @@ export default function ProductDetailScreen() {
             </View>
           </View>
         </Modal>
+
+        {/* Wardrobe Selector Modal */}
+        <WardrobeSelector
+          visible={showWardrobeSelector}
+          onClose={() => setShowWardrobeSelector(false)}
+          onSelect={handleWardrobeSelect}
+          productName={product.name}
+          productPrice={`₹${product.price.toLocaleString()}`}
+          loading={addingToWardrobe}
+        />
       </SafeAreaView>
     </View>
   );
@@ -1107,5 +1222,58 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
     padding: 16,
+  },
+  wardrobeChatActions: {
+    flexDirection: 'row',
+    marginVertical: 12,
+    gap: 8,
+  },
+  wardrobeButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#E91E63',
+    padding: 12,
+    borderRadius: 8,
+    gap: 6,
+  },
+  wardrobeButtonText: {
+    fontSize: 12,
+    color: '#E91E63',
+    fontWeight: '600',
+  },
+  chatButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#4CAF50',
+    padding: 12,
+    borderRadius: 8,
+    gap: 6,
+  },
+  chatButtonText: {
+    fontSize: 12,
+    color: '#4CAF50',
+    fontWeight: '600',
+  },
+  chatButtonDisabled: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#ddd',
+    padding: 12,
+    borderRadius: 8,
+    gap: 6,
+  },
+  chatButtonTextDisabled: {
+    fontSize: 12,
+    color: '#999',
+    fontWeight: '600',
   },
 });

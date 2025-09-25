@@ -1,14 +1,21 @@
 import { ThemedView } from "@/components/themed-view";
+import { useSession } from "@/contexts/session-context";
+import { roomAPI } from "@/services/api";
+import { Wardrobe, wardrobeApi } from "@/services/wardrobeApi";
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import React, { useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
+    ActivityIndicator,
+    Alert,
     FlatList,
     Image,
     StyleSheet,
     Text,
     TouchableOpacity,
-    View,
+    View
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -93,21 +100,156 @@ const wardrobeCategories: WardrobeCategory[] = [
 ];
 
 export default function WardrobesScreen() {
+    const { sessionRoomId } = useSession();
     const [searchQuery, setSearchQuery] = useState("");
+    const [wardrobes, setWardrobes] = useState<Wardrobe[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [roomName, setRoomName] = useState("Wardrobes");
+    const [wardrobeItems, setWardrobeItems] = useState<{[key: string]: any[]}>({});
+
+    useEffect(() => {
+        loadWardrobes();
+        if (sessionRoomId) {
+            loadRoomName();
+        } else {
+            // If no session room ID, try to get the first available room
+            loadDefaultRoom();
+        }
+    }, [sessionRoomId]);
+
+    // Add focus listener to refresh wardrobes when screen comes into focus
+    useFocusEffect(
+        useCallback(() => {
+            loadWardrobes();
+        }, [])
+    );
+
+    const loadDefaultRoom = async () => {
+        try {
+            const token = await AsyncStorage.getItem('auth_token');
+            if (!token) {
+                setRoomName("Wardrobes");
+                return;
+            }
+
+            // Get the first available room
+            const response = await roomAPI.getAll({ limit: 1 });
+            if (response.status === 'success' && response.data && response.data.rooms.length > 0) {
+                const room = response.data.rooms[0];
+                setRoomName(room.name);
+                console.log('Using default room:', room.name);
+            } else {
+                setRoomName("Wardrobes");
+            }
+        } catch (error) {
+            console.error('Error loading default room:', error);
+            setRoomName("Wardrobes");
+        }
+    };
+
+    const loadRoomName = async () => {
+        if (!sessionRoomId) {
+            setRoomName("Wardrobes");
+            return;
+        }
+        
+        try {
+            const token = await AsyncStorage.getItem('auth_token');
+            if (!token) {
+                setRoomName("Wardrobes");
+                return;
+            }
+
+            console.log('Loading room name for room ID:', sessionRoomId);
+            const response = await roomAPI.getById(sessionRoomId);
+            console.log('Room API response:', response);
+            
+            if (response.status === 'success' && response.data) {
+                setRoomName(response.data.room.name);
+            } else {
+                setRoomName("Wardrobes");
+            }
+        } catch (error) {
+            console.error('Error loading room name:', error);
+            setRoomName("Wardrobes");
+        }
+    };
+
+    const loadWardrobes = async () => {
+        setLoading(true);
+        try {
+            const token = await AsyncStorage.getItem('auth_token');
+            if (!token) {
+                Alert.alert('Error', 'Please log in to view wardrobes');
+                setLoading(false);
+                return;
+            }
+
+            const response = await wardrobeApi.getWardrobes(token, {
+                limit: 50
+            });
+            if (response.status === 'success' && response.data) {
+                const wardrobesData = response.data.wardrobes;
+                setWardrobes(wardrobesData);
+                
+                // Load items for each wardrobe
+                const itemsPromises = wardrobesData.map(async (wardrobe) => {
+                    try {
+                        const itemsResponse = await wardrobeApi.getWardrobeItems(token, wardrobe._id, { limit: 5 });
+                        if (itemsResponse.status === 'success' && itemsResponse.data) {
+                            return { wardrobeId: wardrobe._id, items: itemsResponse.data.items };
+                        }
+                    } catch (error) {
+                        console.error(`Error loading items for wardrobe ${wardrobe._id}:`, error);
+                    }
+                    return { wardrobeId: wardrobe._id, items: [] };
+                });
+                
+                const itemsResults = await Promise.all(itemsPromises);
+                const itemsMap: {[key: string]: any[]} = {};
+                itemsResults.forEach(result => {
+                    itemsMap[result.wardrobeId] = result.items;
+                });
+                setWardrobeItems(itemsMap);
+            }
+        } catch (error) {
+            console.error('Error loading wardrobes:', error);
+            Alert.alert('Error', 'Failed to load wardrobes');
+        } finally {
+            setLoading(false);
+        }
+    };
 
     const renderWardrobeItem = ({ item }: { item: WardrobeItem }) => (
-        <Image source={{ uri: item.image }} style={styles.wardrobeItemImage} />
+        <TouchableOpacity 
+            style={styles.wardrobeItemImage}
+            onPress={() => {
+                if (item.wardrobeId) {
+                    router.push(`/wardrobe/${item.wardrobeId}`);
+                } else {
+                    console.warn('No wardrobe ID found for item:', item);
+                }
+            }}
+        >
+            {item.image ? (
+                <Image 
+                    source={{ uri: item.image }} 
+                    style={styles.wardrobeItemImageContent}
+                    resizeMode="cover"
+                />
+            ) : (
+                <Text style={styles.wardrobeItemText}>{item.emoji || '👗'}</Text>
+            )}
+        </TouchableOpacity>
     );
 
     const handleViewAll = (categoryId: string, categoryName: string) => {
-        // Navigate to the wardrobe items page
-        router.push({
-            pathname: "/wardrobe/items",
-            params: {
-                categoryId: categoryId,
-                categoryName: categoryName,
-            },
-        });
+        // Navigate to the wardrobe detail page
+        if (categoryId) {
+            router.push(`/wardrobe/${categoryId}`);
+        } else {
+            console.warn('No category ID found for:', categoryName);
+        }
     };
 
     const renderWardrobeCategory = ({ item, index }: { item: WardrobeCategory; index: number }) => {
@@ -158,6 +300,19 @@ export default function WardrobesScreen() {
         );
     };
 
+    if (loading) {
+        return (
+            <ThemedView style={[styles.container, { backgroundColor: '#ffffff' }]}>
+                <SafeAreaView style={styles.safeArea}>
+                    <View style={styles.loadingContainer}>
+                        <ActivityIndicator size="large" color="#ff6b6b" />
+                        <Text style={styles.loadingText}>Loading wardrobes...</Text>
+                    </View>
+                </SafeAreaView>
+            </ThemedView>
+        );
+    }
+
     return (
         <ThemedView style={[styles.container, { backgroundColor: '#ffffff' }]}>
             <SafeAreaView style={styles.safeArea}>
@@ -168,7 +323,7 @@ export default function WardrobesScreen() {
                     
                     <View style={styles.headerCenter}>
                         <Text style={styles.title}>Wardrobes</Text>
-                        <Text style={styles.subtitle}>Room No. 1</Text>
+                        <Text style={styles.subtitle}>{roomName}</Text>
                     </View>
                     
                     <TouchableOpacity
@@ -179,13 +334,38 @@ export default function WardrobesScreen() {
                     </TouchableOpacity>
                 </View>
 
-                <FlatList
-                    data={wardrobeCategories}
-                    renderItem={({ item, index }) => renderWardrobeCategory({ item, index })}
-                    keyExtractor={(item) => item.id}
-                    showsVerticalScrollIndicator={false}
-                    contentContainerStyle={styles.categoriesList}
-                />
+                {wardrobes.length === 0 ? (
+                    <View style={styles.emptyContainer}>
+                        <Text style={styles.emptyText}>No wardrobes found</Text>
+                    </View>
+                ) : (
+                    <FlatList
+                        data={wardrobes.map(wardrobe => {
+                            const items = wardrobeItems[wardrobe._id] || [];
+                            return {
+                                id: wardrobe._id,
+                                name: wardrobe.name,
+                                subtitle: "AI Powered",
+                                role: "Editor", // You can determine this based on user permissions
+                                items: items.length > 0 ? items.slice(0, 5).map((item, index) => ({
+                                    id: `${wardrobe._id}-${index}`,
+                                    wardrobeId: wardrobe._id,
+                                    emoji: wardrobe.emoji,
+                                    image: item.productId?.images?.[0]?.url || "https://images.unsplash.com/photo-1594633313593-bab3825d0caf?w=150&h=200&fit=crop"
+                                })) : Array.from({ length: Math.min(wardrobe.itemCount, 5) }, (_, index) => ({
+                                    id: `${wardrobe._id}-${index}`,
+                                    wardrobeId: wardrobe._id,
+                                    emoji: wardrobe.emoji,
+                                    image: "https://images.unsplash.com/photo-1594633313593-bab3825d0caf?w=150&h=200&fit=crop"
+                                }))
+                            };
+                        })}
+                        renderItem={renderWardrobeCategory}
+                        keyExtractor={(item) => item.id}
+                        showsVerticalScrollIndicator={false}
+                        contentContainerStyle={styles.categoriesList}
+                    />
+                )}
             </SafeAreaView>
         </ThemedView>
     );
@@ -272,6 +452,17 @@ const styles = StyleSheet.create({
         borderRadius: 12,
         marginRight: 12,
         backgroundColor: "#f0f0f0",
+        justifyContent: 'center',
+        alignItems: 'center',
+        overflow: 'hidden',
+    },
+    wardrobeItemImageContent: {
+        width: '100%',
+        height: '100%',
+    },
+    wardrobeItemText: {
+        fontSize: 48,
+        textAlign: 'center',
     },
     categoryFooter: {
         flexDirection: "row",
@@ -339,5 +530,74 @@ const styles = StyleSheet.create({
         fontSize: 14,
         color: "#333",
         fontWeight: "500",
+    },
+    loadingContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    loadingText: {
+        marginTop: 16,
+        fontSize: 16,
+        color: '#666',
+    },
+    emptyContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingHorizontal: 32,
+    },
+    emptyText: {
+        fontSize: 18,
+        color: '#666',
+        marginBottom: 16,
+        textAlign: 'center',
+    },
+    createFirstButton: {
+        backgroundColor: '#FF69B4',
+        paddingHorizontal: 24,
+        paddingVertical: 12,
+        borderRadius: 8,
+    },
+    createFirstButtonText: {
+        color: 'white',
+        fontSize: 16,
+        fontWeight: '600',
+    },
+    wardrobeCard: {
+        backgroundColor: 'white',
+        borderRadius: 12,
+        padding: 16,
+        marginHorizontal: 16,
+        marginBottom: 12,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 3.84,
+        elevation: 5,
+    },
+    wardrobeHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 8,
+    },
+    wardrobeEmoji: {
+        fontSize: 24,
+        marginRight: 12,
+    },
+    wardrobeName: {
+        fontSize: 18,
+        fontWeight: '600',
+        color: '#1a1a1a',
+        flex: 1,
+    },
+    wardrobeDescription: {
+        fontSize: 14,
+        color: '#666',
+        marginBottom: 8,
+    },
+    wardrobeStats: {
+        fontSize: 12,
+        color: '#999',
     },
 });

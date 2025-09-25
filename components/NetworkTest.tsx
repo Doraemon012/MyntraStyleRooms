@@ -12,7 +12,7 @@ export const NetworkTest = () => {
     
     try {
       // Test basic connectivity
-      const response = await fetch('http://172.27.35.178:5000/api/health');
+      const response = await fetch('http://10.84.92.218:5000/api/health');
       const data = await response.json();
       
       if (data.status === 'success') {

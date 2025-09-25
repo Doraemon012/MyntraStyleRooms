@@ -79,8 +79,11 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       } else {
         setUser(null);
       }
-    } catch (error) {
-      console.error('Auth check error:', error);
+    } catch (error: any) {
+      // Only log as error if it's not a 401 (unauthorized) which is expected for unauthenticated users
+      if (error.message && !error.message.includes('Access token required')) {
+        console.error('Auth check error:', error);
+      }
       setUser(null);
     } finally {
       setIsLoading(false);

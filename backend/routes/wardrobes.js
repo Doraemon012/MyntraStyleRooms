@@ -1,5 +1,6 @@
 const express = require('express');
 const { body, validationResult } = require('express-validator');
+const mongoose = require('mongoose');
 const Wardrobe = require('../models/Wardrobe');
 const WardrobeItem = require('../models/WardrobeItem');
 const User = require('../models/User');
@@ -116,6 +117,7 @@ router.post('/', authenticateToken, [
     .notEmpty()
     .withMessage('Wardrobe emoji is required'),
   body('occasionType')
+    .optional()
     .isIn([
       'Wedding & Celebrations',
       'Office & Professional',
@@ -161,12 +163,12 @@ router.post('/', authenticateToken, [
       name,
       emoji,
       description,
-      occasionType,
+      occasionType: occasionType || 'General Collection',
       budgetRange: budgetRange || { min: 0, max: 50000 },
       isPrivate,
       owner: ownerId,
       members: members.map(member => ({
-        userId: member.userId,
+        userId: new mongoose.Types.ObjectId(member.userId),
         role: member.role || 'Contributor'
       }))
     });

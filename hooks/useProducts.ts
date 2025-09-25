@@ -3,6 +3,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { Product } from '../data/products';
+import { transformAPIProduct } from '../types/api';
 
 // Hook for fetching all products
 export const useProducts = (filters?: {
@@ -23,24 +24,31 @@ export const useProducts = (filters?: {
       setLoading(true);
       setError(null);
       
-      // For now, use mock data. Replace with actual API call when backend is ready
-      // const data = await productAPI.getAll(filters);
-      // setProducts(data.products);
-      
-      // Mock data implementation
-      const { mockProducts, getProductsByCategory, searchProducts } = await import('../data/products');
-      
-      let filteredProducts = mockProducts;
-      
-      if (filters?.search) {
-        filteredProducts = searchProducts(filters.search);
-      } else if (filters?.category) {
-        filteredProducts = getProductsByCategory(filters.category);
-      }
-      
-      setProducts(filteredProducts);
+      // Use actual API call
+      const { productAPI } = await import('../services/api');
+      const data = await productAPI.getAll(filters);
+      const transformedProducts = data.data.products.map(transformAPIProduct);
+      setProducts(transformedProducts);
     } catch (err) {
+      console.error('Error fetching products:', err);
       setError(err instanceof Error ? err.message : 'Failed to fetch products');
+      
+      // Fallback to mock data if API fails
+      try {
+        const { mockProducts, getProductsByCategory, searchProducts } = await import('../data/products');
+        
+        let filteredProducts = mockProducts;
+        
+        if (filters?.search) {
+          filteredProducts = searchProducts(filters.search);
+        } else if (filters?.category) {
+          filteredProducts = getProductsByCategory(filters.category);
+        }
+        
+        setProducts(filteredProducts);
+      } catch (fallbackErr) {
+        console.error('Fallback also failed:', fallbackErr);
+      }
     } finally {
       setLoading(false);
     }
@@ -64,21 +72,28 @@ export const useProduct = (id: string) => {
       setLoading(true);
       setError(null);
       
-      // For now, use mock data. Replace with actual API call when backend is ready
-      // const data = await productAPI.getById(id);
-      // setProduct(data);
-      
-      // Mock data implementation
-      const { getProductById } = await import('../data/products');
-      const productData = getProductById(id);
-      
-      if (!productData) {
-        throw new Error('Product not found');
-      }
-      
-      setProduct(productData);
+      // Use actual API call
+      const { productAPI } = await import('../services/api');
+      const data = await productAPI.getById(id);
+      const transformedProduct = transformAPIProduct(data.data.product);
+      setProduct(transformedProduct);
     } catch (err) {
+      console.error('Error fetching product:', err);
       setError(err instanceof Error ? err.message : 'Failed to fetch product');
+      
+      // Fallback to mock data if API fails
+      try {
+        const { getProductById } = await import('../data/products');
+        const productData = getProductById(id);
+        
+        if (!productData) {
+          throw new Error('Product not found');
+        }
+        
+        setProduct(productData);
+      } catch (fallbackErr) {
+        console.error('Fallback also failed:', fallbackErr);
+      }
     } finally {
       setLoading(false);
     }
@@ -104,16 +119,23 @@ export const useSimilarProducts = (productId: string, limit: number = 4) => {
       setLoading(true);
       setError(null);
       
-      // For now, use mock data. Replace with actual API call when backend is ready
-      // const data = await productAPI.getSimilar(productId, limit);
-      // setProducts(data.products);
-      
-      // Mock data implementation
-      const { getSimilarProducts } = await import('../data/products');
-      const similarProducts = getSimilarProducts(productId, limit);
-      setProducts(similarProducts);
+      // Use actual API call
+      const { productAPI } = await import('../services/api');
+      const data = await productAPI.getSimilar(productId, limit);
+      const transformedProducts = data.data.products.map(transformAPIProduct);
+      setProducts(transformedProducts);
     } catch (err) {
+      console.error('Error fetching similar products:', err);
       setError(err instanceof Error ? err.message : 'Failed to fetch similar products');
+      
+      // Fallback to mock data if API fails
+      try {
+        const { getSimilarProducts } = await import('../data/products');
+        const similarProducts = getSimilarProducts(productId, limit);
+        setProducts(similarProducts);
+      } catch (fallbackErr) {
+        console.error('Fallback also failed:', fallbackErr);
+      }
     } finally {
       setLoading(false);
     }
@@ -139,16 +161,23 @@ export const useRecommendedProducts = (productId: string, limit: number = 4) => 
       setLoading(true);
       setError(null);
       
-      // For now, use mock data. Replace with actual API call when backend is ready
-      // const data = await productAPI.getRecommended(productId, limit);
-      // setProducts(data.products);
-      
-      // Mock data implementation
-      const { getYouMayAlsoLike } = await import('../data/products');
-      const recommendedProducts = getYouMayAlsoLike(productId, limit);
-      setProducts(recommendedProducts);
+      // Use actual API call
+      const { productAPI } = await import('../services/api');
+      const data = await productAPI.getRecommended(productId, limit);
+      const transformedProducts = data.data.products.map(transformAPIProduct);
+      setProducts(transformedProducts);
     } catch (err) {
+      console.error('Error fetching recommended products:', err);
       setError(err instanceof Error ? err.message : 'Failed to fetch recommended products');
+      
+      // Fallback to mock data if API fails
+      try {
+        const { getYouMayAlsoLike } = await import('../data/products');
+        const recommendedProducts = getYouMayAlsoLike(productId, limit);
+        setProducts(recommendedProducts);
+      } catch (fallbackErr) {
+        console.error('Fallback also failed:', fallbackErr);
+      }
     } finally {
       setLoading(false);
     }
@@ -174,16 +203,23 @@ export const useTrendingProducts = (limit: number = 8) => {
       setLoading(true);
       setError(null);
       
-      // For now, use mock data. Replace with actual API call when backend is ready
-      // const data = await productAPI.getTrending(limit);
-      // setProducts(data.products);
-      
-      // Mock data implementation
-      const { getTrendingProducts } = await import('../data/products');
-      const trendingProducts = getTrendingProducts(limit);
-      setProducts(trendingProducts);
+      // Use actual API call
+      const { productAPI } = await import('../services/api');
+      const data = await productAPI.getTrending(limit);
+      const transformedProducts = data.data.products.map(transformAPIProduct);
+      setProducts(transformedProducts);
     } catch (err) {
+      console.error('Error fetching trending products:', err);
       setError(err instanceof Error ? err.message : 'Failed to fetch trending products');
+      
+      // Fallback to mock data if API fails
+      try {
+        const { getTrendingProducts } = await import('../data/products');
+        const trendingProducts = getTrendingProducts(limit);
+        setProducts(trendingProducts);
+      } catch (fallbackErr) {
+        console.error('Fallback also failed:', fallbackErr);
+      }
     } finally {
       setLoading(false);
     }
@@ -212,16 +248,23 @@ export const useProductSearch = (query: string) => {
       setLoading(true);
       setError(null);
       
-      // For now, use mock data. Replace with actual API call when backend is ready
-      // const data = await productAPI.search(searchQuery);
-      // setProducts(data.products);
-      
-      // Mock data implementation
-      const { searchProducts: mockSearch } = await import('../data/products');
-      const searchResults = mockSearch(searchQuery);
-      setProducts(searchResults);
+      // Use actual API call
+      const { productAPI } = await import('../services/api');
+      const data = await productAPI.search(searchQuery);
+      const transformedProducts = data.data.products.map(transformAPIProduct);
+      setProducts(transformedProducts);
     } catch (err) {
+      console.error('Error searching products:', err);
       setError(err instanceof Error ? err.message : 'Failed to search products');
+      
+      // Fallback to mock data if API fails
+      try {
+        const { searchProducts: mockSearch } = await import('../data/products');
+        const searchResults = mockSearch(searchQuery);
+        setProducts(searchResults);
+      } catch (fallbackErr) {
+        console.error('Fallback also failed:', fallbackErr);
+      }
     } finally {
       setLoading(false);
     }

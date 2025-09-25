@@ -49,16 +49,24 @@ async function apiCall<T>(endpoint: string, options: RequestInit = {}): Promise<
     
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      console.error('❌ API Error:', errorData);
+      
+      // Only log as error if it's not a 401 (unauthorized) which is expected for unauthenticated users
+      if (response.status !== 401 || !errorData.message?.includes('Access token required')) {
+        console.error('❌ API Error:', errorData);
+      }
+      
       throw new Error(errorData.message || `API call failed: ${response.status} ${response.statusText}`);
     }
     
     const data = await response.json();
     console.log(`✅ API Success: ${endpoint}`);
     return data;
-  } catch (error) {
-    console.error('❌ API call error:', error);
-    console.error('🔗 URL attempted:', url);
+  } catch (error: any) {
+    // Only log as error if it's not a 401 (unauthorized) which is expected for unauthenticated users
+    if (!error.message?.includes('Access token required')) {
+      console.error('❌ API call error:', error);
+      console.error('🔗 URL attempted:', url);
+    }
     throw error;
   }
 }

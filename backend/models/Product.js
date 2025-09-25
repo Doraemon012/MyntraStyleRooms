@@ -23,7 +23,9 @@ const productSchema = new mongoose.Schema({
       'Bags',
       'Jewelry',
       'Watches',
-      'Home & Living'
+      'Home & Living',
+      'Electronics',
+      'Sports'
     ]
   },
   subcategory: {
@@ -157,7 +159,47 @@ const productSchema = new mongoose.Schema({
     },
     externalId: String,
     lastSynced: Date
-  }
+  },
+  // Additional fields for better frontend compatibility
+  features: [String],
+  delivery: {
+    standard: {
+      estimatedDays: String,
+      price: Number,
+      originalPrice: Number,
+      discount: Number
+    },
+    express: {
+      estimatedDays: String,
+      price: Number
+    }
+  },
+  offers: {
+    bankOffers: [String],
+    couponOffers: [String],
+    additionalDiscount: Number
+  },
+  returnPolicy: String,
+  paymentOptions: {
+    cod: Boolean,
+    codFee: Number
+  },
+  similarProducts: [String],
+  youMayAlsoLike: [String],
+  questions: [{
+    _id: {
+      type: String,
+      default: function() {
+        return new mongoose.Types.ObjectId().toString();
+      }
+    },
+    question: String,
+    answer: String,
+    askedBy: String,
+    answeredBy: String,
+    date: String,
+    helpful: Number
+  }]
 }, {
   timestamps: true,
   toJSON: { virtuals: true },
