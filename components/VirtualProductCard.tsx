@@ -100,10 +100,18 @@ export default function VirtualProductCard({
 
     setAddingToWardrobe(true);
     try {
+      console.log('Adding product to wardrobe via VirtualProductCard:', {
+        wardrobeId,
+        productId: product.productId,
+        productName: product.name
+      });
+
       const response = await wardrobeApi.addToWardrobe(token, wardrobeId, product.productId || '', {
         notes: `Added from virtual product card`,
         priority: 'medium'
       });
+
+      console.log('Add to wardrobe response from VirtualProductCard:', response);
 
       if (response.status === 'success') {
         Alert.alert('Success', 'Product added to wardrobe!');
@@ -113,7 +121,7 @@ export default function VirtualProductCard({
       }
     } catch (error) {
       console.error('Error adding to wardrobe:', error);
-      Alert.alert('Error', 'Failed to add product to wardrobe');
+      Alert.alert('Error', `Failed to add product to wardrobe: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setAddingToWardrobe(false);
     }
@@ -483,6 +491,7 @@ export default function VirtualProductCard({
         productName={product.name}
         productPrice={product.price}
         loading={addingToWardrobe}
+        roomId={sessionRoomId || undefined}
       />
     </>
   );

@@ -78,7 +78,7 @@ export interface Question {
 // Mock data - This will be replaced with MongoDB data
 export const mockProducts: Product[] = [
   {
-    _id: '1',
+    _id: '68d4f81253d1477d8785ca81',
     name: 'Elegant Floral Midi Dress',
     brand: 'Zara',
     price: 2299,
@@ -205,7 +205,7 @@ export const mockProducts: Product[] = [
     updatedAt: '2024-01-20T14:45:00Z'
   },
   {
-    _id: '2',
+    _id: '68d4f81259979da02cafd866',
     name: 'Classic Denim Jacket',
     brand: 'Levi\'s',
     price: 3499,
@@ -319,7 +319,7 @@ export const mockProducts: Product[] = [
     updatedAt: '2024-01-18T11:20:00Z'
   },
   {
-    _id: '3',
+    _id: '68d4f81205d1ac1d8e74d686',
     name: 'Premium Cotton T-Shirt',
     brand: 'Uniqlo',
     price: 899,
@@ -432,7 +432,7 @@ export const mockProducts: Product[] = [
     updatedAt: '2024-01-19T16:45:00Z'
   },
   {
-    _id: '4',
+    _id: '68d4f812358c51e26cc29dae',
     name: 'Air Max 270 Running Shoes',
     brand: 'Nike',
     price: 8999,
@@ -546,7 +546,7 @@ export const mockProducts: Product[] = [
     updatedAt: '2024-01-17T10:30:00Z'
   },
   {
-    _id: '5',
+    _id: '68d4f812f45955e05a3fc1b7',
     name: 'Silk Saree with Zari Work',
     brand: 'Sangria',
     price: 8999,
@@ -660,7 +660,7 @@ export const mockProducts: Product[] = [
     updatedAt: '2024-01-16T13:20:00Z'
   },
   {
-    _id: '6',
+    _id: '68d4f81215cad9a887c1e056',
     name: 'Leather Crossbody Handbag',
     brand: 'Coach',
     price: 12999,
@@ -774,7 +774,7 @@ export const mockProducts: Product[] = [
     updatedAt: '2024-01-15T09:15:00Z'
   },
   {
-    _id: '7',
+    _id: '68d4f812393a89076b5f96f3',
     name: 'Wireless Bluetooth Headphones',
     brand: 'Sony',
     price: 8999,
@@ -888,7 +888,7 @@ export const mockProducts: Product[] = [
     updatedAt: '2024-01-14T12:10:00Z'
   },
   {
-    _id: '8',
+    _id: '68d4f8121637099069095ced',
     name: 'Smart Fitness Watch',
     brand: 'Apple',
     price: 29999,
@@ -1002,7 +1002,7 @@ export const mockProducts: Product[] = [
     updatedAt: '2024-01-13T15:30:00Z'
   },
   {
-    _id: '9',
+    _id: '68d4f812b06ce87875574a80',
     name: 'Premium Skincare Set',
     brand: 'The Ordinary',
     price: 2999,
@@ -1116,7 +1116,7 @@ export const mockProducts: Product[] = [
     updatedAt: '2024-01-12T14:25:00Z'
   },
   {
-    _id: '10',
+    _id: '68d4f8124a93188f872bfcac',
     name: 'Luxury Perfume Collection',
     brand: 'Chanel',
     price: 12999,
@@ -1230,7 +1230,7 @@ export const mockProducts: Product[] = [
     updatedAt: '2024-01-11T16:45:00Z'
   },
   {
-    _id: '11',
+    _id: '68d4f81292fd3e38ac2240b2',
     name: 'Designer Sunglasses',
     brand: 'Ray-Ban',
     price: 8999,
@@ -1344,7 +1344,7 @@ export const mockProducts: Product[] = [
     updatedAt: '2024-01-10T11:35:00Z'
   },
   {
-    _id: '12',
+    _id: '68d4f812c4123a585b18d062',
     name: 'Luxury Watch Collection',
     brand: 'Rolex',
     price: 49999,

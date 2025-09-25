@@ -1,25 +1,7 @@
 // API service for easy backend integration
 // This file contains all the API calls that will be used to fetch data from MongoDB
 
-// API Configuration with fallbacks
-const getApiBaseUrl = () => {
-  if (process.env.EXPO_PUBLIC_API_URL) {
-    return process.env.EXPO_PUBLIC_API_URL;
-  }
-  
-  // Try different IP addresses based on the environment
-  const possibleUrls = [
-    'http://10.84.92.165:5000/api',  // Current system IP (Wi-Fi)
-    'http://192.168.56.1:5000/api',  // Ethernet adapter IP
-    'http://172.27.35.178:5000/api', // Previous IP (fallback)
-    'http://172.20.10.2:5000/api',   // Common mobile network IP
-    'http://192.168.1.100:5000/api', // Alternative local network IP
-    'http://10.0.2.2:5000/api',      // Android emulator localhost
-    'http://localhost:5000/api',      // Web/local development
-  ];
-  
-  return possibleUrls[0]; // Default to the first one
-};
+import { getApiBaseUrl } from '../utils/networkUtils';
 
 const API_BASE_URL = getApiBaseUrl();
 
@@ -41,11 +23,18 @@ async function apiCall<T>(endpoint: string, options: RequestInit = {}): Promise<
 
   console.log(`🌐 Making API call to: ${url}`);
   console.log(`🔑 Token present: ${!!token}`);
+  console.log(`📋 Request options:`, {
+    method: defaultOptions.method || 'GET',
+    headers: defaultOptions.headers,
+    body: defaultOptions.body ? 'Present' : 'None'
+  });
 
   try {
+    console.log(`⏳ Sending request...`);
     const response = await fetch(url, defaultOptions);
     
     console.log(`📡 Response status: ${response.status}`);
+    console.log(`📡 Response headers:`, Object.fromEntries(response.headers.entries()));
     
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));

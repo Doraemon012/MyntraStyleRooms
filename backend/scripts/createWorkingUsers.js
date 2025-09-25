@@ -1,30 +1,137 @@
 const mongoose = require('mongoose');
+const bcrypt = require('bcryptjs');
+const User = require('../models/User');
+const Room = require('../models/Room');
 const Wardrobe = require('../models/Wardrobe');
 const WardrobeItem = require('../models/WardrobeItem');
-const User = require('../models/User');
 const Product = require('../models/Product');
-const Room = require('../models/Room');
 require('dotenv').config();
 
-// Sample data
+// Sample data with real password hashes
 const sampleUsers = [
   {
     name: 'Priya Sharma',
     email: 'priya@example.com',
-    password: '$2b$10$example.hash.here', // This would be hashed in real scenario
+    password: 'password123', // Will be hashed
     profileImage: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face'
   },
   {
     name: 'Richa Patel',
     email: 'richa@example.com',
-    password: '$2b$10$example.hash.here',
+    password: 'password123', // Will be hashed
     profileImage: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face'
   },
   {
     name: 'Neyati Singh',
     email: 'neyati@example.com',
-    password: '$2b$10$example.hash.here',
+    password: 'password123', // Will be hashed
     profileImage: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150&h=150&fit=crop&crop=face'
+  }
+];
+
+const sampleRooms = [
+  {
+    name: 'Fashion Forward',
+    description: 'A trendy room for fashion enthusiasts',
+    isPrivate: false,
+    settings: {
+      allowMemberInvites: true,
+      aiSuggestionsEnabled: true,
+      autoOutfitGeneration: false
+    },
+    tags: ['fashion', 'trendy', 'style']
+  },
+  {
+    name: 'Wedding Collection',
+    description: 'Elegant pieces for special occasions',
+    isPrivate: false,
+    settings: {
+      allowMemberInvites: true,
+      aiSuggestionsEnabled: true,
+      autoOutfitGeneration: true
+    },
+    tags: ['wedding', 'elegant', 'formal']
+  },
+  {
+    name: 'Casual Vibes',
+    description: 'Comfortable everyday wear',
+    isPrivate: false,
+    settings: {
+      allowMemberInvites: true,
+      aiSuggestionsEnabled: true,
+      autoOutfitGeneration: false
+    },
+    tags: ['casual', 'comfortable', 'everyday']
+  },
+  {
+    name: 'Office Professional',
+    description: 'Professional attire for work',
+    isPrivate: true,
+    settings: {
+      allowMemberInvites: true,
+      aiSuggestionsEnabled: true,
+      autoOutfitGeneration: false
+    },
+    tags: ['professional', 'office', 'work']
+  }
+];
+
+const sampleWardrobes = [
+  {
+    name: 'Family Wedding Collection',
+    emoji: '👰',
+    description: 'Beautiful collection for family wedding celebrations',
+    occasionType: 'Wedding & Celebrations',
+    budgetRange: { min: 1000, max: 10000 },
+    isPrivate: false,
+    settings: {
+      allowMemberInvites: true,
+      aiSuggestionsEnabled: true,
+      autoOutfitGeneration: false
+    },
+    tags: ['wedding', 'family', 'celebration']
+  },
+  {
+    name: 'Office Professional',
+    emoji: '💼',
+    description: 'Professional attire for office and meetings',
+    occasionType: 'Office & Professional',
+    budgetRange: { min: 500, max: 5000 },
+    isPrivate: false,
+    settings: {
+      allowMemberInvites: true,
+      aiSuggestionsEnabled: true,
+      autoOutfitGeneration: false
+    },
+    tags: ['office', 'professional', 'work']
+  },
+  {
+    name: 'Casual Weekend',
+    emoji: '👕',
+    description: 'Comfortable casual wear for weekends',
+    occasionType: 'Casual & Weekend',
+    budgetRange: { min: 300, max: 3000 },
+    isPrivate: false,
+    settings: {
+      allowMemberInvites: true,
+      aiSuggestionsEnabled: true,
+      autoOutfitGeneration: false
+    },
+    tags: ['casual', 'weekend', 'comfortable']
+  },
+  {
+    name: 'Party Night Out',
+    emoji: '🎉',
+    description: 'Glamorous outfits for parties and night outs',
+    occasionType: 'Party & Nightlife',
+    budgetRange: { min: 800, max: 8000 },
+    isPrivate: true,
+    settings: {
+      allowMemberInvites: true,
+      aiSuggestionsEnabled: true,
+      autoOutfitGeneration: true
+    },
+    tags: ['party', 'night', 'glamorous']
   }
 ];
 
@@ -109,66 +216,7 @@ const sampleProducts = [
   }
 ];
 
-const sampleWardrobes = [
-  {
-    name: 'Family Wedding Collection',
-    emoji: '👰',
-    description: 'Beautiful collection for family wedding celebrations',
-    occasionType: 'Wedding & Celebrations',
-    budgetRange: { min: 1000, max: 10000 },
-    isPrivate: false,
-    settings: {
-      allowMemberInvites: true,
-      aiSuggestionsEnabled: true,
-      autoOutfitGeneration: false
-    },
-    tags: ['wedding', 'family', 'celebration']
-  },
-  {
-    name: 'Office Professional',
-    emoji: '💼',
-    description: 'Professional attire for office and meetings',
-    occasionType: 'Office & Professional',
-    budgetRange: { min: 500, max: 5000 },
-    isPrivate: false,
-    settings: {
-      allowMemberInvites: true,
-      aiSuggestionsEnabled: true,
-      autoOutfitGeneration: false
-    },
-    tags: ['office', 'professional', 'work']
-  },
-  {
-    name: 'Casual Weekend',
-    emoji: '👕',
-    description: 'Comfortable casual wear for weekends',
-    occasionType: 'Casual & Weekend',
-    budgetRange: { min: 300, max: 3000 },
-    isPrivate: false,
-    settings: {
-      allowMemberInvites: true,
-      aiSuggestionsEnabled: true,
-      autoOutfitGeneration: false
-    },
-    tags: ['casual', 'weekend', 'comfortable']
-  },
-  {
-    name: 'Party Night Out',
-    emoji: '🎉',
-    description: 'Glamorous outfits for parties and night outs',
-    occasionType: 'Party & Nightlife',
-    budgetRange: { min: 800, max: 8000 },
-    isPrivate: true,
-    settings: {
-      allowMemberInvites: true,
-      aiSuggestionsEnabled: true,
-      autoOutfitGeneration: true
-    },
-    tags: ['party', 'night', 'glamorous']
-  }
-];
-
-async function seedDatabase() {
+async function createWorkingUsers() {
   try {
     // Connect to MongoDB
     const mongoUri = process.env.MONGODB_URI;
@@ -184,18 +232,25 @@ async function seedDatabase() {
     console.log('✅ Connected to MongoDB');
 
     // Clear existing data
-    await Wardrobe.deleteMany({});
     await WardrobeItem.deleteMany({});
-    console.log('🗑️ Cleared existing wardrobe data');
+    await Wardrobe.deleteMany({});
+    await Room.deleteMany({});
+    await User.deleteMany({});
+    await Product.deleteMany({});
+    console.log('🗑️ Cleared existing data');
 
-    // Create users
+    // Create users with real password hashes
     const users = [];
     for (const userData of sampleUsers) {
-      const user = new User(userData);
+      const hashedPassword = await bcrypt.hash(userData.password, 10);
+      const user = new User({
+        ...userData,
+        password: hashedPassword
+      });
       await user.save();
       users.push(user);
+      console.log(`👤 Created user: ${user.name} (${user.email}) with password: ${userData.password}`);
     }
-    console.log('👥 Created sample users');
 
     // Create products
     const products = [];
@@ -206,25 +261,15 @@ async function seedDatabase() {
     }
     console.log('🛍️ Created sample products');
 
-    // Get existing rooms
-    const rooms = await Room.find({});
-    if (rooms.length === 0) {
-      console.log('❌ No rooms found. Please run seedRooms.js first to create rooms.');
-      return;
-    }
-    console.log(`🏠 Found ${rooms.length} rooms`);
-
-    // Create wardrobes
-    const wardrobes = [];
-    for (let i = 0; i < sampleWardrobes.length; i++) {
-      const wardrobeData = sampleWardrobes[i];
-      const owner = users[i % users.length]; // Distribute ownership
-      const room = rooms[i % rooms.length]; // Distribute across rooms
+    // Create rooms
+    const rooms = [];
+    for (let i = 0; i < sampleRooms.length; i++) {
+      const roomData = sampleRooms[i];
+      const owner = users[i % users.length];
       
-      const wardrobe = new Wardrobe({
-        ...wardrobeData,
+      const room = new Room({
+        ...roomData,
         owner: owner._id,
-        roomId: room._id, // Associate with specific room
         members: [
           {
             userId: owner._id,
@@ -234,7 +279,43 @@ async function seedDatabase() {
         ]
       });
 
-      // Add other users as members with different roles
+      // Add other users as members
+      const otherUsers = users.filter(u => u._id.toString() !== owner._id.toString());
+      for (let j = 0; j < Math.min(otherUsers.length, 3); j++) {
+        const role = j === 0 ? 'Editor' : j === 1 ? 'Contributor' : 'Viewer';
+        room.members.push({
+          userId: otherUsers[j]._id,
+          role: role,
+          joinedAt: new Date()
+        });
+      }
+
+      await room.save();
+      rooms.push(room);
+      console.log(`🏠 Created room: ${room.name}`);
+    }
+
+    // Create wardrobes with room associations
+    const wardrobes = [];
+    for (let i = 0; i < sampleWardrobes.length; i++) {
+      const wardrobeData = sampleWardrobes[i];
+      const owner = users[i % users.length];
+      const room = rooms[i % rooms.length];
+      
+      const wardrobe = new Wardrobe({
+        ...wardrobeData,
+        owner: owner._id,
+        roomId: room._id,
+        members: [
+          {
+            userId: owner._id,
+            role: 'Owner',
+            joinedAt: new Date()
+          }
+        ]
+      });
+
+      // Add other users as members
       const otherUsers = users.filter(u => u._id.toString() !== owner._id.toString());
       for (let j = 0; j < otherUsers.length; j++) {
         const role = j === 0 ? 'Editor' : j === 1 ? 'Contributor' : 'Viewer';
@@ -247,14 +328,13 @@ async function seedDatabase() {
 
       await wardrobe.save();
       wardrobes.push(wardrobe);
-      console.log(`👗 Created wardrobe "${wardrobe.name}" in room "${room.name}"`);
+      console.log(`👗 Created wardrobe: ${wardrobe.name} in room: ${room.name}`);
     }
-    console.log('👗 Created sample wardrobes');
 
     // Add items to wardrobes
     for (let i = 0; i < wardrobes.length; i++) {
       const wardrobe = wardrobes[i];
-      const productsToAdd = products.slice(i * 2, (i + 1) * 2); // 2 products per wardrobe
+      const productsToAdd = products.slice(i * 2, (i + 1) * 2);
       
       for (const product of productsToAdd) {
         const wardrobeItem = new WardrobeItem({
@@ -277,27 +357,41 @@ async function seedDatabase() {
     }
     console.log('📦 Added items to wardrobes');
 
-    // Update wardrobe item counts
+    // Update counts
     for (const wardrobe of wardrobes) {
       const itemCount = await WardrobeItem.countDocuments({ wardrobeId: wardrobe._id });
       wardrobe.itemCount = itemCount;
       await wardrobe.save();
     }
-    console.log('📊 Updated wardrobe item counts');
 
-    console.log('\n🎉 Database seeding completed successfully!');
-    console.log(`Created ${users.length} users`);
-    console.log(`Created ${products.length} products`);
-    console.log(`Created ${wardrobes.length} wardrobes`);
-    console.log(`Added items to wardrobes`);
+    for (const room of rooms) {
+      room.memberCount = room.members.length;
+      await room.save();
+    }
+
+    console.log('\n🎉 Database setup completed successfully!');
+    console.log('\n🔑 LOGIN CREDENTIALS:');
+    console.log('Email: priya@example.com | Password: password123');
+    console.log('Email: richa@example.com | Password: password123');
+    console.log('Email: neyati@example.com | Password: password123');
+
+    console.log('\n📋 Room-Wardrobe Associations:');
+    for (const room of rooms) {
+      const roomWardrobes = wardrobes.filter(w => w.roomId.toString() === room._id.toString());
+      console.log(`\n🏠 ${room.name}:`);
+      roomWardrobes.forEach(w => {
+        console.log(`  👗 ${w.name} (${w.occasionType})`);
+      });
+    }
 
   } catch (error) {
-    console.error('❌ Error seeding database:', error);
+    console.error('❌ Error setting up database:', error);
   } finally {
     await mongoose.disconnect();
     console.log('🔌 Disconnected from MongoDB');
   }
 }
 
-// Run the seeding function
-seedDatabase();
+// Run the setup function
+createWorkingUsers();
+

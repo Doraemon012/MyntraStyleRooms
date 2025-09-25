@@ -4,16 +4,16 @@ import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  Animated,
-  Dimensions,
-  FlatList,
-  Modal,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View
+    Animated,
+    Dimensions,
+    FlatList,
+    Modal,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AttendeeSessionHeader from '../components/session/AttendeeSessionHeader';
@@ -25,11 +25,11 @@ import { getActiveBanners } from '../data/banners';
 import { Category, mockCategories } from '../data/categories';
 import { getActivePlayMenuItems } from '../data/playMenuItems';
 import {
-  getProductsByCategory,
-  getTrendingProducts,
-  mockProducts,
-  Product,
-  searchProducts
+    getProductsByCategory,
+    getTrendingProducts,
+    mockProducts,
+    Product,
+    searchProducts
 } from '../data/products';
 
 const { width: screenWidth } = Dimensions.get('window');
@@ -38,6 +38,7 @@ const { width: screenWidth } = Dimensions.get('window');
 const banners = getActiveBanners();
 const playMenuItems = getActivePlayMenuItems();
 const categories = mockCategories;
+
 
 export default function CatalogScreen() {
   const { isInSession, isHost, sessionParticipants, presenterName, isMuted, toggleMute, endSession, sessionRoomId } = useSession();
@@ -48,6 +49,7 @@ export default function CatalogScreen() {
   const [currentBannerIndex, setCurrentBannerIndex] = useState(0);
   const bannerScrollRef = useRef<ScrollView>(null);
   const [showPlayMenu, setShowPlayMenu] = useState(false);
+  
   const playButtonScale = useRef(new Animated.Value(1)).current;
   const menuOpacity = useRef(new Animated.Value(0)).current;
   const menuScale = useRef(new Animated.Value(0.8)).current;
@@ -67,6 +69,7 @@ export default function CatalogScreen() {
 
     return () => clearInterval(interval);
   }, []);
+
 
   // Animate play button and menu
   useEffect(() => {
@@ -200,6 +203,7 @@ export default function CatalogScreen() {
     </TouchableOpacity>
   );
 
+
   return (
     <View style={styles.container}>
       <SafeAreaView style={styles.container}>
@@ -292,6 +296,7 @@ export default function CatalogScreen() {
               contentContainerStyle={styles.categoriesList}
             />
           </View>
+
 
           {/* Promotional Banner 1 - GST Savings */}
           <View style={styles.promoBanner1}>

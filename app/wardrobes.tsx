@@ -1,12 +1,13 @@
 import { ThemedView } from "@/components/themed-view";
 import { useSession } from "@/contexts/session-context";
 import { roomAPI } from "@/services/api";
-import { Wardrobe, wardrobeApi } from "@/services/wardrobeApi";
+import { WardrobeItem as ApiWardrobeItem, Wardrobe, wardrobeApi } from "@/services/wardrobeApi";
+import { getDefaultImageProps, getProductImageUri } from "@/utils/imageUtils";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from "expo-linear-gradient";
-import { router } from "expo-router";
-import React, { useCallback, useEffect, useState } from "react";
+import { router, useLocalSearchParams } from "expo-router";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
     ActivityIndicator,
     Alert,
@@ -14,115 +15,47 @@ import {
     Image,
     StyleSheet,
     Text,
+    TextInput,
     TouchableOpacity,
     View
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-interface WardrobeCategory {
-    id: string;
-    name: string;
-    subtitle: string;
-    role: string;
-    items: WardrobeItem[];
-}
-
 interface WardrobeItem {
-    id: string;
-    image: string;
+    _id: string;
+    productId: {
+        _id: string;
+        name: string;
+        price: number;
+        images?: Array<{ url: string }>;
+        image?: string;
+        brand: string;
+        category?: string;
+        description?: string;
+    } | null;
+    addedBy: string;
+    notes: string;
+    priority: string;
+    reactions: Array<{
+        userId: string;
+        type: string;
+        createdAt: string;
+    }>;
 }
-
-const wardrobeCategories: WardrobeCategory[] = [
-    {
-        id: "1",
-        name: "Striped Crop Shirt",
-        subtitle: "AI Powered",
-        role: "Editor",
-        items: [
-            {
-                id: "1",
-                image: "https://images.unsplash.com/photo-1594633313593-bab3825d0caf?w=150&h=200&fit=crop",
-            },
-            {
-                id: "2",
-                image: "https://images.unsplash.com/photo-1515372039744-b8f02a3ae446?w=150&h=200&fit=crop",
-            },
-            {
-                id: "3",
-                image: "https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=150&h=200&fit=crop",
-            },
-            {
-                id: "4",
-                image: "https://images.unsplash.com/photo-1586790170083-2f9ceadc732d?w=150&h=200&fit=crop",
-            },
-            {
-                id: "5",
-                image: "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?w=150&h=200&fit=crop",
-            },
-        ],
-    },
-    {
-        id: "2",
-        name: "Modern Kurtis",
-        subtitle: "AI Powered",
-        role: "Editor",
-        items: [
-            {
-                id: "6",
-                image: "https://images.unsplash.com/photo-1594633312681-425c7b97ccd1?w=150&h=200&fit=crop",
-            },
-            {
-                id: "7",
-                image: "https://images.unsplash.com/photo-1583391733956-6c78276477e2?w=150&h=200&fit=crop",
-            },
-            {
-                id: "8",
-                image: "https://images.unsplash.com/photo-1596755094514-f87e34085b2c?w=150&h=200&fit=crop",
-            },
-        ],
-    },
-    {
-        id: "3",
-        name: "Daytime Looks",
-        subtitle: "AI Powered",
-        role: "Viewer",
-        items: [
-            {
-                id: "9",
-                image: "https://images.unsplash.com/photo-1516726817505-f5ed825624d8?w=300&h=200&fit=crop",
-            },
-            {
-                id: "10",
-                image: "https://images.unsplash.com/photo-1485968579580-b6d095142e6e?w=150&h=200&fit=crop",
-            },
-        ],
-    },
-];
 
 export default function WardrobesScreen() {
     const { sessionRoomId } = useSession();
+    const { roomId } = useLocalSearchParams();
     const [searchQuery, setSearchQuery] = useState("");
     const [wardrobes, setWardrobes] = useState<Wardrobe[]>([]);
     const [loading, setLoading] = useState(true);
     const [roomName, setRoomName] = useState("Wardrobes");
-    const [wardrobeItems, setWardrobeItems] = useState<{[key: string]: any[]}>({});
-
-    useEffect(() => {
-        loadWardrobes();
-        if (sessionRoomId) {
-            loadRoomName();
-        } else {
-            // If no session room ID, try to get the first available room
-            loadDefaultRoom();
-        }
-    }, [sessionRoomId]);
-
-    // Add focus listener to refresh wardrobes when screen comes into focus
-    useFocusEffect(
-        useCallback(() => {
-            loadWardrobes();
-        }, [])
-    );
+    const [wardrobeItems, setWardrobeItems] = useState<{[key: string]: ApiWardrobeItem[]}>({});
+    
+    // Use roomId from params or sessionRoomId as fallback
+    const currentRoomId = useMemo(() => {
+        return (roomId as string) || sessionRoomId;
+    }, [roomId, sessionRoomId]);
 
     const loadDefaultRoom = async () => {
         try {
@@ -132,12 +65,9 @@ export default function WardrobesScreen() {
                 return;
             }
 
-            // Get the first available room
             const response = await roomAPI.getAll({ limit: 1 });
-            if (response.status === 'success' && response.data && response.data.rooms.length > 0) {
-                const room = response.data.rooms[0];
-                setRoomName(room.name);
-                console.log('Using default room:', room.name);
+            if (response.status === 'success' && response.data.rooms.length > 0) {
+                setRoomName(response.data.rooms[0].name);
             } else {
                 setRoomName("Wardrobes");
             }
@@ -148,11 +78,11 @@ export default function WardrobesScreen() {
     };
 
     const loadRoomName = async () => {
-        if (!sessionRoomId) {
+        if (!currentRoomId) {
             setRoomName("Wardrobes");
             return;
         }
-        
+
         try {
             const token = await AsyncStorage.getItem('auth_token');
             if (!token) {
@@ -160,13 +90,11 @@ export default function WardrobesScreen() {
                 return;
             }
 
-            console.log('Loading room name for room ID:', sessionRoomId);
-            const response = await roomAPI.getById(sessionRoomId);
-            console.log('Room API response:', response);
-            
+            const response = await roomAPI.getById(currentRoomId);
             if (response.status === 'success' && response.data) {
                 setRoomName(response.data.room.name);
             } else {
+                console.log('Room not found, using default name');
                 setRoomName("Wardrobes");
             }
         } catch (error) {
@@ -185,8 +113,10 @@ export default function WardrobesScreen() {
                 return;
             }
 
+            // Fetch wardrobes - filter by room if roomId is available, otherwise get all
             const response = await wardrobeApi.getWardrobes(token, {
-                limit: 50
+                limit: 50,
+                ...(currentRoomId && { roomId: currentRoomId })
             });
             if (response.status === 'success' && response.data) {
                 const wardrobesData = response.data.wardrobes;
@@ -195,7 +125,7 @@ export default function WardrobesScreen() {
                 // Load items for each wardrobe
                 const itemsPromises = wardrobesData.map(async (wardrobe) => {
                     try {
-                        const itemsResponse = await wardrobeApi.getWardrobeItems(token, wardrobe._id, { limit: 5 });
+                        const itemsResponse = await wardrobeApi.getWardrobeItems(token, wardrobe._id, { limit: 10 });
                         if (itemsResponse.status === 'success' && itemsResponse.data) {
                             return { wardrobeId: wardrobe._id, items: itemsResponse.data.items };
                         }
@@ -206,7 +136,7 @@ export default function WardrobesScreen() {
                 });
                 
                 const itemsResults = await Promise.all(itemsPromises);
-                const itemsMap: {[key: string]: any[]} = {};
+                const itemsMap: {[key: string]: ApiWardrobeItem[]} = {};
                 itemsResults.forEach(result => {
                     itemsMap[result.wardrobeId] = result.items;
                 });
@@ -220,43 +150,88 @@ export default function WardrobesScreen() {
         }
     };
 
-    const renderWardrobeItem = ({ item }: { item: WardrobeItem }) => (
-        <TouchableOpacity 
-            style={styles.wardrobeItemImage}
-            onPress={() => {
-                if (item.wardrobeId) {
-                    router.push(`/wardrobe/${item.wardrobeId}`);
-                } else {
-                    console.warn('No wardrobe ID found for item:', item);
-                }
-            }}
-        >
-            {item.image ? (
-                <Image 
-                    source={{ uri: item.image }} 
-                    style={styles.wardrobeItemImageContent}
-                    resizeMode="cover"
-                />
-            ) : (
-                <Text style={styles.wardrobeItemText}>{item.emoji || '👗'}</Text>
-            )}
-        </TouchableOpacity>
+    // Memoize the load functions to prevent unnecessary re-renders
+    const loadWardrobesCallback = useCallback(() => {
+        loadWardrobes();
+    }, [currentRoomId]);
+
+    const loadRoomNameCallback = useCallback(() => {
+        if (currentRoomId) {
+            loadRoomName();
+        } else {
+            console.log('No roomId available, loading default room');
+            loadDefaultRoom();
+        }
+    }, [currentRoomId]);
+
+    // Always call hooks in the same order
+    useEffect(() => {
+        loadWardrobesCallback();
+    }, [loadWardrobesCallback]);
+
+    useEffect(() => {
+        loadRoomNameCallback();
+    }, [loadRoomNameCallback]);
+
+    useFocusEffect(
+        useCallback(() => {
+            loadWardrobesCallback();
+        }, [loadWardrobesCallback])
     );
 
-    const handleViewAll = (categoryId: string, categoryName: string) => {
-        // Navigate to the wardrobe detail page
-        if (categoryId) {
-            router.push(`/wardrobe/${categoryId}`);
-        } else {
-            console.warn('No category ID found for:', categoryName);
+    const renderWardrobeItem = ({ item }: { item: ApiWardrobeItem }) => {
+        // Handle null productId
+        if (!item.productId) {
+            return (
+                <TouchableOpacity 
+                    style={styles.wardrobeItemImage}
+                    onPress={() => {
+                        // Don't navigate if no product
+                    }}
+                >
+                    <Image 
+                        source={{ uri: 'https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=400&h=500&fit=crop' }} 
+                        style={styles.wardrobeItemImageContent}
+                        resizeMode="cover"
+                    />
+                    <View style={styles.itemPriceContainer}>
+                        <Text style={styles.itemPrice}>₹0</Text>
+                    </View>
+                </TouchableOpacity>
+            );
         }
+
+        return (
+            <TouchableOpacity 
+                style={styles.wardrobeItemImage}
+                onPress={() => {
+                    router.push(`/product/${item.productId._id}`);
+                }}
+            >
+                <Image 
+                    source={{ uri: getProductImageUri(item.productId) }} 
+                    style={styles.wardrobeItemImageContent}
+                    resizeMode="cover"
+                    {...getDefaultImageProps()}
+                />
+                <View style={styles.itemPriceContainer}>
+                    <Text style={styles.itemPrice}>₹{item.productId.price || 0}</Text>
+                </View>
+            </TouchableOpacity>
+        );
     };
 
-    const renderWardrobeCategory = ({ item, index }: { item: WardrobeCategory; index: number }) => {
+    const handleViewAll = (wardrobeId: string, wardrobeName: string) => {
+        router.push(`/wardrobe/${wardrobeId}`);
+    };
+
+    const renderWardrobeCategory = ({ item, index }: { item: Wardrobe; index: number }) => {
         const isEven = index % 2 === 0;
         const gradientColors = isEven 
             ? ['#F3F1FE', '#FFFFFF'] as const // Purple to white
             : ['#FFEEEC', '#FFFFFF'] as const; // Pink to white
+        
+        const wardrobeItemsList = wardrobeItems[item._id] || [];
         
         return (
             <LinearGradient
@@ -266,23 +241,23 @@ export default function WardrobesScreen() {
                 end={{ x: 0, y: 1 }}
             >
                 <View style={styles.roleBadge}>
-                    <Text style={styles.roleText}>{item.role}</Text>
+                    <Text style={styles.roleText}>Owner</Text>
                 </View>
                 
                 <View style={styles.categoryHeader}>
                     <View style={styles.categoryInfo}>
-                        <Text style={styles.categoryName}>{item.name}</Text>
+                        <Text style={styles.categoryName}>{item.emoji} {item.name}</Text>
                         <View style={styles.subtitleContainer}>
                             <View style={styles.aiIcon} />
-                            <Text style={styles.categorySubtitle}>{item.subtitle}</Text>
+                            <Text style={styles.categorySubtitle}>{item.occasionType}</Text>
                         </View>
                     </View>
                 </View>
 
                 <FlatList
-                    data={item.items}
+                    data={wardrobeItemsList}
                     renderItem={renderWardrobeItem}
-                    keyExtractor={(wardrobeItem) => wardrobeItem.id}
+                    keyExtractor={(wardrobeItem) => wardrobeItem._id}
                     horizontal
                     showsHorizontalScrollIndicator={false}
                     contentContainerStyle={styles.itemsList}
@@ -291,9 +266,9 @@ export default function WardrobesScreen() {
 
                 <TouchableOpacity
                     style={styles.viewAllButton}
-                    onPress={() => handleViewAll(item.id, item.name)}
+                    onPress={() => handleViewAll(item._id, item.name)}
                 >
-                    <Text style={styles.viewAllText}>View all</Text>
+                    <Text style={styles.viewAllText}>View all ({wardrobeItemsList.length})</Text>
                     <Text style={styles.viewAllArrow}>›</Text>
                 </TouchableOpacity>
             </LinearGradient>
@@ -322,50 +297,71 @@ export default function WardrobesScreen() {
                     </TouchableOpacity>
                     
                     <View style={styles.headerCenter}>
-                        <Text style={styles.title}>Wardrobes</Text>
-                        <Text style={styles.subtitle}>{roomName}</Text>
+                        <Text style={styles.headerTitle}>{roomName}</Text>
+                        <Text style={styles.headerSubtitle}>
+                            {currentRoomId ? 'Wardrobes' : 'All Wardrobes'}
+                        </Text>
                     </View>
                     
-                    <TouchableOpacity
-                        style={styles.createButton}
-                        onPress={() => router.push("/wardrobe/create")}
+                    <TouchableOpacity 
+                        style={styles.addButton}
+                        onPress={() => {
+                            if (currentRoomId) {
+                                router.push(`/wardrobe/create?roomId=${currentRoomId}`);
+                            } else {
+                                Alert.alert(
+                                    'Select Room', 
+                                    'Please select a room first to create a wardrobe. Wardrobes are organized by rooms.',
+                                    [
+                                        { text: 'OK', style: 'default' }
+                                    ]
+                                );
+                            }
+                        }}
                     >
-                        <Text style={styles.createButtonText}>+ Create</Text>
+                        <Text style={styles.addButtonText}>+</Text>
                     </TouchableOpacity>
                 </View>
 
-                {wardrobes.length === 0 ? (
-                    <View style={styles.emptyContainer}>
-                        <Text style={styles.emptyText}>No wardrobes found</Text>
+                <View style={styles.searchContainer}>
+                    <View style={styles.searchInputContainer}>
+                        <Text style={styles.searchIcon}>🔍</Text>
+                        <TextInput
+                            style={styles.searchInput}
+                            placeholder="Search wardrobes..."
+                            placeholderTextColor="#999"
+                            value={searchQuery}
+                            onChangeText={setSearchQuery}
+                        />
                     </View>
-                ) : (
-                    <FlatList
-                        data={wardrobes.map(wardrobe => {
-                            const items = wardrobeItems[wardrobe._id] || [];
-                            return {
-                                id: wardrobe._id,
-                                name: wardrobe.name,
-                                subtitle: "AI Powered",
-                                role: "Editor", // You can determine this based on user permissions
-                                items: items.length > 0 ? items.slice(0, 5).map((item, index) => ({
-                                    id: `${wardrobe._id}-${index}`,
-                                    wardrobeId: wardrobe._id,
-                                    emoji: wardrobe.emoji,
-                                    image: item.productId?.images?.[0]?.url || "https://images.unsplash.com/photo-1594633313593-bab3825d0caf?w=150&h=200&fit=crop"
-                                })) : Array.from({ length: Math.min(wardrobe.itemCount, 5) }, (_, index) => ({
-                                    id: `${wardrobe._id}-${index}`,
-                                    wardrobeId: wardrobe._id,
-                                    emoji: wardrobe.emoji,
-                                    image: "https://images.unsplash.com/photo-1594633313593-bab3825d0caf?w=150&h=200&fit=crop"
-                                }))
-                            };
-                        })}
-                        renderItem={renderWardrobeCategory}
-                        keyExtractor={(item) => item.id}
-                        showsVerticalScrollIndicator={false}
-                        contentContainerStyle={styles.categoriesList}
-                    />
-                )}
+                </View>
+
+                <FlatList
+                    data={wardrobes}
+                    renderItem={renderWardrobeCategory}
+                    keyExtractor={(wardrobe) => wardrobe._id}
+                    showsVerticalScrollIndicator={false}
+                    contentContainerStyle={styles.categoriesList}
+                    ListEmptyComponent={
+                        !currentRoomId ? (
+                            <View style={styles.noRoomContainer}>
+                                <Text style={styles.noRoomIcon}>🏠</Text>
+                                <Text style={styles.noRoomTitle}>All Wardrobes</Text>
+                                <Text style={styles.noRoomMessage}>
+                                    Showing all wardrobes. Select a room to filter by room.
+                                </Text>
+                            </View>
+                        ) : wardrobes.length === 0 ? (
+                            <View style={styles.noRoomContainer}>
+                                <Text style={styles.noRoomIcon}>👗</Text>
+                                <Text style={styles.noRoomTitle}>No Wardrobes</Text>
+                                <Text style={styles.noRoomMessage}>
+                                    No wardrobes found for this room. Create one to get started!
+                                </Text>
+                            </View>
+                        ) : null
+                    }
+                />
             </SafeAreaView>
         </ThemedView>
     );
@@ -378,159 +374,6 @@ const styles = StyleSheet.create({
     safeArea: {
         flex: 1,
     },
-    header: {
-        flexDirection: "row",
-        justifyContent: "space-between",
-        alignItems: "center",
-        paddingHorizontal: 20,
-        paddingVertical: 16,
-        backgroundColor: "white",
-    },
-    backButtonContainer: {
-        width: 40,
-        alignItems: "flex-start",
-    },
-    backButton: {
-        fontSize: 24,
-        color: "#666",
-        fontWeight: "300",
-    },
-    headerCenter: {
-        flex: 1,
-        alignItems: "center",
-    },
-    title: {
-        fontSize: 16,
-        fontWeight: "400",
-        color: "#000",
-        textAlign: "center",
-    },
-    subtitle: {
-        fontSize: 10,
-        color: "#666",
-        textAlign: "center",
-    },
-    createButton: {
-        backgroundColor: "transparent",
-        paddingHorizontal: 16,
-        paddingVertical: 8,
-        borderRadius: 20,
-        borderWidth: 1,
-        borderColor: "#FF69B4",
-        minWidth: 80,
-        alignItems: "center",
-        justifyContent: "center",
-    },
-    createButtonText: {
-        color: "#FF69B4",
-        fontSize: 12,
-        fontWeight: "600",
-    },
-    categoriesList: {
-        paddingVertical: 16,
-    },
-    categoryContainer: {
-        marginBottom: 24,
-        paddingTop: 12,
-        paddingHorizontal: 16,
-        paddingBottom: 0,
-    },
-    categoryHeader: {
-        marginBottom: 8,
-    },
-    horizontalList: {
-        marginHorizontal: -16,
-        marginBottom: 0,
-    },
-    itemsList: {
-        paddingHorizontal: 16,
-        gap: 12,
-    },
-    wardrobeItemImage: {
-        width: 160,
-        height: 140,
-        borderRadius: 12,
-        marginRight: 12,
-        backgroundColor: "#f0f0f0",
-        justifyContent: 'center',
-        alignItems: 'center',
-        overflow: 'hidden',
-    },
-    wardrobeItemImageContent: {
-        width: '100%',
-        height: '100%',
-    },
-    wardrobeItemText: {
-        fontSize: 48,
-        textAlign: 'center',
-    },
-    categoryFooter: {
-        flexDirection: "row",
-        justifyContent: "space-between",
-        alignItems: "flex-start",
-    },
-    categoryInfo: {
-        flex: 1,
-    },
-    categoryName: {
-        fontSize: 14,
-        fontWeight: "600",
-        color: "#000",
-    },
-    subtitleContainer: {
-        flexDirection: "row",
-        alignItems: "center",
-    },
-    aiIcon: {
-        width: 6,
-        height: 6,
-        borderRadius: 3,
-        backgroundColor: "#FF69B4",
-        marginRight: 6,
-    },
-    categorySubtitle: {
-        fontSize: 12,
-        color: "#666",
-    },
-    roleBadge: {
-        position: "absolute",
-        top: 12,
-        right: 16,
-        backgroundColor: "rgba(0, 0, 0, 0.6)",
-        paddingHorizontal: 8,
-        paddingVertical: 4,
-        borderRadius: 12,
-        zIndex: 10,
-    },
-    roleText: {
-        fontSize: 10,
-        color: "#CCCCCC",
-        fontWeight: "500",
-    },
-    viewAllButton: {
-        flexDirection: "row",
-        alignItems: "center",
-        justifyContent: "center",
-        paddingVertical: 8,
-        marginTop: 16,
-        marginHorizontal: 16,
-        marginBottom: 16,
-        backgroundColor: "#F5F5F5",
-        borderRadius: 12,
-        alignSelf: "center",
-        minWidth: 380,
-    },
-    viewAllText: {
-        fontSize: 14,
-        color: "#333",
-        fontWeight: "500",
-        marginRight: 6,
-    },
-    viewAllArrow: {
-        fontSize: 14,
-        color: "#333",
-        fontWeight: "500",
-    },
     loadingContainer: {
         flex: 1,
         justifyContent: 'center',
@@ -541,63 +384,217 @@ const styles = StyleSheet.create({
         fontSize: 16,
         color: '#666',
     },
-    emptyContainer: {
+    header: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 20,
+        paddingVertical: 16,
+        borderBottomWidth: 1,
+        borderBottomColor: '#f0f0f0',
+    },
+    backButtonContainer: {
+        width: 40,
+        height: 40,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    backButton: {
+        fontSize: 24,
+        color: '#333',
+        fontWeight: '300',
+    },
+    headerCenter: {
+        flex: 1,
+        alignItems: 'center',
+    },
+    headerTitle: {
+        fontSize: 18,
+        fontWeight: '600',
+        color: '#333',
+    },
+    headerSubtitle: {
+        fontSize: 12,
+        color: '#666',
+        marginTop: 2,
+    },
+    addButton: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: '#ff6b6b',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    addButtonText: {
+        fontSize: 20,
+        color: '#fff',
+        fontWeight: '300',
+    },
+    searchContainer: {
+        paddingHorizontal: 20,
+        paddingVertical: 16,
+    },
+    searchInputContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#f8f8f8',
+        borderRadius: 12,
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+    },
+    searchIcon: {
+        fontSize: 16,
+        marginRight: 8,
+    },
+    searchInput: {
+        flex: 1,
+        fontSize: 16,
+        color: '#333',
+    },
+    categoriesList: {
+        paddingHorizontal: 20,
+        paddingBottom: 20,
+    },
+    categoryContainer: {
+        borderRadius: 16,
+        marginBottom: 20,
+        padding: 20,
+        shadowColor: '#000',
+        shadowOffset: {
+            width: 0,
+            height: 2,
+        },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 3,
+    },
+    roleBadge: {
+        alignSelf: 'flex-start',
+        backgroundColor: '#ff6b6b',
+        paddingHorizontal: 12,
+        paddingVertical: 4,
+        borderRadius: 12,
+        marginBottom: 12,
+    },
+    roleText: {
+        fontSize: 12,
+        fontWeight: '600',
+        color: '#fff',
+    },
+    categoryHeader: {
+        marginBottom: 16,
+    },
+    categoryInfo: {
+        flex: 1,
+    },
+    categoryName: {
+        fontSize: 18,
+        fontWeight: '600',
+        color: '#333',
+        marginBottom: 4,
+    },
+    subtitleContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    aiIcon: {
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+        backgroundColor: '#ff6b6b',
+        marginRight: 6,
+    },
+    categorySubtitle: {
+        fontSize: 14,
+        color: '#666',
+    },
+    horizontalList: {
+        marginBottom: 16,
+    },
+    itemsList: {
+        paddingRight: 20,
+    },
+    wardrobeItemImage: {
+        width: 120,
+        height: 150,
+        marginRight: 12,
+        borderRadius: 12,
+        overflow: 'hidden',
+        backgroundColor: '#f0f0f0',
+        position: 'relative',
+    },
+    wardrobeItemImageContent: {
+        width: '100%',
+        height: '100%',
+    },
+    wardrobeItemPlaceholder: {
+        width: '100%',
+        height: '100%',
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: '#e0e0e0',
+    },
+    wardrobeItemText: {
+        fontSize: 24,
+        fontWeight: '600',
+        color: '#999',
+    },
+    itemPriceContainer: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        backgroundColor: 'rgba(0,0,0,0.7)',
+        paddingVertical: 4,
+        paddingHorizontal: 8,
+    },
+    itemPrice: {
+        color: '#fff',
+        fontSize: 12,
+        fontWeight: '600',
+        textAlign: 'center',
+    },
+    viewAllButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 12,
+        paddingHorizontal: 20,
+        backgroundColor: '#f8f8f8',
+        borderRadius: 8,
+    },
+    viewAllText: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#333',
+        marginRight: 4,
+    },
+    viewAllArrow: {
+        fontSize: 16,
+        color: '#666',
+    },
+    noRoomContainer: {
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
-        paddingHorizontal: 32,
+        paddingHorizontal: 40,
     },
-    emptyText: {
-        fontSize: 18,
-        color: '#666',
+    noRoomIcon: {
+        fontSize: 64,
         marginBottom: 16,
+    },
+    noRoomTitle: {
+        fontSize: 20,
+        fontWeight: '600',
+        color: '#333',
+        marginBottom: 8,
         textAlign: 'center',
     },
-    createFirstButton: {
-        backgroundColor: '#FF69B4',
-        paddingHorizontal: 24,
-        paddingVertical: 12,
-        borderRadius: 8,
-    },
-    createFirstButtonText: {
-        color: 'white',
+    noRoomMessage: {
         fontSize: 16,
-        fontWeight: '600',
-    },
-    wardrobeCard: {
-        backgroundColor: 'white',
-        borderRadius: 12,
-        padding: 16,
-        marginHorizontal: 16,
-        marginBottom: 12,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 3.84,
-        elevation: 5,
-    },
-    wardrobeHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: 8,
-    },
-    wardrobeEmoji: {
-        fontSize: 24,
-        marginRight: 12,
-    },
-    wardrobeName: {
-        fontSize: 18,
-        fontWeight: '600',
-        color: '#1a1a1a',
-        flex: 1,
-    },
-    wardrobeDescription: {
-        fontSize: 14,
         color: '#666',
-        marginBottom: 8,
-    },
-    wardrobeStats: {
-        fontSize: 12,
-        color: '#999',
+        textAlign: 'center',
+        lineHeight: 24,
     },
 });

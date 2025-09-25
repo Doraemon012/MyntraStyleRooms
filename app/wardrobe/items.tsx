@@ -1,8 +1,12 @@
 import { ThemedView } from '@/components/themed-view';
+import { getDefaultImageProps, getProductImageUri } from '@/utils/imageUtils';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
+    ActivityIndicator,
+    Alert,
     FlatList,
     Image,
     StyleSheet,
@@ -11,18 +15,9 @@ import {
     View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { wardrobeApi, WardrobeItem } from '../../services/wardrobeApi';
 
-interface WardrobeItem {
-  id: string;
-  name: string;
-  price: string;
-  image: string;
-  isFavorited: boolean;
-  category: string;
-  addedBy: string;
-  purchasedByUsers: string[];
-  reactions: { userId: string; type: 'like' | 'love' | 'dislike' }[];
-}
+// Remove the local interface since we're importing from wardrobeApi
 
 // Mock room members data
 const roomMembers = [
@@ -175,9 +170,48 @@ const wardrobeItems: WardrobeItem[] = [
 ];
 
 export default function WardrobeItemsScreen() {
-  const { categoryId, categoryName } = useLocalSearchParams();
-  const [items, setItems] = useState<WardrobeItem[]>(wardrobeItems);
+  const { categoryId, categoryName, wardrobeId } = useLocalSearchParams();
+  const [items, setItems] = useState<WardrobeItem[]>([]);
+  const [loading, setLoading] = useState(true);
   const [activeFilter, setActiveFilter] = useState<'All' | 'Most liked' | 'Most bought'>('All');
+
+  useEffect(() => {
+    if (wardrobeId) {
+      loadWardrobeItems();
+    }
+  }, [wardrobeId]);
+
+  const loadWardrobeItems = async () => {
+    if (!wardrobeId) return;
+    
+    setLoading(true);
+    try {
+      const token = await AsyncStorage.getItem('auth_token');
+      if (!token) {
+        Alert.alert('Error', 'Please log in to view wardrobe items');
+        setLoading(false);
+        return;
+      }
+
+      const response = await wardrobeApi.getWardrobeItems(token, wardrobeId as string, {
+        limit: 50,
+        sortBy: 'addedAt',
+        sortOrder: 'desc'
+      });
+
+      if (response.status === 'success' && response.data) {
+        setItems(response.data.items);
+      } else {
+        setItems([]);
+      }
+    } catch (error) {
+      console.error('Error loading wardrobe items:', error);
+      Alert.alert('Error', 'Failed to load wardrobe items');
+      setItems([]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Helper function to get total likes for an item
   const getTotalLikes = (item: WardrobeItem) => {
@@ -186,7 +220,7 @@ export default function WardrobeItemsScreen() {
 
   // Helper function to get total purchases for an item
   const getTotalPurchases = (item: WardrobeItem) => {
-    return item.purchasedByUsers.length;
+    return item.isPurchased ? 1 : 0;
   };
 
   // Filter items based on selected filter
@@ -221,13 +255,17 @@ export default function WardrobeItemsScreen() {
   const renderItem = ({ item }: { item: WardrobeItem }) => (
     <View style={styles.itemCard}>
       <View style={styles.imageContainer}>
-        <Image source={{ uri: item.image }} style={styles.itemImage} />
+        <Image 
+          source={{ uri: getProductImageUri(item.productId) }} 
+          style={styles.itemImage}
+          {...getDefaultImageProps()}
+        />
         <TouchableOpacity 
           style={styles.favoriteButton}
-          onPress={() => toggleFavorite(item.id)}
+          onPress={() => toggleFavorite(item._id)}
         >
-          <Text style={[styles.favoriteIcon, item.isFavorited && styles.favoriteIconActive]}>
-            {item.isFavorited ? '♥' : '♡'}
+          <Text style={[styles.favoriteIcon, false && styles.favoriteIconActive]}>
+            ♡
           </Text>
         </TouchableOpacity>
         <LinearGradient
@@ -235,26 +273,22 @@ export default function WardrobeItemsScreen() {
           style={styles.gradient}
         >
           <View style={styles.priceTag}>
-            <Text style={styles.itemName}>{item.name}</Text>
-            <Text style={styles.itemPrice}>{item.price}</Text>
+            <Text style={styles.itemName}>{item.productId.name}</Text>
+            <Text style={styles.itemPrice}>₹{item.productId.price}</Text>
           </View>
         </LinearGradient>
       </View>
       
       {/* Enhanced item info */}
       <View style={styles.itemInfo}>
-        <Text style={styles.itemCategory}>{item.category}</Text>
-        <Text style={styles.addedBy}>Added by {item.addedBy}</Text>
+        <Text style={styles.itemCategory}>{item.productId.category}</Text>
+        <Text style={styles.addedBy}>Added by {item.addedBy.name}</Text>
         
-        {/* Show purchase count */}
-        {item.purchasedByUsers.length > 0 && (
+        {/* Show purchase status */}
+        {item.isPurchased && (
           <View style={styles.purchaseInfo}>
             <Text style={styles.purchaseText}>
-              🛒 {item.purchasedByUsers.length} room member{item.purchasedByUsers.length > 1 ? 's' : ''} bought this
-            </Text>
-            <Text style={styles.purchasedByNames}>
-              {item.purchasedByUsers.slice(0, 2).map(userId => getUserName(userId)).join(', ')}
-              {item.purchasedByUsers.length > 2 && ` +${item.purchasedByUsers.length - 2} more`}
+              🛒 Purchased by {item.purchasedBy?.name || 'Someone'}
             </Text>
           </View>
         )}
@@ -313,15 +347,28 @@ export default function WardrobeItemsScreen() {
           })}
         </View>
 
-        <FlatList
-          data={getFilteredItems()}
-          renderItem={renderItem}
-          keyExtractor={(item) => item.id}
-          numColumns={2}
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.itemsList}
-          columnWrapperStyle={styles.row}
-        />
+        {loading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#E91E63" />
+            <Text style={styles.loadingText}>Loading wardrobe items...</Text>
+          </View>
+        ) : (
+          <FlatList
+            data={getFilteredItems()}
+            renderItem={renderItem}
+            keyExtractor={(item) => item._id}
+            numColumns={2}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.itemsList}
+            columnWrapperStyle={styles.row}
+            ListEmptyComponent={
+              <View style={styles.emptyContainer}>
+                <Text style={styles.emptyText}>No items in this wardrobe yet</Text>
+                <Text style={styles.emptySubtext}>Add some products to get started!</Text>
+              </View>
+            }
+          />
+        )}
       </SafeAreaView>
     </ThemedView>
   );
@@ -532,5 +579,31 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '700',
     color: '#fff',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 50,
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 14,
+    color: '#666',
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 50,
+  },
+  emptyText: {
+    fontSize: 16,
+    color: '#666',
+    marginBottom: 5,
+  },
+  emptySubtext: {
+    fontSize: 12,
+    color: '#999',
   },
 });

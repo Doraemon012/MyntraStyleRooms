@@ -17,15 +17,17 @@ interface SessionContextType {
   isInLiveView: boolean;
   isHost: boolean;
   sessionRoomId: string | null;
+  selectedWardrobeId: string | null;
   sessionParticipants: SessionParticipant[];
   presenterName: string;
   isMuted: boolean;
-  startSession: (roomId: string, participants: SessionParticipant[], isHost?: boolean) => void;
+  startSession: (roomId: string, participants: SessionParticipant[], isHost?: boolean, wardrobeId?: string) => void;
   enterLiveView: () => void;
   exitLiveView: () => void;
   endSession: () => void;
   toggleMute: () => void;
   setPresenter: (name: string) => void;
+  setSelectedWardrobe: (wardrobeId: string | null) => void;
 }
 
 const SessionContext = createContext<SessionContextType | undefined>(undefined);
@@ -43,14 +45,16 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
   const [isInLiveView, setIsInLiveView] = useState(false);
   const [isHost, setIsHost] = useState(false);
   const [sessionRoomId, setSessionRoomId] = useState<string | null>(null);
+  const [selectedWardrobeId, setSelectedWardrobeId] = useState<string | null>(null);
   const [sessionParticipants, setSessionParticipants] = useState<SessionParticipant[]>([]);
   const [presenterName, setPresenterName] = useState('Jasmine');
   const [isMuted, setIsMuted] = useState(false);
 
-  const startSession = (roomId: string, participants: SessionParticipant[], isHostSession?: boolean) => {
+  const startSession = (roomId: string, participants: SessionParticipant[], isHostSession?: boolean, wardrobeId?: string) => {
     setIsInSession(true);
     setIsHost(isHostSession || false);
     setSessionRoomId(roomId);
+    setSelectedWardrobeId(wardrobeId || null);
     setSessionParticipants(participants);
     setIsInLiveView(false);
   };
@@ -68,6 +72,7 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
     setIsInLiveView(false);
     setIsHost(false);
     setSessionRoomId(null);
+    setSelectedWardrobeId(null);
     setSessionParticipants([]);
     setPresenterName('Jasmine');
     setIsMuted(false);
@@ -81,6 +86,10 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
     setPresenterName(name);
   };
 
+  const setSelectedWardrobe = (wardrobeId: string | null) => {
+    setSelectedWardrobeId(wardrobeId);
+  };
+
   return (
     <SessionContext.Provider
       value={{
@@ -88,6 +97,7 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
         isInLiveView,
         isHost,
         sessionRoomId,
+        selectedWardrobeId,
         sessionParticipants,
         presenterName,
         isMuted,
@@ -97,6 +107,7 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
         endSession,
         toggleMute,
         setPresenter,
+        setSelectedWardrobe,
       }}
     >
       {children}

@@ -8,19 +8,28 @@ const { authenticateToken, checkWardrobePermission } = require('../middleware/au
 const router = express.Router();
 
 // @route   GET /api/wardrobes
-// @desc    Get all wardrobes for current user
+// @desc    Get all wardrobes for current user (optionally filtered by room)
 // @access  Private
 router.get('/', authenticateToken, async (req, res) => {
   try {
-    const { page = 1, limit = 10, search, occasionType } = req.query;
+    const { page = 1, limit = 10, search, occasionType, roomId } = req.query;
     const userId = req.user._id;
+
+    // Validate roomId if provided
+    let validatedRoomId = roomId;
+    if (roomId && !mongoose.Types.ObjectId.isValid(roomId)) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Invalid room ID format'
+      });
+    }
 
     let wardrobes;
     
     if (search) {
-      wardrobes = await Wardrobe.searchWardrobes(search, userId);
+      wardrobes = await Wardrobe.searchWardrobes(search, userId, validatedRoomId);
     } else {
-      wardrobes = await Wardrobe.findByUser(userId, { occasionType });
+      wardrobes = await Wardrobe.findByUser(userId, { occasionType, roomId: validatedRoomId });
     }
 
     // Pagination
@@ -78,6 +87,14 @@ router.get('/stats', authenticateToken, async (req, res) => {
 // @access  Private
 router.get('/:id', authenticateToken, checkWardrobePermission('Viewer'), async (req, res) => {
   try {
+    // Check if the ID is a valid ObjectId
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Invalid wardrobe ID format'
+      });
+    }
+
     const wardrobe = await Wardrobe.findById(req.params.id)
       .populate('owner', 'name email profileImage')
       .populate('members.userId', 'name email profileImage');
@@ -134,7 +151,10 @@ router.post('/', authenticateToken, [
     .optional()
     .trim()
     .isLength({ max: 200 })
-    .withMessage('Description cannot be more than 200 characters')
+    .withMessage('Description cannot be more than 200 characters'),
+  body('roomId')
+    .isMongoId()
+    .withMessage('Valid room ID is required')
 ], async (req, res) => {
   try {
     // Check for validation errors
@@ -154,7 +174,8 @@ router.post('/', authenticateToken, [
       occasionType, 
       budgetRange, 
       isPrivate = false, 
-      members = [] 
+      members = [],
+      roomId
     } = req.body;
     const ownerId = req.user._id;
 
@@ -167,6 +188,7 @@ router.post('/', authenticateToken, [
       budgetRange: budgetRange || { min: 0, max: 50000 },
       isPrivate,
       owner: ownerId,
+      roomId: new mongoose.Types.ObjectId(roomId),
       members: members.map(member => ({
         userId: new mongoose.Types.ObjectId(member.userId),
         role: member.role || 'Contributor'
@@ -211,7 +233,11 @@ router.put('/:id', authenticateToken, checkWardrobePermission('Editor'), [
     .optional()
     .trim()
     .isLength({ max: 200 })
-    .withMessage('Description cannot be more than 200 characters')
+    .withMessage('Description cannot be more than 200 characters'),
+  body('roomId')
+    .optional()
+    .isMongoId()
+    .withMessage('Valid room ID is required')
 ], async (req, res) => {
   try {
     // Check for validation errors
@@ -224,7 +250,7 @@ router.put('/:id', authenticateToken, checkWardrobePermission('Editor'), [
       });
     }
 
-    const { name, emoji, description, occasionType, budgetRange, isPrivate, settings } = req.body;
+    const { name, emoji, description, occasionType, budgetRange, isPrivate, settings, roomId } = req.body;
     const wardrobe = req.wardrobe;
 
     // Update fields
@@ -235,6 +261,7 @@ router.put('/:id', authenticateToken, checkWardrobePermission('Editor'), [
     if (budgetRange !== undefined) wardrobe.budgetRange = budgetRange;
     if (isPrivate !== undefined) wardrobe.isPrivate = isPrivate;
     if (settings !== undefined) wardrobe.settings = { ...wardrobe.settings, ...settings };
+    if (roomId !== undefined) wardrobe.roomId = new mongoose.Types.ObjectId(roomId);
 
     await wardrobe.save();
 
@@ -306,6 +333,17 @@ router.get('/:id/items', authenticateToken, checkWardrobePermission('Viewer'), a
       sortOrder
     });
 
+    // Debug: Check for items with null productId
+    const itemsWithNullProduct = items.filter(item => !item.productId);
+    if (itemsWithNullProduct.length > 0) {
+      console.warn(`⚠️ Found ${itemsWithNullProduct.length} wardrobe items with null productId for wardrobe ${id}`);
+      console.warn('Items with null productId:', itemsWithNullProduct.map(item => ({
+        _id: item._id,
+        productId: item.productId,
+        wardrobeId: item.wardrobeId
+      })));
+    }
+
     res.json({
       status: 'success',
       data: {
@@ -354,6 +392,7 @@ router.post('/:id/items', authenticateToken, checkWardrobePermission('Contributo
     const { productId, notes, customTags, priority = 'medium' } = req.body;
     const addedBy = req.user._id;
 
+
     // Check if item already exists in wardrobe
     const existingItem = await WardrobeItem.findOne({
       wardrobeId: id,
@@ -381,7 +420,14 @@ router.post('/:id/items', authenticateToken, checkWardrobePermission('Contributo
     await wardrobeItem.save();
 
     // Update wardrobe last activity
-    await req.wardrobe.updateLastActivity();
+    if (req.wardrobe && typeof req.wardrobe.updateLastActivity === 'function') {
+      await req.wardrobe.updateLastActivity();
+    } else {
+      // Fallback: update wardrobe directly using the ID from params
+      const Wardrobe = require('../models/Wardrobe');
+      const wardrobeId = req.params.id || req.params.wardrobeId;
+      await Wardrobe.findByIdAndUpdate(wardrobeId, { lastUpdated: new Date() });
+    }
 
     // Populate item data
     await wardrobeItem.populate('productId');

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { authAPI } from '../services/api';
+import { testApiConnectivity } from '../utils/networkUtils';
 
 export const NetworkTest = () => {
   const [isLoading, setIsLoading] = useState(false);
@@ -11,12 +12,11 @@ export const NetworkTest = () => {
     setTestResult('Testing connection...');
     
     try {
-      // Test basic connectivity
-      const response = await fetch('http://10.84.92.218:5000/api/health');
-      const data = await response.json();
+      // Test API connectivity with automatic detection
+      const detectedUrl = await testApiConnectivity();
       
-      if (data.status === 'success') {
-        setTestResult('✅ Backend connection successful!');
+      if (detectedUrl) {
+        setTestResult(`✅ Backend connection successful!\n📍 Server found at: ${detectedUrl}`);
         
         // Test auth endpoint
         try {
@@ -26,13 +26,18 @@ export const NetworkTest = () => {
           setTestResult(prev => prev + '\n⚠️ Auth endpoint error (expected if not logged in)');
         }
       } else {
-        setTestResult('❌ Backend responded with error');
+        setTestResult('❌ No backend server found on any network interface');
+        Alert.alert(
+          'Connection Test Failed',
+          'The app cannot connect to the backend server. Please check:\n\n1. Backend server is running\n2. Both devices are on the same network\n3. Firewall settings allow connections on port 5000',
+          [{ text: 'OK' }]
+        );
       }
     } catch (error) {
       setTestResult(`❌ Connection failed: ${error.message}`);
       Alert.alert(
         'Connection Test Failed',
-        'The app cannot connect to the backend server. Please check:\n\n1. Backend server is running\n2. Correct IP address is configured\n3. Both devices are on the same network',
+        'The app cannot connect to the backend server. Please check:\n\n1. Backend server is running\n2. Both devices are on the same network\n3. Firewall settings allow connections on port 5000',
         [{ text: 'OK' }]
       );
     } finally {
