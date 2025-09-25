@@ -16,11 +16,7 @@
 
 ## Working Demo
 
-
-
-https://github.com/user-attachments/assets/6e2e6621-c126-4299-90bc-a563a02f792f
-
-
+https://github.com/user-attachments/assets/748ac13d-72d3-4b61-9ab4-f371947b7f09
 
 ## 🌟 Overview
 
