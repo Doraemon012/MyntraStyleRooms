@@ -232,7 +232,7 @@ router.delete('/:id', authenticateToken, checkRoomPermission('Owner'), async (re
 });
 
 // @route   POST /api/rooms/:id/members
-// @desc    Add member to room
+// @desc    Send invitation to user (creates invitation instead of direct addition)
 // @access  Private (Owner or Editor)
 router.post('/:roomId/members', authenticateToken, checkRoomPermission('Editor'), [
   body('userId')
@@ -241,7 +241,16 @@ router.post('/:roomId/members', authenticateToken, checkRoomPermission('Editor')
   body('role')
     .optional()
     .isIn(['Editor', 'Contributor', 'Viewer'])
-    .withMessage('Invalid role')
+    .withMessage('Invalid role'),
+  body('message')
+    .optional()
+    .trim()
+    .isLength({ max: 200 })
+    .withMessage('Message cannot be more than 200 characters'),
+  body('expiresInDays')
+    .optional()
+    .isInt({ min: 1, max: 30 })
+    .withMessage('Expiration must be between 1 and 30 days')
 ], async (req, res) => {
   try {
     // Check for validation errors
@@ -254,8 +263,9 @@ router.post('/:roomId/members', authenticateToken, checkRoomPermission('Editor')
       });
     }
 
-    const { userId, role = 'Contributor' } = req.body;
+    const { userId, role = 'Contributor', message, expiresInDays = 7 } = req.body;
     const room = req.room;
+    const inviterId = req.user._id;
 
     // Check if user exists
     const user = await User.findById(userId);
@@ -266,29 +276,65 @@ router.post('/:roomId/members', authenticateToken, checkRoomPermission('Editor')
       });
     }
 
-    // Add member to room
-    await room.addMember(userId, role);
+    // Check if user is already a member
+    const isAlreadyMember = room.members.some(member => 
+      member.userId.toString() === userId.toString()
+    );
 
-    // Populate the room data
-    await room.populate('owner', 'name email profileImage');
-    await room.populate('members.userId', 'name email profileImage');
+    if (isAlreadyMember) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'User is already a member of this room'
+      });
+    }
 
-    res.json({
+    // Check if user is the owner
+    if (room.owner.toString() === userId.toString()) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Cannot invite room owner'
+      });
+    }
+
+    // Create invitation
+    const Invitation = require('../models/Invitation');
+    const invitation = new Invitation({
+      room: room._id,
+      inviter: inviterId,
+      invitee: userId,
+      role,
+      message,
+      expiresAt: new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000)
+    });
+
+    await invitation.save();
+
+    // Add invitation to user's invitations array
+    await User.findByIdAndUpdate(userId, {
+      $push: { invitations: invitation._id }
+    });
+
+    // Populate invitation data
+    await invitation.populate('room', 'name emoji description isPrivate');
+    await invitation.populate('inviter', 'name email profileImage');
+    await invitation.populate('invitee', 'name email profileImage');
+
+    res.status(201).json({
       status: 'success',
-      message: 'Member added successfully',
+      message: 'Invitation sent successfully',
       data: {
-        room
+        invitation
       }
     });
   } catch (error) {
-    if (error.message === 'User is already a member of this room') {
+    if (error.message === 'User already has a pending invitation for this room') {
       return res.status(400).json({
         status: 'error',
         message: error.message
       });
     }
     
-    console.error('Add member error:', error);
+    console.error('Send invitation error:', error);
     res.status(500).json({
       status: 'error',
       message: 'Server error'

@@ -473,6 +473,48 @@ export const roomAPI = {
     }),
 };
 
+// Invitation API calls
+export const invitationAPI = {
+  // Get all invitations for current user
+  getAll: (params?: { status?: string; room?: string }) => 
+    apiCall<{ status: string; data: { invitations: any[] } }>(`/invitations?${new URLSearchParams(params as any).toString()}`),
+  
+  // Get pending invitations for current user
+  getPending: () => 
+    apiCall<{ status: string; data: { invitations: any[] } }>('/invitations/pending'),
+  
+  // Send invitation
+  send: (data: {
+    roomId: string;
+    inviteeId: string;
+    role?: 'Editor' | 'Contributor' | 'Viewer';
+    message?: string;
+    expiresInDays?: number;
+  }) => 
+    apiCall<{ status: string; message: string; data: { invitation: any } }>('/invitations', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  
+  // Accept invitation
+  accept: (invitationId: string) => 
+    apiCall<{ status: string; message: string; data: { invitation: any } }>(`/invitations/${invitationId}/accept`, {
+      method: 'PUT',
+    }),
+  
+  // Decline invitation
+  decline: (invitationId: string) => 
+    apiCall<{ status: string; message: string }>(`/invitations/${invitationId}/decline`, {
+      method: 'PUT',
+    }),
+  
+  // Cancel invitation (inviter only)
+  cancel: (invitationId: string) => 
+    apiCall<{ status: string; message: string }>(`/invitations/${invitationId}`, {
+      method: 'DELETE',
+    }),
+};
+
 // Export all APIs
 export default {
   auth: authAPI,
@@ -485,4 +527,5 @@ export default {
   order: orderAPI,
   review: reviewAPI,
   room: roomAPI,
+  invitation: invitationAPI,
 };
