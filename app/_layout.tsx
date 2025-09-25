@@ -36,7 +36,9 @@ function AppContent() {
             <Stack.Screen name="catalog" options={{ headerShown: false }} />
           )}
           <Stack.Screen name="auth/signup" options={{ headerShown: false }} />
-          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="profile" options={{ headerShown: false }} />
+        <Stack.Screen name="invitations" options={{ headerShown: false }} />
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="wardrobes" options={{ headerShown: false }} />
           <Stack.Screen name="product/[id]" options={{ headerShown: false }} />
           <Stack.Screen name="room/create" options={{ headerShown: false }} />

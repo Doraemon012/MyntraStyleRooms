@@ -253,7 +253,10 @@ export default function CatalogScreen() {
               <TouchableOpacity style={styles.headerButton}>
                 <Ionicons name="heart-outline" size={20} color="#000" />
               </TouchableOpacity>
-              <TouchableOpacity style={styles.headerButton}>
+              <TouchableOpacity 
+                style={styles.headerButton}
+                onPress={() => router.push('/profile')}
+              >
                 <Ionicons name="person-outline" size={20} color="#000" />
               </TouchableOpacity>
               <TouchableOpacity 

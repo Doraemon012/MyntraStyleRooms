@@ -68,7 +68,11 @@ const userSchema = new mongoose.Schema({
   isActive: {
     type: Boolean,
     default: true
-  }
+  },
+  invitations: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Invitation'
+  }]
 }, {
   timestamps: true,
   toJSON: { virtuals: true },
