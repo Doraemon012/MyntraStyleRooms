@@ -37,7 +37,6 @@ Online shopping has become increasingly isolated, with users resorting to fragme
 ### 🤖 **AI-Powered Live Voice Calls**
 - **Group-Aware AI**: Contextual suggestions during voice conversations
 - **Real-time Product Curation**: AI listens and provides relevant recommendations
-- **Voice-to-Text Integration**: Seamless conversion of spoken requests
 - **Synchronized Browsing**: All participants see the same products simultaneously
 
 ### 👗 **Permissioned Shared Wardrobes**
@@ -109,8 +108,6 @@ Online shopping has become increasingly isolated, with users resorting to fragme
 - **npm** or **yarn**
 - **Expo CLI** (`npm install -g @expo/cli`)
 - **MongoDB Atlas** account
-- **Cloudinary** account
-- **OpenAI API** key
 
 ### Installation
 
@@ -431,15 +428,6 @@ npm run test:e2e
 - **Discussions**: GitHub Discussions for questions
 - **Email**: support@myntra-fashion-ecosystem.com
 
-### Community
-
-- **Discord**: Join our developer community
-- **Twitter**: Follow for updates and announcements
-- **LinkedIn**: Professional network and job opportunities
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ## 🙏 Acknowledgments
 
