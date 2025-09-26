@@ -8,13 +8,14 @@ import { AuthProvider, useAuth } from '@/contexts/auth-context';
 import { SessionProvider } from '@/contexts/session-context';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
-export const unstable_settings = {
-  anchor: 'catalog',
-};
+// Removed unstable_settings to allow proper authentication flow
 
 function AppContent() {
   const colorScheme = useColorScheme();
   const { isAuthenticated, isLoading } = useAuth();
+
+  // Debug logging
+  console.log('🔐 Auth State:', { isAuthenticated, isLoading });
 
   if (isLoading) {
     return (
@@ -27,29 +28,25 @@ function AppContent() {
   return (
     <SessionProvider>
       <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-        <Stack>
-          {!isAuthenticated ? (
-            // Auth screens
-            <Stack.Screen name="auth/login" options={{ headerShown: false }} />
-          ) : (
-            // Main app screens
-            <Stack.Screen name="catalog" options={{ headerShown: false }} />
-          )}
-          <Stack.Screen name="auth/signup" options={{ headerShown: false }} />
-          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen name="wardrobes" options={{ headerShown: false }} />
-          <Stack.Screen name="product/[id]" options={{ headerShown: false }} />
-          <Stack.Screen name="room/create" options={{ headerShown: false }} />
-          <Stack.Screen name="room/[id]" options={{ headerShown: false }} />
-          <Stack.Screen name="wardrobe/ai-outfits" options={{ headerShown: false }} />
-          <Stack.Screen name="wardrobe/items" options={{ headerShown: false }} />
-          <Stack.Screen name="room/settings" options={{ headerShown: false }} />
-          <Stack.Screen name="wardrobe/create" options={{ headerShown: false}} />
-          <Stack.Screen name="start-session" options={{ headerShown: false }} />
-          <Stack.Screen name="join-session" options={{ headerShown: false }} />
-          <Stack.Screen name="call/[id]" options={{ headerShown: false }} />
-          <Stack.Screen name="wardrobe/[id]" options={{ headerShown: false }} />
-          <Stack.Screen name="maya-demo" options={{ headerShown: false }} />
+        <Stack screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="index" options={{ headerShown: false }} />
+          <Stack.Screen name="auth/login" />
+          <Stack.Screen name="auth/signup" />
+          <Stack.Screen name="catalog" />
+          <Stack.Screen name="(tabs)" />
+          <Stack.Screen name="wardrobes" />
+          <Stack.Screen name="product/[id]" />
+          <Stack.Screen name="room/create" />
+          <Stack.Screen name="room/[id]" />
+          <Stack.Screen name="wardrobe/ai-outfits" />
+          <Stack.Screen name="wardrobe/items" />
+          <Stack.Screen name="room/settings" />
+          <Stack.Screen name="wardrobe/create" />
+          <Stack.Screen name="start-session" />
+          <Stack.Screen name="join-session" />
+          <Stack.Screen name="call/[id]" />
+          <Stack.Screen name="wardrobe/[id]" />
+          <Stack.Screen name="maya-demo" />
           <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
         </Stack>
         <StatusBar style="auto" />

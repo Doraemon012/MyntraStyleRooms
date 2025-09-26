@@ -189,6 +189,48 @@ const liveCallSchema = new mongoose.Schema({
       }
     }]
   },
+  // Master screen control system
+  masterControl: {
+    currentController: {
+      userId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        default: null
+      },
+      startedAt: {
+        type: Date,
+        default: null
+      },
+      expiresAt: {
+        type: Date,
+        default: null
+      }
+    },
+    controlRequests: [{
+      userId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        required: true
+      },
+      requestedAt: {
+        type: Date,
+        default: Date.now
+      },
+      status: {
+        type: String,
+        enum: ['pending', 'approved', 'denied'],
+        default: 'pending'
+      },
+      expiresAt: {
+        type: Date,
+        default: Date.now() + 5 * 60 * 1000 // 5 minutes
+      }
+    }],
+    autoTransferAfter: {
+      type: Number, // minutes
+      default: 10
+    }
+  },
   callDuration: {
     type: Number,
     default: 0 // in seconds
@@ -652,6 +694,122 @@ liveCallSchema.methods.getCallStatus = function() {
     },
     status: this.status
   };
+};
+
+// Instance method to request master control
+liveCallSchema.methods.requestMasterControl = function(userId) {
+  // Check if user is already the controller
+  if (this.masterControl.currentController.userId && 
+      this.masterControl.currentController.userId.toString() === userId.toString()) {
+    return { success: false, message: 'You already have control' };
+  }
+
+  // Check if user already has a pending request
+  const existingRequest = this.masterControl.controlRequests.find(
+    req => req.userId.toString() === userId.toString() && req.status === 'pending'
+  );
+
+  if (existingRequest) {
+    return { success: false, message: 'You already have a pending request' };
+  }
+
+  // Add new control request
+  this.masterControl.controlRequests.push({
+    userId,
+    requestedAt: new Date(),
+    status: 'pending',
+    expiresAt: new Date(Date.now() + 5 * 60 * 1000) // 5 minutes
+  });
+
+  return this.save().then(() => ({ success: true, message: 'Control request sent' }));
+};
+
+// Instance method to approve control request
+liveCallSchema.methods.approveControlRequest = function(requestUserId, approverUserId) {
+  // Only host can approve requests
+  if (this.hostId.toString() !== approverUserId.toString()) {
+    return { success: false, message: 'Only the host can approve control requests' };
+  }
+
+  const request = this.masterControl.controlRequests.find(
+    req => req.userId.toString() === requestUserId.toString() && req.status === 'pending'
+  );
+
+  if (!request) {
+    return { success: false, message: 'No pending request found' };
+  }
+
+  // Update request status
+  request.status = 'approved';
+
+  // Transfer control
+  this.masterControl.currentController = {
+    userId: requestUserId,
+    startedAt: new Date(),
+    expiresAt: new Date(Date.now() + this.masterControl.autoTransferAfter * 60 * 1000)
+  };
+
+  // Clear all other pending requests
+  this.masterControl.controlRequests.forEach(req => {
+    if (req.status === 'pending') {
+      req.status = 'denied';
+    }
+  });
+
+  return this.save().then(() => ({ success: true, message: 'Control transferred successfully' }));
+};
+
+// Instance method to deny control request
+liveCallSchema.methods.denyControlRequest = function(requestUserId, denierUserId) {
+  // Only host can deny requests
+  if (this.hostId.toString() !== denierUserId.toString()) {
+    return { success: false, message: 'Only the host can deny control requests' };
+  }
+
+  const request = this.masterControl.controlRequests.find(
+    req => req.userId.toString() === requestUserId.toString() && req.status === 'pending'
+  );
+
+  if (!request) {
+    return { success: false, message: 'No pending request found' };
+  }
+
+  request.status = 'denied';
+  return this.save().then(() => ({ success: true, message: 'Control request denied' }));
+};
+
+// Instance method to release master control
+liveCallSchema.methods.releaseMasterControl = function(userId) {
+  if (!this.masterControl.currentController.userId || 
+      this.masterControl.currentController.userId.toString() !== userId.toString()) {
+    return { success: false, message: 'You are not the current controller' };
+  }
+
+  this.masterControl.currentController = {
+    userId: null,
+    startedAt: null,
+    expiresAt: null
+  };
+
+  return this.save().then(() => ({ success: true, message: 'Control released' }));
+};
+
+// Instance method to transfer control to host
+liveCallSchema.methods.transferControlToHost = function() {
+  this.masterControl.currentController = {
+    userId: this.hostId,
+    startedAt: new Date(),
+    expiresAt: null
+  };
+
+  // Clear all pending requests
+  this.masterControl.controlRequests.forEach(req => {
+    if (req.status === 'pending') {
+      req.status = 'denied';
+    }
+  });
+
+  return this.save();
 };
 
 // Static method to find active call for room

@@ -9,19 +9,20 @@ const getApiBaseUrl = () => {
   
   // Try different IP addresses based on the environment
   const possibleUrls = [
-    'http://10.84.92.165:5000/api',  // Current system IP (Wi-Fi)
+    'http://172.20.10.2:5000/api',   // Current network IP (first priority)
+    'http://localhost:5000/api',      // Web/local development
+    'http://10.84.92.165:5000/api',  // Previous system IP (Wi-Fi)
     'http://192.168.56.1:5000/api',  // Ethernet adapter IP
     'http://172.27.35.178:5000/api', // Previous IP (fallback)
-    'http://172.20.10.2:5000/api',   // Common mobile network IP
     'http://192.168.1.100:5000/api', // Alternative local network IP
     'http://10.0.2.2:5000/api',      // Android emulator localhost
-    'http://localhost:5000/api',      // Web/local development
   ];
   
   return possibleUrls[0]; // Default to the first one
 };
 
 const API_BASE_URL = getApiBaseUrl();
+console.log('🌐 API Base URL configured:', API_BASE_URL);
 
 // Generic API call function
 async function apiCall<T>(endpoint: string, options: RequestInit = {}): Promise<T> {

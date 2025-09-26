@@ -2,18 +2,18 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Image } from 'expo-image';
 import React, { useRef, useState } from 'react';
 import {
-  Alert,
-  Dimensions,
-  FlatList,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View
+    Alert,
+    Dimensions,
+    FlatList,
+    KeyboardAvoidingView,
+    Modal,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { wardrobeApi } from '../services/wardrobeApi';
@@ -25,7 +25,7 @@ const { width: screenWidth } = Dimensions.get('window');
 interface Message {
   id: string;
   text: string;
-  sender: 'user' | 'maya' | 'friend' | 'ai';
+  sender: 'user' | 'maya' | 'friend' | 'ai' | 'system';
   senderName: string;
   senderAvatar?: string;
   timestamp: string;
@@ -52,6 +52,8 @@ interface MayaChatProps {
   messages?: Message[];
   onSendMessage?: (text: string) => void;
   onProductAction?: (action: string, productData: any) => void;
+  typingUsers?: string[];
+  socketConnected?: boolean;
 }
 
 const MayaChat: React.FC<MayaChatProps> = ({
@@ -61,6 +63,8 @@ const MayaChat: React.FC<MayaChatProps> = ({
   messages = [],
   onSendMessage,
   onProductAction,
+  typingUsers = [],
+  socketConnected = false,
 }) => {
   const [inputText, setInputText] = useState('');
   const [showProductModal, setShowProductModal] = useState(false);
@@ -281,6 +285,27 @@ const MayaChat: React.FC<MayaChatProps> = ({
           showsVerticalScrollIndicator={false}
           onContentSizeChange={() => flatListRef.current?.scrollToEnd()}
         />
+
+        {/* Typing Indicators */}
+        {typingUsers.length > 0 && (
+          <View style={styles.typingContainer}>
+            <Text style={styles.typingText}>
+              {typingUsers.length === 1 
+                ? `${typingUsers[0]} is typing...`
+                : `${typingUsers.length} people are typing...`
+              }
+            </Text>
+          </View>
+        )}
+
+        {/* Connection Status */}
+        {!socketConnected && (
+          <View style={styles.connectionStatus}>
+            <Text style={styles.connectionText}>
+              🔌 Connecting to real-time chat...
+            </Text>
+          </View>
+        )}
 
         {/* Input Area */}
         <KeyboardAvoidingView
@@ -702,6 +727,30 @@ const styles = StyleSheet.create({
     height: 80,
     borderRadius: 8,
     resizeMode: 'cover',
+  },
+  typingContainer: {
+    backgroundColor: '#f8f9fa',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#e0e0e0',
+  },
+  typingText: {
+    fontSize: 12,
+    color: '#666',
+    fontStyle: 'italic',
+  },
+  connectionStatus: {
+    backgroundColor: '#fff3cd',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#ffeaa7',
+  },
+  connectionText: {
+    fontSize: 12,
+    color: '#856404',
+    textAlign: 'center',
   },
 });
 

@@ -38,6 +38,15 @@ io.use(async (socket, next) => {
   try {
     const token = socket.handshake.auth.token;
     const userId = socket.handshake.auth.userId;
+    const userName = socket.handshake.auth.userName;
+    
+    // For development, allow mock authentication
+    if (token === 'mock-token') {
+      socket.userId = userId;
+      socket.userName = userName || 'You';
+      console.log(`🔌 Socket authenticated with mock user: ${socket.userName} (${userId})`);
+      return next();
+    }
     
     if (!token) {
       return next(new Error('Authentication token required'));
@@ -53,13 +62,21 @@ io.use(async (socket, next) => {
     
     // Attach user info to socket
     socket.userId = userId;
-    socket.userName = socket.handshake.auth.userName;
+    socket.userName = userName;
     
     console.log(`🔌 Socket authenticated for user: ${socket.userName} (${userId})`);
     next();
   } catch (error) {
     console.error('❌ Socket authentication error:', error.message);
-    next(new Error('Authentication failed'));
+    // For development, allow connection even with auth errors
+    if (process.env.NODE_ENV === 'development') {
+      console.log('⚠️ Development mode: Allowing connection despite auth error');
+      socket.userId = socket.handshake.auth.userId || 'dev-user';
+      socket.userName = socket.handshake.auth.userName || 'Dev User';
+      next();
+    } else {
+      next(new Error('Authentication failed'));
+    }
   }
 });
 
@@ -75,6 +92,14 @@ io.on('connection', (socket) => {
     console.log(`🚪 User ${socket.userName} joining room: ${roomId}`);
     socket.join(roomId);
     socket.emit('room-joined', roomId);
+    
+    // Notify other users in the room that someone joined
+    socket.to(roomId).emit('user-joined-room', {
+      userId: socket.userId,
+      userName: socket.userName,
+      roomId: roomId,
+      timestamp: new Date()
+    });
   });
   
   // Handle leaving rooms
@@ -82,6 +107,37 @@ io.on('connection', (socket) => {
     console.log(`🚪 User ${socket.userName} leaving room: ${roomId}`);
     socket.leave(roomId);
     socket.emit('room-left', roomId);
+    
+    // Notify other users in the room that someone left
+    socket.to(roomId).emit('user-left-room', {
+      userId: socket.userId,
+      userName: socket.userName,
+      roomId: roomId,
+      timestamp: new Date()
+    });
+  });
+
+  // Handle real-time messaging
+  socket.on('send-message', (data) => {
+    console.log(`💬 Message from ${socket.userName} in room ${data.roomId}: ${data.text}`);
+    
+    // Determine sender type - if it's AI, keep it as 'ai', otherwise 'friend'
+    const senderType = data.sender === 'ai' ? 'ai' : 'friend';
+    
+    // Broadcast message to all users in the room except sender
+    socket.to(data.roomId).emit('new-message', {
+      id: data.id || Date.now().toString(),
+      text: data.text,
+      sender: senderType,
+      senderName: data.senderName || socket.userName,
+      senderId: socket.userId,
+      senderAvatar: data.senderAvatar,
+      timestamp: data.timestamp || new Date().toISOString(),
+      roomId: data.roomId,
+      messageType: data.messageType || 'text',
+      productData: data.productData,
+      reactions: data.reactions || { thumbsUp: 0, thumbsDown: 0 }
+    });
   });
 
   // Handle typing indicators with automatic timeout
@@ -122,6 +178,20 @@ io.on('connection', (socket) => {
       userId: socket.userId,
       userName: socket.userName,
       roomId: data.roomId
+    });
+  });
+
+  // Handle message reactions
+  socket.on('message-reaction', (data) => {
+    console.log(`👍 Reaction from ${socket.userName} on message ${data.messageId}: ${data.reactionType}`);
+    
+    socket.to(data.roomId).emit('message-reaction-updated', {
+      messageId: data.messageId,
+      userId: socket.userId,
+      userName: socket.userName,
+      reactionType: data.reactionType,
+      roomId: data.roomId,
+      timestamp: new Date()
     });
   });
   
@@ -190,66 +260,69 @@ if (process.env.NODE_ENV === 'development') {
 
 // Database connection - FORCE MYNTRA FASHION DATABASE
 const mongoUri = process.env.MONGODB_URI;
-// Ensure we're using the myntra-fashion database
-const mongoUriWithDb = mongoUri.includes('myntra-fashion') 
-  ? mongoUri 
-  : mongoUri.replace('mongodb.net/', 'mongodb.net/myntra-fashion');
 
-console.log('🔗 Connecting to Myntra Fashion Database:', mongoUriWithDb);
+// For development, you can use a local MongoDB or skip DB connection
+if (process.env.NODE_ENV === 'development' && !mongoUri) {
+  console.log('⚠️ No MongoDB URI found, running without database (Socket.IO will still work)');
+} else {
+  // Ensure we're using the myntra-fashion database
+  const mongoUriWithDb = mongoUri.includes('myntra-fashion') 
+    ? mongoUri 
+    : mongoUri.replace('mongodb.net/', 'mongodb.net/myntra-fashion');
 
-mongoose.connect(mongoUriWithDb, {
-  maxPoolSize: 10, // Maintain up to 10 socket connections
-  serverSelectionTimeoutMS: 5000, // Keep trying to send operations for 5 seconds
-  socketTimeoutMS: 45000, // Close sockets after 45 seconds of inactivity
-  connectTimeoutMS: 10000, // Give up initial connection after 10 seconds
-  retryWrites: true,
-  w: 'majority'
-})
-.then(() => console.log('✅ Connected to MYNTRA FASHION DATABASE successfully'))
-.catch(err => console.error('❌ MongoDB connection error:', err));
+  console.log('🔗 Connecting to Myntra Fashion Database:', mongoUriWithDb);
 
-// Socket.io connection handling
+  mongoose.connect(mongoUriWithDb, {
+    maxPoolSize: 10, // Maintain up to 10 socket connections
+    serverSelectionTimeoutMS: 10000, // Increased timeout
+    socketTimeoutMS: 45000, // Close sockets after 45 seconds of inactivity
+    connectTimeoutMS: 15000, // Increased timeout
+    retryWrites: true,
+    w: 'majority'
+  })
+  .then(() => console.log('✅ Connected to MYNTRA FASHION DATABASE successfully'))
+  .catch(err => {
+    console.error('❌ MongoDB connection error:', err);
+    console.log('⚠️ Continuing without database - Socket.IO will still work for real-time chat');
+  });
+}
+
+// Additional Socket.io handlers for call sessions and other features
 io.on('connection', (socket) => {
-  console.log('👤 User connected:', socket.id);
-
-  // Join room
-  socket.on('join-room', (roomId) => {
-    socket.join(roomId);
-    console.log(`👤 User ${socket.id} joined room ${roomId}`);
-  });
-
-  // Leave room
-  socket.on('leave-room', (roomId) => {
-    socket.leave(roomId);
-    console.log(`👤 User ${socket.id} left room ${roomId}`);
-  });
-
-  // Send message
-  socket.on('send-message', (data) => {
-    socket.to(data.roomId).emit('new-message', data);
-  });
-
   // Join call session
   socket.on('join-call', (callId) => {
     socket.join(`call-${callId}`);
-    console.log(`👤 User ${socket.id} joined call ${callId}`);
+    console.log(`👤 User ${socket.userId} joined call ${callId}`);
   });
 
   // Leave call session
   socket.on('leave-call', (callId) => {
     socket.leave(`call-${callId}`);
-    console.log(`👤 User ${socket.id} left call ${callId}`);
+    console.log(`👤 User ${socket.userId} left call ${callId}`);
   });
 
   // Join user-specific room for notifications
   socket.on('join-user', (userId) => {
     socket.join(`user-${userId}`);
-    console.log(`👤 User ${socket.id} joined user room ${userId}`);
+    console.log(`👤 User ${socket.userId} joined user room ${userId}`);
   });
 
   // Voice call signaling
   socket.on('call-signal', (data) => {
     socket.to(data.targetUserId).emit('call-signal', data);
+  });
+
+  // Call notifications
+  socket.on('call-started', (data) => {
+    socket.to(data.roomId).emit('call-started', data);
+  });
+
+  socket.on('user-joined-call', (data) => {
+    socket.to(data.roomId).emit('user-joined-call', data);
+  });
+
+  socket.on('user-left-call', (data) => {
+    socket.to(data.roomId).emit('user-left-call', data);
   });
 
   // Real-time browsing sync (enhanced)
@@ -269,6 +342,40 @@ io.on('connection', (socket) => {
     });
   });
 
+  // Master control events
+  socket.on('call:request-control', (data) => {
+    socket.to(`call-${data.callId}`).emit('call:control-requested', {
+      userId: data.userId,
+      userName: data.userName,
+      callId: data.callId,
+      timestamp: new Date()
+    });
+  });
+
+  socket.on('call:approve-control', (data) => {
+    socket.to(`call-${data.callId}`).emit('call:control-transferred', {
+      newController: data.newController,
+      callId: data.callId,
+      timestamp: new Date()
+    });
+  });
+
+  socket.on('call:deny-control', (data) => {
+    socket.to(`call-${data.callId}`).emit('call:control-denied', {
+      requestUserId: data.requestUserId,
+      callId: data.callId,
+      timestamp: new Date()
+    });
+  });
+
+  socket.on('call:release-control', (data) => {
+    socket.to(`call-${data.callId}`).emit('call:control-released', {
+      userId: data.userId,
+      callId: data.callId,
+      timestamp: new Date()
+    });
+  });
+
   // Cart updates
   socket.on('call:cart-update', (data) => {
     socket.to(`call-${data.callId}`).emit('call:cart-notification', data);
@@ -277,11 +384,6 @@ io.on('connection', (socket) => {
   // Control changes
   socket.on('call:control-changed', (data) => {
     socket.to(`call-${data.callId}`).emit('call:control-update', data);
-  });
-
-  // Disconnect
-  socket.on('disconnect', () => {
-    console.log('👤 User disconnected:', socket.id);
   });
 });
 

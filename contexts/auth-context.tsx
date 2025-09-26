@@ -71,21 +71,28 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
   const checkAuthStatus = async () => {
     try {
+      console.log('🔍 Checking auth status...');
       setIsLoading(true);
       const response = await authAPI.getCurrentUser();
       
+      console.log('📡 Auth response:', response);
+      
       if (response.status === 'success' && response.data.user) {
+        console.log('✅ User authenticated:', response.data.user.email);
         setUser(response.data.user);
       } else {
+        console.log('❌ No user found, setting to null');
         setUser(null);
       }
     } catch (error: any) {
+      console.log('🚫 Auth check failed:', error.message);
       // Only log as error if it's not a 401 (unauthorized) which is expected for unauthenticated users
       if (error.message && !error.message.includes('Access token required')) {
         console.error('Auth check error:', error);
       }
       setUser(null);
     } finally {
+      console.log('🏁 Auth check complete, setting loading to false');
       setIsLoading(false);
     }
   };

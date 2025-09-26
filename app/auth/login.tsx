@@ -2,16 +2,16 @@ import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Alert,
+    KeyboardAvoidingView,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import { useAuth } from '../../contexts/auth-context';
 
@@ -33,18 +33,23 @@ export default function LoginScreen() {
       return;
     }
 
+    console.log('🔐 Attempting login with:', { email: email.trim(), passwordLength: password.length });
+
     setIsLoading(true);
     try {
       const result = await login(email.trim(), password);
       
+      console.log('🔐 Login result:', result);
+      
       if (result.success) {
         Alert.alert('Success', 'Login successful!', [
-          { text: 'OK', onPress: () => router.replace('/catalog') }
+          { text: 'OK', onPress: () => router.replace('/(tabs)') }
         ]);
       } else {
         Alert.alert('Error', result.message || 'Login failed');
       }
     } catch (error) {
+      console.error('🔐 Login error:', error);
       Alert.alert('Error', 'An unexpected error occurred');
     } finally {
       setIsLoading(false);
@@ -126,6 +131,17 @@ export default function LoginScreen() {
               <Text style={styles.signupButtonText}>
                 Don't have an account? <Text style={styles.signupLink}>Sign Up</Text>
               </Text>
+            </TouchableOpacity>
+
+            {/* Test User Button */}
+            <TouchableOpacity
+              style={styles.testButton}
+              onPress={() => {
+                setEmail('test@example.com');
+                setPassword('password123');
+              }}
+            >
+              <Text style={styles.testButtonText}>Use Test Credentials</Text>
             </TouchableOpacity>
           </View>
         </ScrollView>
@@ -253,5 +269,17 @@ const styles = StyleSheet.create({
   signupLink: {
     color: '#E91E63',
     fontWeight: '600',
+  },
+  testButton: {
+    marginTop: 8,
+    padding: 8,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 6,
+    alignItems: 'center',
+  },
+  testButtonText: {
+    fontSize: 10,
+    color: '#666',
+    fontWeight: '500',
   },
 });

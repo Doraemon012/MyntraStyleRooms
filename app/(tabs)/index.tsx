@@ -93,6 +93,7 @@
 import { roomAPI } from '@/services/api';
 import { DancingScript_400Regular, DancingScript_700Bold, useFonts } from '@expo-google-fonts/dancing-script';
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -111,6 +112,16 @@ import {
     View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+
+// Token management function
+const getStoredToken = async (): Promise<string | null> => {
+  try {
+    return await AsyncStorage.getItem('auth_token');
+  } catch (error) {
+    console.error('Error getting stored token:', error);
+    return null;
+  }
+};
 
 interface Room {
   _id: string;
@@ -235,6 +246,15 @@ export default function HomeScreen() {
   const fetchRooms = async (search?: string) => {
     try {
       setLoading(true);
+      
+      // Check if user is authenticated before making API call
+      const token = await getStoredToken();
+      if (!token) {
+        console.log('No authentication token, using mock data');
+        setRooms(mockRooms);
+        return;
+      }
+      
       const response = await roomAPI.getAll({ 
         search: search || searchQuery,
         limit: 50 
@@ -560,9 +580,9 @@ export default function HomeScreen() {
             />
           }
         >
-          {filteredRooms.map((item) => (
+          {filteredRooms.map((item, index) => (
             <TouchableOpacity 
-              key={item._id} 
+              key={item._id || `room-${index}`} 
               style={styles.roomCard}
               onPress={() => router.push(`/room/${item._id}`)}
             >

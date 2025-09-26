@@ -2,6 +2,8 @@ import MayaChat from '@/components/maya-chat';
 import { ThemedView } from '@/components/themed-view';
 import MayaTheme from '@/constants/maya-theme';
 import { roomAPI } from '@/services/api';
+import messageStorage from '@/services/messageStorage';
+import socketService from '@/services/socketService';
 import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -21,7 +23,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 interface Message {
   id: string;
   text: string;
-  sender: 'user' | 'friend' | 'ai' | 'maya';
+  sender: 'user' | 'friend' | 'ai' | 'maya' | 'system';
   senderName: string;
   senderAvatar?: string;
   timestamp: string;
@@ -193,22 +195,65 @@ const mockRooms: Record<string, { name: string; memberCount: number; hasActiveSe
 
 export default function RoomChatScreen() {
   const { id } = useLocalSearchParams();
-  const roomData = mockRooms[id as string] || mockRooms['1'];
+  const roomId = id as string || '1'; // Default to room '1' if id is undefined
+  const roomData = mockRooms[roomId] || mockRooms['1'];
   
-  const [messages, setMessages] = useState<Message[]>(mockMessages);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
   const [room, setRoom] = useState<Room | null>(null);
   const [loading, setLoading] = useState(true);
   const [showMenu, setShowMenu] = useState(false);
+  const [typingUsers, setTypingUsers] = useState<string[]>([]);
+  const [socketConnected, setSocketConnected] = useState(false);
 
   const flatListRef = useRef<FlatList>(null);
+  
+  // Load messages from storage
+  const loadMessages = async () => {
+    try {
+      const storedMessages = await messageStorage.loadMessages(roomId);
+      
+      if (storedMessages.length > 0) {
+        // Load saved messages
+        setMessages(storedMessages);
+        console.log(`📂 Loaded ${storedMessages.length} saved messages for room ${roomId}`);
+      } else {
+        // No saved messages, use initial messages based on room type
+        const isExistingRoom = roomId && ['1', '2', '3', '4', '5'].includes(roomId);
+        const initialMessages = isExistingRoom ? mockMessages : [
+          // Welcome message for new rooms
+          {
+            id: 'welcome-1',
+            text: 'Welcome to your new room! Start chatting with your friends.',
+            sender: 'system' as 'user' | 'friend' | 'ai' | 'maya',
+            senderName: 'System',
+            senderAvatar: 'https://ui-avatars.com/api/?name=S&background=28A745&color=FFFFFF&size=150',
+            timestamp: formatTimestamp(new Date()),
+          }
+        ];
+        setMessages(initialMessages);
+        
+        // Save initial messages
+        await messageStorage.saveMessages(roomId, initialMessages);
+      }
+    } catch (error) {
+      console.error('❌ Error loading messages:', error);
+      // Fallback to empty messages
+      setMessages([]);
+    }
+  };
   
   // Fetch room data from API with better error handling
   const fetchRoomData = async () => {
     try {
       setLoading(true);
       
-      const response = await roomAPI.getById(id as string);
+      // Validate that id exists before making API call
+      if (!id || typeof id !== 'string') {
+        throw new Error('Invalid room ID');
+      }
+      
+      const response = await roomAPI.getById(id);
       
       if (response.status === 'success') {
         setRoom(response.data.room);
@@ -218,13 +263,15 @@ export default function RoomChatScreen() {
       
     } catch (error) {
       console.error('Error fetching room data:', error);
-      // Fallback to mock data
-      const mockRoomData = mockRooms[id as string];
+      // Fallback to mock data for existing rooms, or create new room data
+      const roomId = id as string || '1'; // Default to room '1' if id is undefined
+      const mockRoomData = mockRooms[roomId];
       if (mockRoomData) {
+        // Existing room with mock data
         setRoom({
-          _id: id as string,
+          _id: roomId,
           name: mockRoomData.name,
-          emoji: getRoomEmoji(id as string),
+          emoji: getRoomEmoji(roomId),
           members: generateMockMembers(mockRoomData.memberCount - 1),
           owner: { _id: '1', name: 'Room Owner', email: 'owner@example.com' },
           isPrivate: false,
@@ -232,7 +279,17 @@ export default function RoomChatScreen() {
           updatedAt: new Date().toISOString(),
         });
       } else {
-        setRoom(null);
+        // New room - create basic room data
+        setRoom({
+          _id: roomId,
+          name: `Room ${roomId}`,
+          emoji: '💬',
+          members: [],
+          owner: { _id: '1', name: 'Room Owner', email: 'owner@example.com' },
+          isPrivate: false,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        });
       }
     } finally {
       setLoading(false);
@@ -266,7 +323,101 @@ export default function RoomChatScreen() {
     }));
   };
   
+  // Initialize Socket.IO connection
   useEffect(() => {
+    const initializeSocket = async () => {
+      try {
+        await socketService.initialize({
+          onConnect: () => {
+            console.log('✅ Socket connected');
+            setSocketConnected(true);
+            // Join the room when connected
+            socketService.joinRoom(roomId);
+          },
+          onDisconnect: () => {
+            console.log('❌ Socket disconnected');
+            setSocketConnected(false);
+          },
+          onMessage: async (message) => {
+            console.log('💬 Received real-time message:', message.text);
+            const newMessage: Message = {
+              id: message.id,
+              text: message.text,
+              sender: message.sender as 'user' | 'friend' | 'ai' | 'maya',
+              senderName: message.senderName,
+              senderAvatar: message.senderAvatar,
+              timestamp: formatTimestamp(new Date(message.timestamp)),
+              isProduct: message.messageType === 'product',
+              productData: message.productData,
+              reactions: message.reactions
+            };
+            
+            setMessages(prev => [...prev, newMessage]);
+            
+            // Save incoming message to storage
+            await messageStorage.addMessage(roomId, newMessage);
+          },
+          onTypingStart: (user) => {
+            setTypingUsers(prev => {
+              if (!prev.includes(user.userName)) {
+                return [...prev, user.userName];
+              }
+              return prev;
+            });
+          },
+          onTypingStop: (user) => {
+            setTypingUsers(prev => prev.filter(name => name !== user.userName));
+          },
+          onUserJoined: (user) => {
+            console.log('👋 User joined:', user.userName);
+            // You can add a system message here if needed
+          },
+          onUserLeft: (user) => {
+            console.log('👋 User left:', user.userName);
+            // You can add a system message here if needed
+          },
+          onReactionUpdate: (data) => {
+            console.log('👍 Reaction updated:', data);
+            // Handle reaction updates
+            setMessages(prev => prev.map(msg => {
+              if (msg.id === data.messageId) {
+                // Update reactions based on the data
+                return {
+                  ...msg,
+                  reactions: {
+                    ...msg.reactions,
+                    thumbsUp: data.reactionType === 'thumbsUp' ? 
+                      (msg.reactions?.thumbsUp || 0) + 1 : 
+                      (msg.reactions?.thumbsUp || 0),
+                    thumbsDown: data.reactionType === 'thumbsDown' ? 
+                      (msg.reactions?.thumbsDown || 0) + 1 : 
+                      (msg.reactions?.thumbsDown || 0)
+                  }
+                };
+              }
+              return msg;
+            }));
+          },
+          onError: (error) => {
+            console.error('❌ Socket error:', error);
+          }
+        });
+      } catch (error) {
+        console.error('❌ Failed to initialize socket:', error);
+      }
+    };
+
+    initializeSocket();
+
+    // Cleanup on unmount
+    return () => {
+      socketService.leaveRoom(roomId);
+      socketService.disconnect();
+    };
+  }, [roomId]);
+
+  useEffect(() => {
+    loadMessages();
     fetchRoomData();
   }, [id]);
 
@@ -277,32 +428,51 @@ export default function RoomChatScreen() {
     }, [id])
   );
 
-  const sendMessage = () => {
+  const sendMessage = async () => {
     if (inputText.trim()) {
       const now = new Date();
+      const messageText = inputText.trim();
+      
+      // Create local message immediately for better UX
       const newMessage: Message = {
-        id: Date.now().toString(),
-        text: inputText.trim(),
+        id: `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        text: messageText,
         sender: 'user',
         senderName: 'You',
-        senderAvatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face',
+        senderAvatar: 'https://ui-avatars.com/api/?name=You&background=FF6B9D&color=FFFFFF&size=150',
         timestamp: formatTimestamp(now),
       };
       
-      setMessages([...messages, newMessage]);
+      const updatedMessages = [...messages, newMessage];
+      setMessages(updatedMessages);
       setInputText('');
       
+      // Save message to storage
+      await messageStorage.addMessage(roomId, newMessage);
+      
+      // Send message via Socket.IO for real-time delivery
+      if (socketConnected) {
+        socketService.sendMessage({
+          text: messageText,
+          sender: 'user',
+          senderName: 'You',
+          senderAvatar: 'https://ui-avatars.com/api/?name=You&background=FF6B9D&color=FFFFFF&size=150',
+          roomId: roomId,
+          messageType: 'text'
+        });
+      }
+      
       // Check if message mentions Maya AI
-      if (inputText.toLowerCase().includes('@maya') || inputText.toLowerCase().includes('@mayaai')) {
-      setTimeout(() => {
-        const aiResponseTime = new Date();
-        const aiResponse: Message = {
-          id: (Date.now() + 1).toString(),
+      if (messageText.toLowerCase().includes('@maya') || messageText.toLowerCase().includes('@mayaai')) {
+        setTimeout(async () => {
+          const aiResponseTime = new Date();
+          const aiResponse: Message = {
+            id: `ai_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
             text: 'I found some beautiful options for you! Here\'s a stunning piece from Myntra\'s collection.',
-          sender: 'ai',
+            sender: 'ai',
             senderName: 'Maya(AI)',
-            senderAvatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face',
-          timestamp: formatTimestamp(aiResponseTime),
+            senderAvatar: 'https://ui-avatars.com/api/?name=AI&background=4A90E2&color=FFFFFF&size=150',
+            timestamp: formatTimestamp(aiResponseTime),
             isProduct: true,
             productData: {
               name: 'Designer Ethnic Wear',
@@ -314,8 +484,26 @@ export default function RoomChatScreen() {
               thumbsUp: 0,
               thumbsDown: 0,
             },
-        };
-        setMessages(prev => [...prev, aiResponse]);
+          };
+          const updatedMessagesWithAI = [...messages, newMessage, aiResponse];
+          setMessages(updatedMessagesWithAI);
+          
+          // Save AI response to storage
+          await messageStorage.addMessage(roomId, aiResponse);
+          
+          // Broadcast AI response to all users in the room via Socket.IO
+          if (socketConnected) {
+            socketService.sendMessage({
+              text: aiResponse.text,
+              sender: 'ai',
+              senderName: 'Maya(AI)',
+              senderAvatar: 'https://ui-avatars.com/api/?name=AI&background=4A90E2&color=FFFFFF&size=150',
+              roomId: roomId,
+              messageType: 'product',
+              productData: aiResponse.productData,
+              reactions: aiResponse.reactions
+            });
+          }
         }, 1500);
       }
     }
@@ -616,29 +804,48 @@ export default function RoomChatScreen() {
     } : undefined,
   }));
 
-  const handleSendMessage = (text: string) => {
+  const handleSendMessage = async (text: string) => {
     const now = new Date();
+    const messageText = text.trim();
+    
+    // Create local message immediately for better UX
     const newMessage: Message = {
-      id: Date.now().toString(),
-      text: text,
+      id: `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      text: messageText,
       sender: 'user',
       senderName: 'You',
-      senderAvatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face',
+      senderAvatar: 'https://ui-avatars.com/api/?name=You&background=FF6B9D&color=FFFFFF&size=150',
       timestamp: formatTimestamp(now),
     };
     
-    setMessages([...messages, newMessage]);
+    const updatedMessages = [...messages, newMessage];
+    setMessages(updatedMessages);
+    
+    // Save message to storage
+    await messageStorage.addMessage(roomId, newMessage);
+    
+    // Send message via Socket.IO for real-time delivery
+    if (socketConnected) {
+      socketService.sendMessage({
+        text: messageText,
+        sender: 'user',
+        senderName: 'You',
+        senderAvatar: 'https://ui-avatars.com/api/?name=You&background=FF6B9D&color=FFFFFF&size=150',
+        roomId: roomId,
+        messageType: 'text'
+      });
+    }
     
     // Check if message mentions Maya AI
-    if (text.toLowerCase().includes('@maya') || text.toLowerCase().includes('@mayaai')) {
-      setTimeout(() => {
+    if (messageText.toLowerCase().includes('@maya') || messageText.toLowerCase().includes('@mayaai')) {
+      setTimeout(async () => {
         const aiResponseTime = new Date();
         const aiResponse: Message = {
-          id: (Date.now() + 1).toString(),
+          id: `ai_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
           text: 'I found some beautiful options for you! Here\'s a stunning piece from Myntra\'s collection.',
           sender: 'ai',
           senderName: 'Maya(AI)',
-          senderAvatar: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face',
+          senderAvatar: 'https://ui-avatars.com/api/?name=AI&background=4A90E2&color=FFFFFF&size=150',
           timestamp: formatTimestamp(aiResponseTime),
           isProduct: true,
           productData: {
@@ -658,7 +865,25 @@ export default function RoomChatScreen() {
             thumbsDown: 0,
           },
         };
-        setMessages(prev => [...prev, aiResponse]);
+        const updatedMessagesWithAI = [...messages, newMessage, aiResponse];
+        setMessages(updatedMessagesWithAI);
+        
+        // Save AI response to storage
+        await messageStorage.addMessage(roomId, aiResponse);
+        
+        // Broadcast AI response to all users in the room via Socket.IO
+        if (socketConnected) {
+          socketService.sendMessage({
+            text: aiResponse.text,
+            sender: 'ai',
+            senderName: 'Maya(AI)',
+            senderAvatar: 'https://ui-avatars.com/api/?name=AI&background=4A90E2&color=FFFFFF&size=150',
+            roomId: roomId,
+            messageType: 'product',
+            productData: aiResponse.productData,
+            reactions: aiResponse.reactions
+          });
+        }
       }, 1500);
     }
   };
@@ -677,6 +902,8 @@ export default function RoomChatScreen() {
         messages={mayaMessages}
         onSendMessage={handleSendMessage}
         onProductAction={handleProductAction}
+        typingUsers={typingUsers}
+        socketConnected={socketConnected}
       />
 
       {/* Menu Modal */}

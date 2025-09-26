@@ -4,18 +4,19 @@ import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  Animated,
-  Dimensions,
-  FlatList,
-  Modal,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View
+    Animated,
+    Dimensions,
+    FlatList,
+    Modal,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import RoomSelectionModal from '../components/RoomSelectionModal';
 import AttendeeSessionHeader from '../components/session/AttendeeSessionHeader';
 import HostSessionHeader from '../components/session/HostSessionHeader';
 import SessionBottomControls from '../components/session/SessionBottomControls';
@@ -25,12 +26,14 @@ import { getActiveBanners } from '../data/banners';
 import { Category, mockCategories } from '../data/categories';
 import { getActivePlayMenuItems } from '../data/playMenuItems';
 import {
-  getProductsByCategory,
-  getTrendingProducts,
-  mockProducts,
-  Product,
-  searchProducts
+    getProductsByCategory,
+    getTrendingProducts,
+    mockProducts,
+    Product,
+    searchProducts
 } from '../data/products';
+import messageStorage from '../services/messageStorage';
+import socketService from '../services/socketService';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -51,6 +54,8 @@ export default function CatalogScreen() {
   const playButtonScale = useRef(new Animated.Value(1)).current;
   const menuOpacity = useRef(new Animated.Value(0)).current;
   const menuScale = useRef(new Animated.Value(0.8)).current;
+  const [showRoomSelection, setShowRoomSelection] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
 
   // Auto-scroll banner every 3 seconds
   useEffect(() => {
@@ -138,6 +143,71 @@ export default function CatalogScreen() {
     }
   };
 
+  // Handle sending product to chat
+  const handleSendToChat = (product: Product) => {
+    setSelectedProduct(product);
+    setShowRoomSelection(true);
+  };
+
+  // Handle room selection for sending product
+  const handleRoomSelect = async (room: any) => {
+    if (!selectedProduct) return;
+
+    try {
+      // Create product message with unique ID
+      const productMessage = {
+        id: `product_${selectedProduct._id}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        text: `Check out this ${selectedProduct.name}!`,
+        sender: 'user' as 'user' | 'friend' | 'ai' | 'maya',
+        senderName: 'You',
+        senderAvatar: 'https://ui-avatars.com/api/?name=You&background=FF6B9D&color=FFFFFF&size=150',
+        timestamp: new Date().toISOString(),
+        isProduct: true,
+        productData: {
+          name: selectedProduct.name,
+          price: `₹${selectedProduct.price.toLocaleString()}`,
+          image: selectedProduct.image,
+          description: selectedProduct.description || `${selectedProduct.brand} ${selectedProduct.name}`,
+          brand: selectedProduct.brand,
+          category: selectedProduct.category,
+          rating: selectedProduct.rating,
+          discountPercentage: selectedProduct.discountPercentage,
+          originalPrice: selectedProduct.originalPrice ? `₹${selectedProduct.originalPrice.toLocaleString()}` : undefined,
+        },
+        reactions: {
+          thumbsUp: 0,
+          thumbsDown: 0,
+        }
+      };
+
+      // Save message to storage
+      await messageStorage.addMessage(room._id, productMessage);
+
+      // Send via Socket.IO if connected
+      const connectionStatus = socketService.getConnectionStatus();
+      if (connectionStatus.isConnected) {
+        socketService.sendMessage({
+          text: productMessage.text,
+          sender: 'user',
+          senderName: 'You',
+          senderAvatar: 'https://ui-avatars.com/api/?name=You&background=FF6B9D&color=FFFFFF&size=150',
+          roomId: room._id,
+          messageType: 'product',
+          productData: productMessage.productData,
+          reactions: productMessage.reactions
+        });
+      }
+
+      console.log(`✅ Product "${selectedProduct.name}" sent to room "${room.name}"`);
+      
+      // Navigate to the room chat
+      router.push(`/room/${room._id}`);
+      
+    } catch (error) {
+      console.error('❌ Error sending product to chat:', error);
+    }
+  };
+
   const renderCategory = ({ item }: { item: Category }) => (
     <TouchableOpacity
       style={[
@@ -162,42 +232,53 @@ export default function CatalogScreen() {
   );
 
   const renderProduct = ({ item }: { item: Product }) => (
-    <TouchableOpacity 
-      style={styles.productCard}
+    <View style={styles.productCard}>
+      <TouchableOpacity 
+        style={styles.productCardInner}
         onPress={() => router.push(`/product/${item._id}` as any)}
-    >
-      <View style={styles.productImageContainer}>
-        <Image source={{ uri: item.image }} style={styles.productImage} />
-        {item.isNew && (
-          <View style={styles.newBadge}>
-            <Text style={styles.newBadgeText}>NEW</Text>
-          </View>
-        )}
-        {item.isTrending && (
-          <View style={styles.trendingBadge}>
-            <Text style={styles.trendingBadgeText}>🔥</Text>
-          </View>
-        )}
-        {item.discountPercentage > 0 && (
-          <View style={styles.discountBadge}>
-            <Text style={styles.discountBadgeText}>{item.discountPercentage}% OFF</Text>
-          </View>
-        )}
-      </View>
-      <View style={styles.productInfo}>
-        <Text style={styles.brandName}>{item.brand}</Text>
-        <Text style={styles.productName} numberOfLines={2}>{item.name}</Text>
-        <View style={styles.priceContainer}>
-          <Text style={styles.price}>₹{item.price.toLocaleString()}</Text>
-          {item.originalPrice > item.price && (
-            <Text style={styles.originalPrice}>₹{item.originalPrice.toLocaleString()}</Text>
+      >
+        <View style={styles.productImageContainer}>
+          <Image source={{ uri: item.image }} style={styles.productImage} />
+          {item.isNew && (
+            <View style={styles.newBadge}>
+              <Text style={styles.newBadgeText}>NEW</Text>
+            </View>
+          )}
+          {item.isTrending && (
+            <View style={styles.trendingBadge}>
+              <Text style={styles.trendingBadgeText}>🔥</Text>
+            </View>
+          )}
+          {item.discountPercentage > 0 && (
+            <View style={styles.discountBadge}>
+              <Text style={styles.discountBadgeText}>{item.discountPercentage}% OFF</Text>
+            </View>
           )}
         </View>
-        <View style={styles.ratingContainer}>
-          <Text style={styles.rating}>⭐ {item.rating}</Text>
+        <View style={styles.productInfo}>
+          <Text style={styles.brandName}>{item.brand}</Text>
+          <Text style={styles.productName} numberOfLines={2}>{item.name}</Text>
+          <View style={styles.priceContainer}>
+            <Text style={styles.price}>₹{item.price.toLocaleString()}</Text>
+            {item.originalPrice > item.price && (
+              <Text style={styles.originalPrice}>₹{item.originalPrice.toLocaleString()}</Text>
+            )}
+          </View>
+          <View style={styles.ratingContainer}>
+            <Text style={styles.rating}>⭐ {item.rating}</Text>
+          </View>
         </View>
-      </View>
-    </TouchableOpacity>
+      </TouchableOpacity>
+      
+      {/* Send to Chat Button */}
+      <TouchableOpacity 
+        style={styles.sendToChatButton}
+        onPress={() => handleSendToChat(item)}
+      >
+        <Ionicons name="chatbubble-outline" size={16} color="#E91E63" />
+        <Text style={styles.sendToChatText}>Send to Chat</Text>
+      </TouchableOpacity>
+    </View>
   );
 
   return (
@@ -408,38 +489,48 @@ export default function CatalogScreen() {
               contentContainerStyle={styles.mockCardsContainer}
             >
               {trendingProducts.map((product) => (
-                <TouchableOpacity 
-                  key={product._id} 
-                  style={styles.mockCard}
-                  onPress={() => router.push(`/product/${product._id}` as any)}
-                >
-                  <View style={styles.mockCardImageContainer}>
-                    <Image source={{ uri: product.image }} style={styles.mockCardImage} />
-                    {product.isNew && (
-                      <View style={styles.mockCardBadge}>
-                        <Text style={styles.mockCardBadgeText}>NEW</Text>
-                      </View>
-                    )}
-                    {product.discountPercentage > 0 && (
-                      <View style={styles.mockCardDiscount}>
-                        <Text style={styles.mockCardDiscountText}>{product.discountPercentage}% OFF</Text>
-                      </View>
-                    )}
-                  </View>
-                  <View style={styles.mockCardInfo}>
-                    <Text style={styles.mockCardBrand}>{product.brand}</Text>
-                    <Text style={styles.mockCardName} numberOfLines={2}>{product.name}</Text>
-                    <View style={styles.mockCardPriceContainer}>
-                      <Text style={styles.mockCardPrice}>₹{product.price.toLocaleString()}</Text>
-                      {product.originalPrice > product.price && (
-                        <Text style={styles.mockCardOriginalPrice}>₹{product.originalPrice.toLocaleString()}</Text>
+                <View key={product._id} style={styles.mockCard}>
+                  <TouchableOpacity 
+                    style={styles.mockCardInner}
+                    onPress={() => router.push(`/product/${product._id}` as any)}
+                  >
+                    <View style={styles.mockCardImageContainer}>
+                      <Image source={{ uri: product.image }} style={styles.mockCardImage} />
+                      {product.isNew && (
+                        <View style={styles.mockCardBadge}>
+                          <Text style={styles.mockCardBadgeText}>NEW</Text>
+                        </View>
+                      )}
+                      {product.discountPercentage > 0 && (
+                        <View style={styles.mockCardDiscount}>
+                          <Text style={styles.mockCardDiscountText}>{product.discountPercentage}% OFF</Text>
+                        </View>
                       )}
                     </View>
-                    <View style={styles.mockCardRating}>
-                      <Text style={styles.mockCardRatingText}>⭐ {product.rating}</Text>
+                    <View style={styles.mockCardInfo}>
+                      <Text style={styles.mockCardBrand}>{product.brand}</Text>
+                      <Text style={styles.mockCardName} numberOfLines={2}>{product.name}</Text>
+                      <View style={styles.mockCardPriceContainer}>
+                        <Text style={styles.mockCardPrice}>₹{product.price.toLocaleString()}</Text>
+                        {product.originalPrice > product.price && (
+                          <Text style={styles.mockCardOriginalPrice}>₹{product.originalPrice.toLocaleString()}</Text>
+                        )}
+                      </View>
+                      <View style={styles.mockCardRating}>
+                        <Text style={styles.mockCardRatingText}>⭐ {product.rating}</Text>
+                      </View>
                     </View>
-                  </View>
-                </TouchableOpacity>
+                  </TouchableOpacity>
+                  
+                  {/* Send to Chat Button for Trending Products */}
+                  <TouchableOpacity 
+                    style={styles.mockCardSendToChatButton}
+                    onPress={() => handleSendToChat(product)}
+                  >
+                    <Ionicons name="chatbubble-outline" size={14} color="#E91E63" />
+                    <Text style={styles.mockCardSendToChatText}>Send</Text>
+                  </TouchableOpacity>
+                </View>
               ))}
             </ScrollView>
           </View>
@@ -596,6 +687,14 @@ export default function CatalogScreen() {
             </View>
           </TouchableOpacity>
         </Modal>
+
+        {/* Room Selection Modal */}
+        <RoomSelectionModal
+          visible={showRoomSelection}
+          onClose={() => setShowRoomSelection(false)}
+          onRoomSelect={handleRoomSelect}
+          productName={selectedProduct?.name}
+        />
 
         {/* Play Menu Modal */}
         <Modal
@@ -1581,5 +1680,45 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.8,
     shadowRadius: 4,
     elevation: 4,
+  },
+  // Send to Chat Button styles
+  productCardInner: {
+    flex: 1,
+  },
+  sendToChatButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: '#f8f9fa',
+    borderTopWidth: 1,
+    borderTopColor: '#e0e0e0',
+    gap: 6,
+  },
+  sendToChatText: {
+    fontSize: 12,
+    color: '#E91E63',
+    fontWeight: '600',
+  },
+  // Mock Card Send to Chat Button styles
+  mockCardInner: {
+    flex: 1,
+  },
+  mockCardSendToChatButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+    backgroundColor: '#f8f9fa',
+    borderTopWidth: 1,
+    borderTopColor: '#e0e0e0',
+    gap: 4,
+  },
+  mockCardSendToChatText: {
+    fontSize: 10,
+    color: '#E91E63',
+    fontWeight: '600',
   },
 });
