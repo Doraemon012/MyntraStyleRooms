@@ -92,13 +92,22 @@ export default function ProductDetailScreen() {
       const token = await AsyncStorage.getItem('auth_token');
       if (!token) {
         Alert.alert('Error', 'Please log in to add products to wardrobe');
+        setAddingToWardrobe(false);
         return;
       }
+
+      console.log('Adding product to wardrobe:', {
+        wardrobeId,
+        productId: product._id,
+        productName: product.name
+      });
 
       const response = await wardrobeApi.addToWardrobe(token, wardrobeId, product._id, {
         notes: `Added from product screen`,
         priority: 'medium'
       });
+
+      console.log('Add to wardrobe response:', response);
 
       if (response.status === 'success') {
         Alert.alert('Success', 'Product added to wardrobe!');
@@ -108,7 +117,7 @@ export default function ProductDetailScreen() {
       }
     } catch (error) {
       console.error('Error adding to wardrobe:', error);
-      Alert.alert('Error', 'Failed to add product to wardrobe');
+      Alert.alert('Error', `Failed to add product to wardrobe: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setAddingToWardrobe(false);
     }
@@ -587,6 +596,7 @@ export default function ProductDetailScreen() {
           productName={product.name}
           productPrice={`₹${product.price.toLocaleString()}`}
           loading={addingToWardrobe}
+          roomId={sessionRoomId || undefined}
         />
       </SafeAreaView>
     </View>

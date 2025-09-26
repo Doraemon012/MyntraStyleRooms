@@ -1,25 +1,7 @@
 // API service for easy backend integration
 // This file contains all the API calls that will be used to fetch data from MongoDB
 
-// API Configuration with fallbacks
-const getApiBaseUrl = () => {
-  if (process.env.EXPO_PUBLIC_API_URL) {
-    return process.env.EXPO_PUBLIC_API_URL;
-  }
-  
-  // Try different IP addresses based on the environment
-  const possibleUrls = [
-    'http://172.20.10.2:5000/api',   // Current network IP (first priority)
-    'http://localhost:5000/api',      // Web/local development
-    'http://10.84.92.165:5000/api',  // Previous system IP (Wi-Fi)
-    'http://192.168.56.1:5000/api',  // Ethernet adapter IP
-    'http://172.27.35.178:5000/api', // Previous IP (fallback)
-    'http://192.168.1.100:5000/api', // Alternative local network IP
-    'http://10.0.2.2:5000/api',      // Android emulator localhost
-  ];
-  
-  return possibleUrls[0]; // Default to the first one
-};
+import { getApiBaseUrl } from '../utils/networkUtils';
 
 const API_BASE_URL = getApiBaseUrl();
 console.log('🌐 API Base URL configured:', API_BASE_URL);
@@ -42,11 +24,18 @@ async function apiCall<T>(endpoint: string, options: RequestInit = {}): Promise<
 
   console.log(`🌐 Making API call to: ${url}`);
   console.log(`🔑 Token present: ${!!token}`);
+  console.log(`📋 Request options:`, {
+    method: defaultOptions.method || 'GET',
+    headers: defaultOptions.headers,
+    body: defaultOptions.body ? 'Present' : 'None'
+  });
 
   try {
+    console.log(`⏳ Sending request...`);
     const response = await fetch(url, defaultOptions);
     
     console.log(`📡 Response status: ${response.status}`);
+    console.log(`📡 Response headers:`, Object.fromEntries(response.headers.entries()));
     
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
@@ -482,6 +471,48 @@ export const roomAPI = {
     }),
 };
 
+// Invitation API calls
+export const invitationAPI = {
+  // Get all invitations for current user
+  getAll: (params?: { status?: string; room?: string }) => 
+    apiCall<{ status: string; data: { invitations: any[] } }>(`/invitations?${new URLSearchParams(params as any).toString()}`),
+  
+  // Get pending invitations for current user
+  getPending: () => 
+    apiCall<{ status: string; data: { invitations: any[] } }>('/invitations/pending'),
+  
+  // Send invitation
+  send: (data: {
+    roomId: string;
+    inviteeId: string;
+    role?: 'Editor' | 'Contributor' | 'Viewer';
+    message?: string;
+    expiresInDays?: number;
+  }) => 
+    apiCall<{ status: string; message: string; data: { invitation: any } }>('/invitations', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  
+  // Accept invitation
+  accept: (invitationId: string) => 
+    apiCall<{ status: string; message: string; data: { invitation: any } }>(`/invitations/${invitationId}/accept`, {
+      method: 'PUT',
+    }),
+  
+  // Decline invitation
+  decline: (invitationId: string) => 
+    apiCall<{ status: string; message: string }>(`/invitations/${invitationId}/decline`, {
+      method: 'PUT',
+    }),
+  
+  // Cancel invitation (inviter only)
+  cancel: (invitationId: string) => 
+    apiCall<{ status: string; message: string }>(`/invitations/${invitationId}`, {
+      method: 'DELETE',
+    }),
+};
+
 // Export all APIs
 export default {
   auth: authAPI,
@@ -494,4 +525,5 @@ export default {
   order: orderAPI,
   review: reviewAPI,
   room: roomAPI,
+  invitation: invitationAPI,
 };

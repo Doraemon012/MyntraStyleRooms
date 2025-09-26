@@ -125,6 +125,7 @@ const mockMessages: Message[] = [
           price: '₹4,999',
           image: 'https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=400&h=500&fit=crop',
           description: 'Elegant red silk saree with intricate golden border work, perfect for weddings and festive events. Made from luxurious silk with traditional zari weaving.',
+          productId: '68d516da69694e195ce65b53',
         },
     reactions: {
       thumbsUp: 2,
@@ -479,6 +480,7 @@ export default function RoomChatScreen() {
               price: '₹3,999',
               image: 'https://images.unsplash.com/photo-1594736797933-d0401ba2fe65?w=300&h=400&fit=crop&crop=face',
               description: 'Beautiful ethnic wear perfect for special occasions',
+              productId: '68d516da69694e195ce65b5f',
             },
             reactions: {
               thumbsUp: 0,
@@ -853,6 +855,7 @@ export default function RoomChatScreen() {
             price: '₹3,999',
             image: 'https://images.unsplash.com/photo-1549298916-b41d501d3772?w=400&h=500&fit=crop',
             description: 'Step out in style with these stylish sneakers that offer both comfort and flair. Perfect for casual outings or workouts, they will keep you looking fresh and trendy.',
+            productId: '68d516da69694e195ce65b6b',
             images: [
               'https://images.unsplash.com/photo-1549298916-b41d501d3772?w=400&h=500&fit=crop',
               'https://images.unsplash.com/photo-1594633312681-425c7b97ccd1?w=400&h=500&fit=crop',
@@ -897,6 +900,7 @@ export default function RoomChatScreen() {
     <>
       <MayaChat
         roomName={room ? room.name : 'Room'}
+        roomId={id as string}
         onBack={() => router.back()}
         onMenuPress={() => setShowMenu(true)}
         messages={mayaMessages}

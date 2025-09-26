@@ -3,6 +3,7 @@ const Wardrobe = require('../models/Wardrobe');
 const WardrobeItem = require('../models/WardrobeItem');
 const User = require('../models/User');
 const Product = require('../models/Product');
+const Room = require('../models/Room');
 require('dotenv').config();
 
 // Sample data
@@ -205,15 +206,25 @@ async function seedDatabase() {
     }
     console.log('🛍️ Created sample products');
 
+    // Get existing rooms
+    const rooms = await Room.find({});
+    if (rooms.length === 0) {
+      console.log('❌ No rooms found. Please run seedRooms.js first to create rooms.');
+      return;
+    }
+    console.log(`🏠 Found ${rooms.length} rooms`);
+
     // Create wardrobes
     const wardrobes = [];
     for (let i = 0; i < sampleWardrobes.length; i++) {
       const wardrobeData = sampleWardrobes[i];
       const owner = users[i % users.length]; // Distribute ownership
+      const room = rooms[i % rooms.length]; // Distribute across rooms
       
       const wardrobe = new Wardrobe({
         ...wardrobeData,
         owner: owner._id,
+        roomId: room._id, // Associate with specific room
         members: [
           {
             userId: owner._id,
@@ -236,6 +247,7 @@ async function seedDatabase() {
 
       await wardrobe.save();
       wardrobes.push(wardrobe);
+      console.log(`👗 Created wardrobe "${wardrobe.name}" in room "${room.name}"`);
     }
     console.log('👗 Created sample wardrobes');
 

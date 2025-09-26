@@ -1,8 +1,10 @@
 import { DancingScript_400Regular, DancingScript_700Bold, useFonts } from '@expo-google-fonts/dancing-script';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
+    Alert,
     FlatList,
     Image,
     StyleSheet,
@@ -12,6 +14,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useSession } from '../contexts/session-context';
+import { wardrobeApi } from '../services/wardrobeApi';
 
 interface WardrobeCategory {
     id: string;
@@ -135,12 +138,67 @@ export default function StartSessionScreen() {
     const [selectedWardrobe, setSelectedWardrobe] = useState<string | null>(null);
     const [notifyMembers, setNotifyMembers] = useState(true);
     const [isNotifying, setIsNotifying] = useState(false);
+    const [realWardrobes, setRealWardrobes] = useState<any[]>([]);
+    const [loadingWardrobes, setLoadingWardrobes] = useState(false);
     const { startSession } = useSession();
 
     let [fontsLoaded] = useFonts({
         DancingScript_400Regular,
         DancingScript_700Bold,
     });
+
+    // Load real wardrobes and convert to original UI format
+    const loadRealWardrobes = async () => {
+        setLoadingWardrobes(true);
+        try {
+            const token = await AsyncStorage.getItem('auth_token');
+            if (!token) {
+                console.log('No auth token found');
+                setLoadingWardrobes(false);
+                return;
+            }
+
+            const response = await wardrobeApi.getWardrobes(token, { limit: 50 });
+            if (response.status === 'success' && response.data) {
+                // Convert real wardrobes to original UI format
+                const convertedWardrobes = response.data.wardrobes.map((wardrobe: any) => {
+                    // Generate diverse sample images for wardrobe items
+                    const sampleImages = [
+                        'https://images.unsplash.com/photo-1594633313593-bab3825d0caf?w=150&h=200&fit=crop',
+                        'https://images.unsplash.com/photo-1515372039744-b8f02a3ae446?w=150&h=200&fit=crop',
+                        'https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=150&h=200&fit=crop',
+                        'https://images.unsplash.com/photo-1583743814966-fa38a8414556?w=150&h=200&fit=crop',
+                        'https://images.unsplash.com/photo-1523381294911-8d3cead2f61c?w=150&h=200&fit=crop',
+                        'https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?w=150&h=200&fit=crop',
+                        'https://images.unsplash.com/photo-1525507119060-efcd09af0796?w=150&h=200&fit=crop',
+                        'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=150&h=200&fit=crop',
+                        'https://images.unsplash.com/photo-1560243563-062bfc001d68?w=150&h=200&fit=crop',
+                        'https://images.unsplash.com/photo-1551698618-1dfe5d97d256?w=150&h=200&fit=crop'
+                    ];
+                    
+                    return {
+                        id: wardrobe._id,
+                        name: wardrobe.name,
+                        subtitle: wardrobe.occasionType || 'AI Powered',
+                        items: Array.from({ length: Math.min(5, wardrobe.itemCount || 3) }, (_, index) => ({
+                            id: `${wardrobe._id}_${index}`,
+                            image: sampleImages[index % sampleImages.length]
+                        }))
+                    };
+                });
+                setRealWardrobes(convertedWardrobes);
+            }
+        } catch (error) {
+            console.error('Error loading wardrobes:', error);
+        } finally {
+            setLoadingWardrobes(false);
+        }
+    };
+
+    // Load wardrobes on component mount
+    useEffect(() => {
+        loadRealWardrobes();
+    }, []);
 
     if (!fontsLoaded) {
         return null;
@@ -165,8 +223,12 @@ export default function StartSessionScreen() {
     };
 
     const handleStartSession = () => {
+        if (!selectedWardrobe) {
+            Alert.alert('Error', 'Please select a wardrobe before starting the session');
+            return;
+        }
         // Start the session as host with participants
-        startSession('1', mockParticipants, true);
+        startSession('1', mockParticipants, true, selectedWardrobe);
         // Navigate to the catalog screen for the session
         router.push("/catalog");
     };
@@ -221,9 +283,20 @@ export default function StartSessionScreen() {
         );
     };
 
-    const renderWardrobeItem = ({ item }: { item: WardrobeItem }) => (
-        <Image source={{ uri: item.image }} style={styles.wardrobeItemImage} />
-    );
+    const renderWardrobeItem = ({ item }: { item: WardrobeItem }) => {
+        const fallbackImage = 'https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=150&h=200&fit=crop';
+        
+        return (
+            <Image 
+                source={{ uri: item.image || fallbackImage }} 
+                style={styles.wardrobeItemImage}
+                defaultSource={{ uri: fallbackImage }}
+                onError={(e) => {
+                    console.log('Image failed to load:', item.image);
+                }}
+            />
+        );
+    };
 
 
     const renderWardrobeCategory = ({ item, index }: { item: WardrobeCategory; index: number }) => {
@@ -274,17 +347,27 @@ export default function StartSessionScreen() {
         );
     };
 
-    const renderWardrobeStep = () => (
-        <View style={styles.stepContent}>
-            <FlatList
-                data={wardrobeCategories}
-                renderItem={({ item, index }) => renderWardrobeCategory({ item, index })}
-                keyExtractor={(item) => item.id}
-                showsVerticalScrollIndicator={false}
-                contentContainerStyle={styles.categoriesList}
-            />
-        </View>
-    );
+    const renderWardrobeStep = () => {
+        const dataToShow = realWardrobes.length > 0 ? realWardrobes : wardrobeCategories;
+        
+        return (
+            <View style={styles.stepContent}>
+                {loadingWardrobes ? (
+                    <View style={styles.loadingContainer}>
+                        <Text style={styles.loadingText}>Loading wardrobes...</Text>
+                    </View>
+                ) : (
+                    <FlatList
+                        data={dataToShow}
+                        renderItem={({ item, index }) => renderWardrobeCategory({ item, index })}
+                        keyExtractor={(item) => item.id}
+                        showsVerticalScrollIndicator={false}
+                        contentContainerStyle={styles.categoriesList}
+                    />
+                )}
+            </View>
+        );
+    };
 
     const renderNotifyStep = () => (
         <View style={styles.stepContent}>
@@ -693,5 +776,16 @@ const styles = StyleSheet.create({
         color: "white",
         fontSize: 18,
         fontWeight: "bold",
+    },
+    loadingContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingVertical: 40,
+    },
+    loadingText: {
+        fontSize: 16,
+        color: '#666',
+        marginTop: 10,
     },
 });

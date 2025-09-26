@@ -128,11 +128,12 @@ const checkRoomPermission = (requiredRole = 'Viewer') => {
 const checkWardrobePermission = (requiredRole = 'Viewer') => {
   return async (req, res, next) => {
     try {
-      const { wardrobeId } = req.params;
+      const { id, wardrobeId } = req.params;
+      const wardrobeIdToUse = id || wardrobeId; // Support both parameter names
       const userId = req.user._id;
 
       const Wardrobe = require('../models/Wardrobe');
-      const wardrobe = await Wardrobe.findById(wardrobeId);
+      const wardrobe = await Wardrobe.findById(wardrobeIdToUse);
 
       if (!wardrobe) {
         return res.status(404).json({
@@ -144,6 +145,7 @@ const checkWardrobePermission = (requiredRole = 'Viewer') => {
       // Check if user is owner
       if (wardrobe.owner.toString() === userId.toString()) {
         req.userRole = 'Owner';
+        req.wardrobe = wardrobe; // Add wardrobe to request object
         return next();
       }
 

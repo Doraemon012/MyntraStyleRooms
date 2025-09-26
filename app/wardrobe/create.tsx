@@ -3,7 +3,7 @@ import { roomAPI, userAPI } from '@/services/api';
 import { wardrobeApi } from '@/services/wardrobeApi';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
@@ -37,8 +37,10 @@ interface WardrobeMember {
 
 export default function CreateWardrobeScreen() {
   const { sessionRoomId } = useSession();
+  const { roomId } = useLocalSearchParams();
   const [wardrobeName, setWardrobeName] = useState('');
   const [description, setDescription] = useState('');
+  const [occasionType, setOccasionType] = useState('General Collection');
   const [isPrivate, setIsPrivate] = useState(false);
   const [members, setMembers] = useState<WardrobeMember[]>([]);
   const [showUserModal, setShowUserModal] = useState(false);
@@ -46,6 +48,21 @@ export default function CreateWardrobeScreen() {
   const [loading, setLoading] = useState(false);
   const [users, setUsers] = useState<User[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
+
+  // Use roomId from params or sessionRoomId as fallback
+  const currentRoomId = (roomId as string) || sessionRoomId;
+
+  const occasionTypes = [
+    'Wedding & Celebrations',
+    'Office & Professional',
+    'Casual & Weekend',
+    'Party & Nightlife',
+    'Travel & Vacation',
+    'Festival & Cultural',
+    'Sports & Fitness',
+    'Date Night',
+    'General Collection'
+  ];
 
   useEffect(() => {
     loadUsers();
@@ -62,10 +79,10 @@ export default function CreateWardrobeScreen() {
       }
 
       let response;
-      if (sessionRoomId) {
+      if (currentRoomId) {
         // Get users from the current room
-        console.log('Loading users from room:', sessionRoomId);
-        response = await roomAPI.getById(sessionRoomId);
+        console.log('Loading users from room:', currentRoomId);
+        response = await roomAPI.getById(currentRoomId);
         if (response.status === 'success' && response.data) {
           // Extract users from room members
           const roomMembers = response.data.room.members || [];
@@ -118,7 +135,7 @@ export default function CreateWardrobeScreen() {
   };
 
   const addAllRoomMembers = () => {
-    if (sessionRoomId && users.length > 0) {
+    if (currentRoomId && users.length > 0) {
       const newMembers: WardrobeMember[] = users
         .filter(user => !members.some(member => member.userId === user._id))
         .map(user => ({
@@ -158,6 +175,11 @@ export default function CreateWardrobeScreen() {
       return;
     }
 
+    if (!currentRoomId) {
+      Alert.alert('Error', 'Please select a room first');
+      return;
+    }
+
     setLoading(true);
     try {
       const token = await AsyncStorage.getItem('auth_token');
@@ -167,16 +189,23 @@ export default function CreateWardrobeScreen() {
         return;
       }
 
-      const response = await wardrobeApi.createWardrobe(token, {
+      const wardrobeData = {
         name: wardrobeName,
         emoji: '👗', // Default emoji
         description: description || undefined,
+        occasionType: occasionType,
         isPrivate,
+        roomId: currentRoomId,
         members: members.map(member => ({
           userId: member.userId,
           role: member.role as 'Editor' | 'Contributor' | 'Viewer'
         }))
-      });
+      };
+
+      console.log('Creating wardrobe with data:', wardrobeData);
+      console.log('Current room ID:', currentRoomId);
+
+      const response = await wardrobeApi.createWardrobe(token, wardrobeData);
 
       if (response.status === 'success') {
         // Show success message and navigate back
@@ -258,7 +287,32 @@ export default function CreateWardrobeScreen() {
                 />
               </View>
 
-
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Occasion Type *</Text>
+                <View style={styles.pickerContainer}>
+                  <Text style={styles.pickerText}>{occasionType}</Text>
+                  <Text style={styles.pickerIcon}>▼</Text>
+                </View>
+                <View style={styles.occasionTypesContainer}>
+                  {occasionTypes.map((type) => (
+                    <TouchableOpacity
+                      key={type}
+                      style={[
+                        styles.occasionTypeOption,
+                        occasionType === type && styles.occasionTypeOptionSelected
+                      ]}
+                      onPress={() => setOccasionType(type)}
+                    >
+                      <Text style={[
+                        styles.occasionTypeText,
+                        occasionType === type && styles.occasionTypeTextSelected
+                      ]}>
+                        {type}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
 
               <View style={styles.inputGroup}>
                 <View style={styles.privacyToggle}>
@@ -296,7 +350,7 @@ export default function CreateWardrobeScreen() {
                 <Text style={styles.dropdownIcon}>▼</Text>
               </TouchableOpacity>
               
-              {sessionRoomId && users.length > 0 && (
+              {currentRoomId && users.length > 0 && (
                 <TouchableOpacity 
                   style={styles.addAllButton}
                   onPress={addAllRoomMembers}
@@ -493,6 +547,51 @@ const styles = StyleSheet.create({
   sublabel: {
     fontSize: 12,
     color: '#666',
+  },
+  pickerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    backgroundColor: '#fff',
+    marginBottom: 8,
+  },
+  pickerText: {
+    fontSize: 14,
+    color: '#1a1a1a',
+  },
+  pickerIcon: {
+    fontSize: 12,
+    color: '#999',
+  },
+  occasionTypesContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  occasionTypeOption: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: '#f0f0f0',
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
+  occasionTypeOptionSelected: {
+    backgroundColor: '#E91E63',
+    borderColor: '#E91E63',
+  },
+  occasionTypeText: {
+    fontSize: 12,
+    color: '#666',
+  },
+  occasionTypeTextSelected: {
+    color: '#fff',
+    fontWeight: '600',
   },
   textInput: {
     borderWidth: 1,

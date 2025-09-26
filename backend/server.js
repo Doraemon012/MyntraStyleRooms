@@ -217,6 +217,7 @@ const messageRoutes = require('./routes/messages');
 const callRoutes = require('./routes/calls');
 const aiRoutes = require('./routes/ai');
 const notificationRoutes = require('./routes/notifications');
+const invitationRoutes = require('./routes/invitations');
 
 // Import middleware
 const errorHandler = require('./middleware/errorHandler');
@@ -397,6 +398,7 @@ app.use('/api/messages', authenticateToken, messageRoutes);
 app.use('/api/calls', authenticateToken, callRoutes);
 app.use('/api/ai', authenticateToken, aiRoutes);
 app.use('/api/notifications', authenticateToken, notificationRoutes);
+app.use('/api/invitations', authenticateToken, invitationRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {

@@ -99,25 +99,37 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
   const login = async (email: string, password: string): Promise<{ success: boolean; message?: string }> => {
     try {
+      console.log('🔐 Starting login process for:', email);
       setIsLoading(true);
+      
+      console.log('🌐 Making API call to login endpoint...');
       const response = await authAPI.login({ email, password });
+      console.log('📡 Login API response:', response);
       
       if (response.status === 'success' && response.data.user) {
+        console.log('✅ Login successful, setting user:', response.data.user.email);
         setUser(response.data.user);
         return { success: true };
       } else {
+        console.log('❌ Login failed:', response.message);
         return { 
           success: false, 
           message: response.message || 'Login failed' 
         };
       }
     } catch (error: any) {
-      console.error('Login error:', error);
+      console.error('❌ Login error:', error);
+      console.error('❌ Error details:', {
+        message: error.message,
+        stack: error.stack,
+        name: error.name
+      });
       return { 
         success: false, 
         message: error.message || 'Login failed' 
       };
     } finally {
+      console.log('🏁 Login process completed, setting loading to false');
       setIsLoading(false);
     }
   };

@@ -1,7 +1,7 @@
 // Product data extracted from frontend for seeding
 const mockProducts = [
   {
-    _id: '1',
+    _id: '68d4f831c9f726dee56992fa',
     name: 'Elegant Floral Midi Dress',
     brand: 'Zara',
     price: 2299,
@@ -100,7 +100,7 @@ const mockProducts = [
     updatedAt: '2024-01-20T14:45:00Z'
   },
   {
-    _id: '2',
+    _id: '68d4f8311b09dd0b75af8164',
     name: 'Classic Denim Jacket',
     brand: 'Levi\'s',
     price: 3499,
@@ -185,7 +185,7 @@ const mockProducts = [
     updatedAt: '2024-01-18T11:20:00Z'
   },
   {
-    _id: '3',
+    _id: '68d4f831b1b464d7fc4acbf3',
     name: 'Premium Cotton T-Shirt',
     brand: 'Uniqlo',
     price: 899,
@@ -269,7 +269,7 @@ const mockProducts = [
     updatedAt: '2024-01-19T16:45:00Z'
   },
   {
-    _id: '4',
+    _id: '68d4f831b5fd26f6ed7d491d',
     name: 'Air Max 270 Running Shoes',
     brand: 'Nike',
     price: 8999,
@@ -354,7 +354,7 @@ const mockProducts = [
     updatedAt: '2024-01-17T10:30:00Z'
   },
   {
-    _id: '5',
+    _id: '68d4f83154c1e5d2369c419d',
     name: 'Silk Saree with Zari Work',
     brand: 'Sangria',
     price: 8999,

@@ -1,20 +1,5 @@
-// Import API_BASE_URL from the existing API service
-const getApiBaseUrl = () => {
-  if (process.env.EXPO_PUBLIC_API_URL) {
-    return process.env.EXPO_PUBLIC_API_URL;
-  }
-  
-  // Try different IP addresses based on the environment
-  const possibleUrls = [
-    'http://10.84.92.218:5000/api',  // Current system IP
-    'http://172.20.10.2:5000/api',   // Common mobile network IP
-    'http://192.168.1.100:5000/api', // Alternative local network IP
-    'http://10.0.2.2:5000/api',      // Android emulator localhost
-    'http://localhost:5000/api',      // Web/local development
-  ];
-  
-  return possibleUrls[0]; // Default to the first one
-};
+// Import API_BASE_URL from the network utilities
+import { getApiBaseUrl } from '../utils/networkUtils';
 
 const API_BASE_URL = getApiBaseUrl();
 
@@ -67,6 +52,7 @@ export interface Wardrobe {
   emoji: string;
   description?: string;
   occasionType: string;
+  roomId: string;
   budgetRange: {
     min: number;
     max: number;
@@ -162,6 +148,7 @@ class WardrobeApi {
       limit?: number;
       search?: string;
       occasionType?: string;
+      roomId?: string;
     }
   ): Promise<GetWardrobesResponse> {
     try {
@@ -170,6 +157,7 @@ class WardrobeApi {
       if (options?.limit) queryParams.append('limit', options.limit.toString());
       if (options?.search) queryParams.append('search', options.search);
       if (options?.occasionType) queryParams.append('occasionType', options.occasionType);
+      if (options?.roomId) queryParams.append('roomId', options.roomId);
 
       const response = await fetch(`${this.baseUrl}?${queryParams}`, {
         method: 'GET',
@@ -230,6 +218,13 @@ class WardrobeApi {
   }
 
   /**
+   * Get wardrobe by ID (alias for getWardrobe)
+   */
+  async getWardrobeById(token: string, wardrobeId: string): Promise<{ status: string; data?: { wardrobe: Wardrobe; userRole: string } }> {
+    return this.getWardrobe(token, wardrobeId);
+  }
+
+  /**
    * Create new wardrobe
    */
   async createWardrobe(
@@ -238,8 +233,10 @@ class WardrobeApi {
       name: string;
       emoji: string;
       description?: string;
+      occasionType?: string;
       budgetRange?: { min: number; max: number };
       isPrivate?: boolean;
+      roomId?: string;
       members?: Array<{ userId: string; role?: string }>;
     }
   ): Promise<{ status: string; data?: { wardrobe: Wardrobe }; message?: string }> {

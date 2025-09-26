@@ -29,24 +29,30 @@ function AppContent() {
     <SessionProvider>
       <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
         <Stack screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="index" options={{ headerShown: false }} />
-          <Stack.Screen name="auth/login" />
-          <Stack.Screen name="auth/signup" />
-          <Stack.Screen name="catalog" />
-          <Stack.Screen name="(tabs)" />
-          <Stack.Screen name="wardrobes" />
-          <Stack.Screen name="product/[id]" />
-          <Stack.Screen name="room/create" />
-          <Stack.Screen name="room/[id]" />
-          <Stack.Screen name="wardrobe/ai-outfits" />
-          <Stack.Screen name="wardrobe/items" />
-          <Stack.Screen name="room/settings" />
-          <Stack.Screen name="wardrobe/create" />
-          <Stack.Screen name="start-session" />
-          <Stack.Screen name="join-session" />
-          <Stack.Screen name="call/[id]" />
-          <Stack.Screen name="wardrobe/[id]" />
-          <Stack.Screen name="maya-demo" />
+          {!isAuthenticated ? (
+            // Auth screens
+            <Stack.Screen name="auth/login" options={{ headerShown: false }} />
+          ) : (
+            // Main app screens
+            <Stack.Screen name="catalog" options={{ headerShown: false }} />
+          )}
+          <Stack.Screen name="auth/signup" options={{ headerShown: false }} />
+          <Stack.Screen name="profile" options={{ headerShown: false }} />
+          <Stack.Screen name="invitations" options={{ headerShown: false }} />
+          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen name="wardrobes" options={{ headerShown: false }} />
+          <Stack.Screen name="product/[id]" options={{ headerShown: false }} />
+          <Stack.Screen name="room/create" options={{ headerShown: false }} />
+          <Stack.Screen name="room/[id]" options={{ headerShown: false }} />
+          <Stack.Screen name="wardrobe/ai-outfits" options={{ headerShown: false }} />
+          <Stack.Screen name="wardrobe/items" options={{ headerShown: false }} />
+          <Stack.Screen name="room/settings" options={{ headerShown: false }} />
+          <Stack.Screen name="wardrobe/create" options={{ headerShown: false }} />
+          <Stack.Screen name="start-session" options={{ headerShown: false }} />
+          <Stack.Screen name="join-session" options={{ headerShown: false }} />
+          <Stack.Screen name="call/[id]" options={{ headerShown: false }} />
+          <Stack.Screen name="wardrobe/[id]" options={{ headerShown: false }} />
+          <Stack.Screen name="maya-demo" options={{ headerShown: false }} />
           <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
         </Stack>
         <StatusBar style="auto" />

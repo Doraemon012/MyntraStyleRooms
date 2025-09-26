@@ -61,6 +61,7 @@ const demoMessages: Message[] = [
     timestamp: '2:31 PM',
     isProduct: true,
     productData: {
+      productId: '68d428cf2d09f0ab5be5acdf',
       name: 'Stylish Sneakers',
       price: '₹3,999',
       image: 'https://images.unsplash.com/photo-1549298916-b41d501d3772?w=400&h=500&fit=crop',
@@ -102,6 +103,7 @@ const demoMessages: Message[] = [
     timestamp: '2:33 PM',
     isProduct: true,
     productData: {
+      productId: '68d428cf2d09f0ab5be5ace0',
       name: 'Chic Crossbody Bag',
       price: '₹2,499',
       image: 'https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=300&h=400&fit=crop',
@@ -152,6 +154,7 @@ export default function MayaDemoScreen() {
           timestamp: aiResponseTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
           isProduct: true,
           productData: {
+            productId: '68d428cf2d09f0ab5be5ace1',
             name: 'Elegant Evening Dress',
             price: '₹5,999',
             image: 'https://images.unsplash.com/photo-1515372039744-b8f02a3ae446?w=300&h=400&fit=crop',
@@ -184,6 +187,7 @@ export default function MayaDemoScreen() {
           timestamp: aiResponseTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
           isProduct: true,
           productData: {
+            productId: '68d428cf2d09f0ab5be5ace2',
             name: 'Classic Office Suit',
             price: '₹7,999',
             image: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300&h=400&fit=crop',
@@ -216,6 +220,7 @@ export default function MayaDemoScreen() {
           timestamp: aiResponseTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
           isProduct: true,
           productData: {
+            productId: '68d428cf2d09f0ab5be5acdd',
             name: 'Red Silk Saree with Golden Border',
             price: '₹4,999',
             image: 'https://images.unsplash.com/photo-1677002419193-9a74069587af?q=80&w=774&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',

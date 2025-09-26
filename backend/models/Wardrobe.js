@@ -51,6 +51,11 @@ const wardrobeSchema = new mongoose.Schema({
     ref: 'User',
     required: true
   },
+  roomId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Room',
+    required: true
+  },
   members: [{
     userId: {
       type: mongoose.Schema.Types.ObjectId,
@@ -221,6 +226,10 @@ wardrobeSchema.statics.findByUser = function(userId, options = {}) {
     query.occasionType = options.occasionType;
   }
 
+  if (options.roomId && mongoose.Types.ObjectId.isValid(options.roomId)) {
+    query.roomId = options.roomId;
+  }
+
   return this.find(query)
     .populate('owner', 'name email profileImage')
     .populate('members.userId', 'name email profileImage')
@@ -228,7 +237,7 @@ wardrobeSchema.statics.findByUser = function(userId, options = {}) {
 };
 
 // Static method to search wardrobes
-wardrobeSchema.statics.searchWardrobes = function(searchTerm, userId = null) {
+wardrobeSchema.statics.searchWardrobes = function(searchTerm, userId = null, roomId = null) {
   const query = {
     $or: [
       { name: { $regex: searchTerm, $options: 'i' } },
@@ -239,6 +248,10 @@ wardrobeSchema.statics.searchWardrobes = function(searchTerm, userId = null) {
     isActive: true,
     isPrivate: false // Only search public wardrobes
   };
+
+  if (roomId && mongoose.Types.ObjectId.isValid(roomId)) {
+    query.roomId = roomId;
+  }
 
   // If user is provided, also include their private wardrobes
   if (userId) {

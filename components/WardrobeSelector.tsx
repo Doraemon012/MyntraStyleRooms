@@ -1,4 +1,3 @@
-import { Wardrobe, wardrobeApi } from '@/services/wardrobeApi';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { useEffect, useState } from 'react';
@@ -12,6 +11,8 @@ import {
     TouchableOpacity,
     View
 } from 'react-native';
+import { roomApi } from '../services/roomApi';
+import { Wardrobe, wardrobeApi } from '../services/wardrobeApi';
 
 interface WardrobeSelectorProps {
   visible: boolean;
@@ -20,6 +21,7 @@ interface WardrobeSelectorProps {
   productName?: string;
   productPrice?: string;
   loading?: boolean;
+  roomId?: string; // Filter wardrobes by room
 }
 
 export default function WardrobeSelector({
@@ -28,10 +30,12 @@ export default function WardrobeSelector({
   onSelect,
   productName,
   productPrice,
-  loading = false
+  loading = false,
+  roomId
 }: WardrobeSelectorProps) {
   const [wardrobes, setWardrobes] = useState<Wardrobe[]>([]);
   const [loadingWardrobes, setLoadingWardrobes] = useState(false);
+  const [rooms, setRooms] = useState<{[key: string]: { name: string } }>({});
 
   useEffect(() => {
     if (visible) {
@@ -49,9 +53,29 @@ export default function WardrobeSelector({
         return;
       }
 
-      const response = await wardrobeApi.getWardrobes(token, { limit: 50 });
+      const response = await wardrobeApi.getWardrobes(token, { 
+        limit: 50,
+        ...(roomId && { roomId: roomId })
+      });
       if (response.status === 'success' && response.data) {
         setWardrobes(response.data.wardrobes);
+        
+        // Load room information for each wardrobe
+        const roomIds = [...new Set(response.data.wardrobes.map(w => w.roomId))];
+        const roomsData: {[key: string]: { name: string } } = {};
+        
+        for (const roomId of roomIds) {
+          try {
+            const roomResponse = await roomApi.getRoomById(roomId);
+            if (roomResponse.status === 'success' && roomResponse.data) {
+              roomsData[roomId] = { name: roomResponse.data.room.name };
+            }
+          } catch (error) {
+            console.error(`Error loading room ${roomId}:`, error);
+          }
+        }
+        
+        setRooms(roomsData);
       }
     } catch (error) {
       console.error('Error loading wardrobes:', error);
@@ -124,28 +148,37 @@ export default function WardrobeSelector({
             <FlatList
               data={wardrobes}
               keyExtractor={(item) => item._id}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={styles.wardrobeOption}
-                  onPress={() => handleWardrobeSelect(item._id)}
-                  disabled={loading}
-                >
-                  <View style={styles.wardrobeEmoji}>
-                    {getWardrobeEmoji(item.occasionType)}
-                  </View>
-                  <View style={styles.wardrobeInfo}>
-                    <Text style={styles.wardrobeName}>{item.name}</Text>
-                    <Text style={styles.wardrobeCount}>
-                      {item.itemCount} items • {item.occasionType}
-                    </Text>
-                  </View>
-                  {loading ? (
-                    <ActivityIndicator size="small" color="#E91E63" />
-                  ) : (
-                    <Text style={styles.addIcon}>+</Text>
-                  )}
-                </TouchableOpacity>
-              )}
+              renderItem={({ item }) => {
+                const room = rooms[item.roomId];
+                return (
+                  <TouchableOpacity
+                    style={styles.wardrobeOption}
+                    onPress={() => handleWardrobeSelect(item._id)}
+                    disabled={loading}
+                  >
+                    <View style={styles.wardrobeEmoji}>
+                      {getWardrobeEmoji(item.occasionType)}
+                    </View>
+                    <View style={styles.wardrobeInfo}>
+                      <Text style={styles.wardrobeName}>{item.name}</Text>
+                      <Text style={styles.wardrobeCount}>
+                        {item.itemCount} items • {item.occasionType}
+                      </Text>
+                      {room && (
+                        <View style={styles.roomInfo}>
+                          <Ionicons name="home-outline" size={12} color="#666" />
+                          <Text style={styles.roomName}>{room.name}</Text>
+                        </View>
+                      )}
+                    </View>
+                    {loading ? (
+                      <ActivityIndicator size="small" color="#E91E63" />
+                    ) : (
+                      <Text style={styles.addIcon}>+</Text>
+                    )}
+                  </TouchableOpacity>
+                );
+              }}
               style={styles.wardrobeList}
               showsVerticalScrollIndicator={false}
             />
@@ -242,6 +275,16 @@ const styles = StyleSheet.create({
   wardrobeCount: {
     fontSize: 12,
     color: '#666',
+  },
+  roomInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  roomName: {
+    fontSize: 11,
+    color: '#666',
+    marginLeft: 4,
   },
   addIcon: {
     fontSize: 20,

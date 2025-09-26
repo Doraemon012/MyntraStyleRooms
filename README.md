@@ -14,6 +14,10 @@
 
 </div>
 
+## Working Demo
+
+https://github.com/user-attachments/assets/748ac13d-72d3-4b61-9ab4-f371947b7f09
+
 ## 🌟 Overview
 
 The **Myntra Fashion Ecosystem** is a revolutionary social shopping platform that transforms the traditional e-commerce experience into an interactive, collaborative, and AI-powered journey. Built as a comprehensive solution for the Myntra hackathon, this platform addresses the critical gap in social shopping experiences by creating persistent group spaces, intelligent AI assistance, and shared wardrobe management.
@@ -33,7 +37,6 @@ Online shopping has become increasingly isolated, with users resorting to fragme
 ### 🤖 **AI-Powered Live Voice Calls**
 - **Group-Aware AI**: Contextual suggestions during voice conversations
 - **Real-time Product Curation**: AI listens and provides relevant recommendations
-- **Voice-to-Text Integration**: Seamless conversion of spoken requests
 - **Synchronized Browsing**: All participants see the same products simultaneously
 
 ### 👗 **Permissioned Shared Wardrobes**
@@ -105,8 +108,6 @@ Online shopping has become increasingly isolated, with users resorting to fragme
 - **npm** or **yarn**
 - **Expo CLI** (`npm install -g @expo/cli`)
 - **MongoDB Atlas** account
-- **Cloudinary** account
-- **OpenAI API** key
 
 ### Installation
 
@@ -427,15 +428,6 @@ npm run test:e2e
 - **Discussions**: GitHub Discussions for questions
 - **Email**: support@myntra-fashion-ecosystem.com
 
-### Community
-
-- **Discord**: Join our developer community
-- **Twitter**: Follow for updates and announcements
-- **LinkedIn**: Professional network and job opportunities
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ## 🙏 Acknowledgments
 
@@ -446,14 +438,3 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - **Cloudinary**: For image management and optimization
 
 ---
-
-<div align="center">
-
-**Built with ❤️ for the future of social shopping**
-
-*"Myntra is no longer just where you shop. It's where you plan, style, and celebrate fashion together."*
-
-[![GitHub stars](https://img.shields.io/github/stars/username/myntra-fashion-ecosystem?style=social)](https://github.com/username/myntra-fashion-ecosystem)
-[![GitHub forks](https://img.shields.io/github/forks/username/myntra-fashion-ecosystem?style=social)](https://github.com/username/myntra-fashion-ecosystem)
-
-</div>

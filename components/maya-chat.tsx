@@ -16,6 +16,7 @@ import {
     View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSession } from '../contexts/session-context';
 import { wardrobeApi } from '../services/wardrobeApi';
 import { IconSymbol } from './ui/icon-symbol';
 import WardrobeSelector from './WardrobeSelector';
@@ -31,6 +32,9 @@ interface Message {
   timestamp: string;
   isProduct?: boolean;
   productData?: {
+    productId?: string;
+    id?: string;
+    _id?: string;
     name: string;
     price: string;
     image: string;
@@ -47,6 +51,7 @@ interface Message {
 
 interface MayaChatProps {
   roomName?: string;
+  roomId?: string;
   onBack?: () => void;
   onMenuPress?: () => void;
   messages?: Message[];
@@ -58,6 +63,7 @@ interface MayaChatProps {
 
 const MayaChat: React.FC<MayaChatProps> = ({
   roomName = "Maya",
+  roomId,
   onBack,
   onMenuPress,
   messages = [],
@@ -72,6 +78,7 @@ const MayaChat: React.FC<MayaChatProps> = ({
   const [showWardrobeSelector, setShowWardrobeSelector] = useState(false);
   const [addingToWardrobe, setAddingToWardrobe] = useState(false);
   const flatListRef = useRef<FlatList>(null);
+  const { sessionRoomId } = useSession();
 
   const mayaAvatar = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&h=150&fit=crop&crop=face';
 
@@ -83,6 +90,9 @@ const MayaChat: React.FC<MayaChatProps> = ({
   };
 
   const handleProductAction = (action: string, productData: any) => {
+    console.log('🔍 Product action:', action);
+    console.log('📦 Product data structure:', JSON.stringify(productData, null, 2));
+    
     if (onProductAction) {
       onProductAction(action, productData);
     }
@@ -106,8 +116,17 @@ const MayaChat: React.FC<MayaChatProps> = ({
         return;
       }
 
-      const productId = selectedProduct.productId || selectedProduct.id || selectedProduct._id;
+      console.log('🔍 Selected product for wardrobe:', JSON.stringify(selectedProduct, null, 2));
+      console.log('🔍 Available ID fields:', {
+        productId: selectedProduct.productId,
+        id: selectedProduct.id,
+        _id: selectedProduct._id,
+        product_id: selectedProduct.product_id
+      });
+
+      const productId = selectedProduct.productId || selectedProduct.id || selectedProduct._id || selectedProduct.product_id;
       if (!productId) {
+        console.error('❌ No valid product ID found in:', selectedProduct);
         Alert.alert('Error', 'Product ID not found. Cannot add to wardrobe.');
         return;
       }
@@ -378,6 +397,7 @@ const MayaChat: React.FC<MayaChatProps> = ({
           productName={selectedProduct?.name}
           productPrice={selectedProduct?.price ? `₹${selectedProduct.price.toLocaleString()}` : undefined}
           loading={addingToWardrobe}
+          roomId={sessionRoomId || roomId}
         />
       </SafeAreaView>
     {/* </View> */}
