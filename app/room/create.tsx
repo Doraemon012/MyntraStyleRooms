@@ -1,19 +1,19 @@
-import { roomAPI, userAPI } from '@/services/api';
+import { invitationAPI, roomAPI, userAPI } from '@/services/api';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  FlatList,
-  Image,
-  Modal,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View
+    ActivityIndicator,
+    Alert,
+    FlatList,
+    Image,
+    Modal,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -81,14 +81,14 @@ export default function CreateRoomScreen() {
         console.log('✅ Processed users data:', usersData);
         setUsers(usersData);
       } else {
-        // Fallback to mock data if API fails
-        console.log('❌ API failed, using mock users');
-        setUsers(mockUsers);
+        // Don't use mock users with invalid IDs, use empty array instead
+        console.log('❌ API failed, using empty users list');
+        setUsers([]);
       }
     } catch (error) {
       console.error('❌ Error fetching users:', error);
-      // Fallback to mock data
-      setUsers(mockUsers);
+      // Don't use mock users with invalid IDs, use empty array instead
+      setUsers([]);
     } finally {
       setLoadingUsers(false);
     }
@@ -136,18 +136,37 @@ export default function CreateRoomScreen() {
         emoji: '👗', // Default emoji
         description: description.trim() || undefined,
         isPrivate,
-        members: members.map(member => ({
-          userId: member._id,
-          role: member.role as 'Editor' | 'Contributor' | 'Viewer'
-        }))
+        members: [] // Don't add members directly, send invitations instead
       };
 
       const response = await roomAPI.create(roomData);
       
       if (response.status === 'success') {
+        const roomId = response.data.room._id;
+        
+        // Send invitations to all added members
+        if (members.length > 0) {
+          try {
+            const invitationPromises = members.map(member => 
+              invitationAPI.send({
+                roomId: roomId,
+                inviteeId: member._id,
+                role: member.role as 'Editor' | 'Contributor' | 'Viewer',
+                message: `You've been invited to join "${roomName.trim()}" room!`
+              })
+            );
+            
+            await Promise.all(invitationPromises);
+            console.log('✅ All invitations sent successfully');
+          } catch (invitationError) {
+            console.error('❌ Error sending invitations:', invitationError);
+            // Don't fail the room creation if invitations fail
+          }
+        }
+        
         Alert.alert(
           'Success', 
-          'Room created successfully!',
+          'Room created successfully! Invitations have been sent to all members.',
           [
             {
               text: 'OK',

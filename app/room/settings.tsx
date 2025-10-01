@@ -1,4 +1,4 @@
-import { roomAPI, userAPI } from '@/services/api';
+import { invitationAPI, roomAPI, userAPI } from '@/services/api';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useState } from 'react';
@@ -86,27 +86,46 @@ export default function RoomSettingsScreen() {
         console.log('✅ Processed users data:', usersData);
         setUsers(usersData);
       } else {
-        // Fallback to mock data if API fails
-        console.log('❌ API failed, using mock users');
-        setUsers(mockUsers);
+        // Don't use mock users with invalid IDs, use empty array instead
+        console.log('❌ API failed, using empty users list');
+        setUsers([]);
       }
     } catch (error) {
       console.error('❌ Error fetching users:', error);
-      // Fallback to mock data
-      setUsers(mockUsers);
+      // Don't use mock users with invalid IDs, use empty array instead
+      setUsers([]);
     } finally {
       setLoadingUsers(false);
     }
   };
 
-  const addMember = (user: User) => {
-    const newMember: RoomMember = {
-      _id: user._id,
-      name: user.name,
-      email: user.email,
-      role: 'Contributor',
-    };
-    setMembers([...members, newMember]);
+  const addMember = async (user: User) => {
+    // Send invitation to the new member
+    if (id) {
+      try {
+        await invitationAPI.send({
+          roomId: id as string,
+          inviteeId: user._id,
+          role: 'Contributor',
+          message: `You've been invited to join "${roomName || 'this room'}"!`
+        });
+        console.log('✅ Invitation sent to', user.name);
+        
+        // Add to local members list for UI display
+        const newMember: RoomMember = {
+          _id: user._id,
+          name: user.name,
+          email: user.email,
+          role: 'Contributor',
+        };
+        setMembers([...members, newMember]);
+        
+        Alert.alert('Success', `Invitation sent to ${user.name}!`);
+      } catch (error) {
+        console.error('❌ Error sending invitation:', error);
+        Alert.alert('Error', `Failed to send invitation to ${user.name}. They may already be a member or have a pending invitation.`);
+      }
+    }
   };
 
   const removeMember = (id: string) => {

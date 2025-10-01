@@ -158,7 +158,14 @@ invitationSchema.statics.findPendingForUser = function(userId) {
     status: 'pending',
     expiresAt: { $gt: new Date() }
   })
-    .populate('room', 'name emoji description isPrivate')
+    .populate({
+      path: 'room',
+      select: 'name emoji description isPrivate members',
+      populate: {
+        path: 'members.userId',
+        select: 'name email profileImage'
+      }
+    })
     .populate('inviter', 'name email profileImage')
     .sort({ createdAt: -1 });
 };

@@ -33,7 +33,7 @@ function AppContent() {
             // Auth screens
             <Stack.Screen name="auth/login" options={{ headerShown: false }} />
           ) : (
-            // Main app screens
+            // Main app screens - catalog is the default authenticated screen
             <Stack.Screen name="catalog" options={{ headerShown: false }} />
           )}
           <Stack.Screen name="auth/signup" options={{ headerShown: false }} />

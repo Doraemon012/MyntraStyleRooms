@@ -2,18 +2,18 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Image } from 'expo-image';
 import React, { useRef, useState } from 'react';
 import {
-    Alert,
-    Dimensions,
-    FlatList,
-    KeyboardAvoidingView,
-    Modal,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
+  Alert,
+  Dimensions,
+  FlatList,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSession } from '../contexts/session-context';
@@ -286,7 +286,6 @@ const MayaChat: React.FC<MayaChatProps> = ({
           </TouchableOpacity>
           <View style={styles.headerContent}>
             <Text style={styles.headerTitle}>{roomName}</Text>
-            <Text style={styles.headerSubtitle}>Your ChatGPT powered assistant</Text>
           </View>
           <TouchableOpacity onPress={onMenuPress} style={styles.menuButton}>
             <Text style={styles.menuButtonText}>⋮</Text>
@@ -346,9 +345,6 @@ const MayaChat: React.FC<MayaChatProps> = ({
               <IconSymbol name="paperplane.fill" size={20} color="#000" />
             </TouchableOpacity>
           </View>
-          <Text style={styles.disclaimer}>
-            AI chat: Risk of inaccurate results. Don't share personal info.
-          </Text>
         </KeyboardAvoidingView>
 
         {/* Product Modal */}
@@ -641,9 +637,9 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   inputContainer: {
-    backgroundColor: 'white',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    backgroundColor: 'transparent',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
     borderTopWidth: 1,
     borderTopColor: '#e0e0e0',
   },

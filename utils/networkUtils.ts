@@ -15,7 +15,7 @@ export const getApiBaseUrl = () => {
   }
   
   // Fallback to network IP
-  const networkUrl = 'http://10.42.0.1:5000/api';
+  const networkUrl = 'http://10.84.92.165:5000/api';
   console.log('🌐 Using fallback API URL:', networkUrl);
   return networkUrl;
 };
@@ -23,9 +23,9 @@ export const getApiBaseUrl = () => {
 // Function to test API connectivity
 export const testApiConnectivity = async (): Promise<string | null> => {
   const possibleUrls = [
+    'http://10.84.92.165:5000/api',
     'http://10.42.0.1:5000/api',
     'http://10.84.92.218:5000/api',
-    'http://10.84.92.165:5000/api',
     'http://192.168.56.1:5000/api',
     'http://172.27.35.178:5000/api',
     'http://172.20.10.2:5000/api',
@@ -36,13 +36,21 @@ export const testApiConnectivity = async (): Promise<string | null> => {
 
   for (const url of possibleUrls) {
     try {
-      const response = await fetch(`${url}/auth/me`, {
+      // Create a timeout promise
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => {
+          reject(new Error('Request timeout'));
+        }, 5000);
+      });
+
+      const fetchPromise = fetch(`${url}/auth/me`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
         },
-        timeout: 5000, // 5 second timeout
       });
+
+      const response = await Promise.race([fetchPromise, timeoutPromise]);
       
       // If we get any response (even an error), the server is reachable
       if (response.status === 401 || response.status === 200) {

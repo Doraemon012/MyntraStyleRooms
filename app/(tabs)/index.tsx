@@ -90,7 +90,7 @@
 // });
 
 
-import { roomAPI } from '@/services/api';
+import { invitationAPI, roomAPI } from '@/services/api';
 import { DancingScript_400Regular, DancingScript_700Bold, useFonts } from '@expo-google-fonts/dancing-script';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -136,6 +136,8 @@ interface Room {
   emoji?: string;
   description?: string;
   isPrivate?: boolean;
+  invitationId?: string;
+  invitationMessage?: string;
   owner?: {
     _id: string;
     name: string;
@@ -255,18 +257,25 @@ export default function HomeScreen() {
         return;
       }
       
-      const response = await roomAPI.getAll({ 
-        search: search || searchQuery,
-        limit: 50 
-      });
+      // Fetch both rooms and invitations in parallel
+      const [roomsResponse, invitationsResponse] = await Promise.all([
+        roomAPI.getAll({ 
+          search: search || searchQuery,
+          limit: 50 
+        }),
+        invitationAPI.getPending()
+      ]);
       
-      if (response.status === 'success') {
-        const roomsData = response.data.rooms.map((room: any) => ({
+      let allRooms: Room[] = [];
+      
+      // Process joined rooms
+      if (roomsResponse.status === 'success') {
+        const joinedRooms = roomsResponse.data.rooms.map((room: any) => ({
           _id: room._id,
           name: room.name,
           lastMessage: room.lastMessage || 'No messages yet',
           memberCount: room.memberCount || room.members?.length || 0,
-          status: 'joined' as const, // All rooms from API are joined
+          status: 'joined' as const,
           lastActivity: formatLastActivity(room.lastActivity || room.updatedAt),
           memberAvatars: generateMemberAvatars(room.members || []),
           emoji: room.emoji || '👗',
@@ -275,7 +284,31 @@ export default function HomeScreen() {
           owner: room.owner,
           members: room.members
         }));
-        setRooms(roomsData);
+        allRooms = [...joinedRooms];
+      }
+      
+      // Process invited rooms
+      if (invitationsResponse.status === 'success') {
+        const invitedRooms = invitationsResponse.data.invitations.map((invitation: any) => ({
+          _id: invitation.room._id,
+          name: invitation.room.name,
+          lastMessage: 'You have a pending invitation',
+          memberCount: invitation.room.members?.length || invitation.room.memberCount || 0,
+          status: 'invited' as const,
+          lastActivity: formatLastActivity(invitation.createdAt),
+          invitedBy: invitation.inviter.name,
+          memberAvatars: generateMemberAvatars(invitation.room.members || []),
+          emoji: invitation.room.emoji || '👗',
+          description: invitation.room.description,
+          isPrivate: invitation.room.isPrivate,
+          invitationId: invitation._id,
+          invitationMessage: invitation.message
+        }));
+        allRooms = [...allRooms, ...invitedRooms];
+      }
+      
+      if (allRooms.length > 0) {
+        setRooms(allRooms);
       } else {
         // Fallback to mock data if API fails
         console.log('API failed, using mock data');
@@ -346,9 +379,16 @@ export default function HomeScreen() {
     fetchRooms();
   };
 
-  const handleAcceptInvitation = async (roomId: string) => {
+  const handleAcceptInvitation = async (roomId: string, invitationId?: string) => {
     try {
-      await roomAPI.join(roomId);
+      if (invitationId) {
+        // Use invitation API to accept
+        await invitationAPI.accept(invitationId);
+      } else {
+        // Fallback to room API
+        await roomAPI.join(roomId);
+      }
+      
       setRooms(prevRooms => 
         prevRooms.map(room => 
           room._id === roomId 
@@ -363,10 +403,21 @@ export default function HomeScreen() {
     }
   };
 
-  const handleDeclineInvitation = (roomId: string) => {
-    setRooms(prevRooms => 
-      prevRooms.filter(room => room._id !== roomId)
-    );
+  const handleDeclineInvitation = async (roomId: string, invitationId?: string) => {
+    try {
+      if (invitationId) {
+        // Use invitation API to decline
+        await invitationAPI.decline(invitationId);
+      }
+      
+      setRooms(prevRooms => 
+        prevRooms.filter(room => room._id !== roomId)
+      );
+      Alert.alert('Success', 'Invitation declined');
+    } catch (error) {
+      console.error('Error declining invitation:', error);
+      Alert.alert('Error', 'Failed to decline invitation. Please try again.');
+    }
   };
 
   const handleJoinRoom = async () => {
@@ -584,7 +635,17 @@ export default function HomeScreen() {
             <TouchableOpacity 
               key={item._id || `room-${index}`} 
               style={styles.roomCard}
-              onPress={() => router.push(`/room/${item._id}`)}
+              onPress={() => {
+                if (item.status === 'invited') {
+                  Alert.alert(
+                    'Pending Invitation',
+                    `You have a pending invitation to join "${item.name}". Please accept or decline the invitation first.`,
+                    [{ text: 'OK' }]
+                  );
+                  return;
+                }
+                router.push(`/room/${item._id}`);
+              }}
             >
               {item.status === 'invited' && (
                 <Text style={styles.invitedText}>{item.invitedBy} invited you to:</Text>
@@ -620,7 +681,7 @@ export default function HomeScreen() {
                         style={styles.acceptButton}
                         onPress={(e) => {
                           e.stopPropagation();
-                          handleAcceptInvitation(item._id);
+                          handleAcceptInvitation(item._id, item.invitationId);
                         }}
                       >
                         <Ionicons 
@@ -633,7 +694,7 @@ export default function HomeScreen() {
                         style={styles.declineButton}
                         onPress={(e) => {
                           e.stopPropagation();
-                          handleDeclineInvitation(item._id);
+                          handleDeclineInvitation(item._id, item.invitationId);
                         }}
                       >
                         <Ionicons 
@@ -889,7 +950,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   lastMessage: {
-    fontSize: 11,
+    fontSize: 10,
     color: '#999',
     fontWeight: '400',
     marginTop: 2,
@@ -900,7 +961,7 @@ const styles = StyleSheet.create({
     minHeight: 40,
   },
   timeStamp: {
-    fontSize: 10,
+    fontSize: 9,
     color: '#999',
     fontWeight: '400',
     marginTop: 4,

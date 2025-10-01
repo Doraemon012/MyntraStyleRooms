@@ -297,10 +297,10 @@ export default function WardrobesScreen() {
                     </TouchableOpacity>
                     
                     <View style={styles.headerCenter}>
-                        <Text style={styles.headerTitle}>{roomName}</Text>
-                        <Text style={styles.headerSubtitle}>
+                        <Text style={styles.headerTitle}>
                             {currentRoomId ? 'Wardrobes' : 'All Wardrobes'}
                         </Text>
+                        <Text style={styles.headerSubtitle}>{roomName}</Text>
                     </View>
                     
                     <TouchableOpacity 
@@ -319,7 +319,7 @@ export default function WardrobesScreen() {
                             }
                         }}
                     >
-                        <Text style={styles.addButtonText}>+</Text>
+                        <Text style={styles.addButtonText}>+ Create</Text>
                     </TouchableOpacity>
                 </View>
 
@@ -388,8 +388,8 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingHorizontal: 20,
-        paddingVertical: 16,
+        paddingHorizontal: 16,
+        paddingVertical: 12,
         borderBottomWidth: 1,
         borderBottomColor: '#f0f0f0',
     },
@@ -409,39 +409,41 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     headerTitle: {
-        fontSize: 18,
+        fontSize: 16,
         fontWeight: '600',
         color: '#333',
     },
     headerSubtitle: {
-        fontSize: 12,
+        fontSize: 11,
         color: '#666',
-        marginTop: 2,
+        marginTop: 1,
     },
     addButton: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        backgroundColor: '#ff6b6b',
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 16,
+        backgroundColor: 'transparent',
+        borderWidth: 1,
+        borderColor: '#8B5CF6',
         justifyContent: 'center',
         alignItems: 'center',
     },
     addButtonText: {
-        fontSize: 20,
-        color: '#fff',
-        fontWeight: '300',
+        fontSize: 12,
+        color: '#8B5CF6',
+        fontWeight: '600',
     },
     searchContainer: {
-        paddingHorizontal: 20,
-        paddingVertical: 16,
+        paddingHorizontal: 3,
+        paddingVertical: 6,
     },
     searchInputContainer: {
         flexDirection: 'row',
         alignItems: 'center',
         backgroundColor: '#f8f8f8',
-        borderRadius: 12,
-        paddingHorizontal: 16,
-        paddingVertical: 12,
+        borderRadius: 8,
+        paddingHorizontal: 6,
+        paddingVertical: 4,
     },
     searchIcon: {
         fontSize: 16,
@@ -449,25 +451,26 @@ const styles = StyleSheet.create({
     },
     searchInput: {
         flex: 1,
-        fontSize: 16,
+        fontSize: 14,
         color: '#333',
     },
     categoriesList: {
-        paddingHorizontal: 20,
-        paddingBottom: 20,
+        paddingHorizontal: 16,
+        paddingBottom: 16,
     },
     categoryContainer: {
-        borderRadius: 16,
-        marginBottom: 20,
-        padding: 20,
+        borderRadius: 12,
+        marginBottom: 16,
+        padding: 12,
+        backgroundColor: 'white',
         shadowColor: '#000',
         shadowOffset: {
             width: 0,
-            height: 2,
+            height: 1,
         },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 3,
+        shadowOpacity: 0.05,
+        shadowRadius: 2,
+        elevation: 2,
     },
     roleBadge: {
         alignSelf: 'flex-start',
@@ -489,10 +492,10 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     categoryName: {
-        fontSize: 18,
+        fontSize: 16,
         fontWeight: '600',
         color: '#333',
-        marginBottom: 4,
+        marginBottom: 2,
     },
     subtitleContainer: {
         flexDirection: 'row',
@@ -506,7 +509,7 @@ const styles = StyleSheet.create({
         marginRight: 6,
     },
     categorySubtitle: {
-        fontSize: 14,
+        fontSize: 12,
         color: '#666',
     },
     horizontalList: {
@@ -516,10 +519,10 @@ const styles = StyleSheet.create({
         paddingRight: 20,
     },
     wardrobeItemImage: {
-        width: 120,
-        height: 150,
-        marginRight: 12,
-        borderRadius: 12,
+        width: 80,
+        height: 100,
+        marginRight: 8,
+        borderRadius: 8,
         overflow: 'hidden',
         backgroundColor: '#f0f0f0',
         position: 'relative',
@@ -551,7 +554,7 @@ const styles = StyleSheet.create({
     },
     itemPrice: {
         color: '#fff',
-        fontSize: 12,
+        fontSize: 10,
         fontWeight: '600',
         textAlign: 'center',
     },
@@ -559,19 +562,19 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        paddingVertical: 12,
-        paddingHorizontal: 20,
+        paddingVertical: 8,
+        paddingHorizontal: 16,
         backgroundColor: '#f8f8f8',
-        borderRadius: 8,
+        borderRadius: 6,
     },
     viewAllText: {
-        fontSize: 14,
+        fontSize: 12,
         fontWeight: '600',
         color: '#333',
-        marginRight: 4,
+        marginRight: 2,
     },
     viewAllArrow: {
-        fontSize: 16,
+        fontSize: 12,
         color: '#666',
     },
     noRoomContainer: {

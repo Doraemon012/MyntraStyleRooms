@@ -106,19 +106,20 @@ roomSchema.index({ isActive: 1 });
 
 // Virtual for member count
 roomSchema.virtual('memberCount').get(function() {
-  return this.members.length;
+  return this.members ? this.members.length : 0;
 });
 
 // Virtual for checking if user is member
 roomSchema.virtual('isMember').get(function() {
   return (userId) => {
-    return this.members.some(member => member.userId.toString() === userId.toString());
+    return this.members ? this.members.some(member => member.userId.toString() === userId.toString()) : false;
   };
 });
 
 // Virtual for getting user role in room
 roomSchema.virtual('getUserRole').get(function() {
   return (userId) => {
+    if (!this.members) return null;
     const member = this.members.find(member => member.userId.toString() === userId.toString());
     return member ? member.role : null;
   };
