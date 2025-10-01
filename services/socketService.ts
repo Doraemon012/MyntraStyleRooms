@@ -69,7 +69,7 @@ class SocketService {
       
       // Determine server URL based on environment
       const serverUrl = __DEV__ 
-        ? 'http://10.84.92.165:5000'  // Updated to correct local IP
+        ? 'http://10.10.53.19:5000'  // Updated to correct local IP
         : 'https://your-production-url.com';
 
       console.log('🔌 Connecting to Socket.IO server:', serverUrl);

@@ -46,7 +46,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
       }
 
       // Create new socket connection
-      const newSocket = io(process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5000', {
+      const newSocket = io('http://10.10.53.19:5000', {
         auth: {
           token,
           userId: user._id,
