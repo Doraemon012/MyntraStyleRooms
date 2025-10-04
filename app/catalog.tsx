@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
     Animated,
     Dimensions,
@@ -22,25 +22,23 @@ import HostSessionHeader from '../components/session/HostSessionHeader';
 import SessionBottomControls from '../components/session/SessionBottomControls';
 import { useAuth } from '../contexts/auth-context';
 import { useSession } from '../contexts/session-context';
-import { getActiveBanners } from '../data/banners';
-import { Category, mockCategories } from '../data/categories';
-import { getActivePlayMenuItems } from '../data/playMenuItems';
+import { Category } from '../data/categories';
+import { PlayMenuItem } from '../data/playMenuItems';
+import { useActiveBanners } from '../hooks/useBanners';
+import { useActiveCategories } from '../hooks/useCategories';
+import { useActivePlayMenuItems } from '../hooks/usePlayMenu';
 import {
-    getProductsByCategory,
-    getTrendingProducts,
-    mockProducts,
     Product,
-    searchProducts
-} from '../data/products';
+    useProducts,
+    useProductSearch,
+    useTrendingProducts
+} from '../hooks/useProducts';
 import messageStorage from '../services/messageStorage';
 import socketService from '../services/socketService';
 
 const { width: screenWidth } = Dimensions.get('window');
 
-// Get data from centralized data files
-const banners = getActiveBanners();
-const playMenuItems = getActivePlayMenuItems();
-const categories = mockCategories;
+// Note: Data will be fetched using hooks inside the component
 
 
 export default function CatalogScreen() {
@@ -52,6 +50,17 @@ export default function CatalogScreen() {
   const [currentBannerIndex, setCurrentBannerIndex] = useState(0);
   const bannerScrollRef = useRef<ScrollView>(null);
   const [showPlayMenu, setShowPlayMenu] = useState(false);
+  
+  // Fetch data from backend using hooks
+  const { banners, loading: bannersLoading } = useActiveBanners();
+  const { categories, loading: categoriesLoading } = useActiveCategories();
+  const { items: playMenuItems, loading: playMenuLoading } = useActivePlayMenuItems();
+  const productFilters = useMemo(() => ({
+    category: selectedCategory === '1' ? undefined : categories.find(cat => cat._id === selectedCategory)?.name
+  }), [selectedCategory, categories]);
+  const { products, loading: productsLoading } = useProducts(productFilters);
+  const { products: trendingProducts, loading: trendingLoading } = useTrendingProducts(8);
+  const { products: searchResults, loading: searchLoading } = useProductSearch(searchQuery);
   
   const playButtonScale = useRef(new Animated.Value(1)).current;
   const menuOpacity = useRef(new Animated.Value(0)).current;
@@ -115,14 +124,9 @@ export default function CatalogScreen() {
     }
   }, [showPlayMenu]);
 
-  const filteredProducts = searchQuery 
-    ? searchProducts(searchQuery)
-    : selectedCategory === '1' 
-      ? mockProducts 
-      : getProductsByCategory(categories.find(cat => cat._id === selectedCategory)?.name || '');
-
-  const displayProducts = filteredProducts;
-  const trendingProducts = getTrendingProducts(8);
+  // Determine which products to display
+  const displayProducts = searchQuery ? searchResults : products;
+  const isLoading = searchQuery ? searchLoading : productsLoading;
 
   // Handle logout
   const handleLogout = async () => {
@@ -284,6 +288,19 @@ export default function CatalogScreen() {
     </View>
   );
 
+
+  // Show loading state if any critical data is loading
+  if (bannersLoading || categoriesLoading || productsLoading) {
+    return (
+      <View style={styles.container}>
+        <SafeAreaView style={styles.container}>
+          <View style={styles.loadingContainer}>
+            <Text style={styles.loadingText}>Loading catalog...</Text>
+          </View>
+        </SafeAreaView>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -721,7 +738,7 @@ export default function CatalogScreen() {
               transform: [{ scale: menuScale }] 
             }]}>
               <View style={styles.playMenuList}>
-                {playMenuItems.map((item) => (
+                {playMenuItems.map((item: PlayMenuItem) => (
                   <TouchableOpacity 
                     key={item._id} 
                     style={styles.playMenuItem}
@@ -1728,5 +1745,17 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: '#E91E63',
     fontWeight: '600',
+  },
+  // Loading styles
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F8F9FA',
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#8E8E93',
   },
 });

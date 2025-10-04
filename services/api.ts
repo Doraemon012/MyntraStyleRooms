@@ -6,9 +6,23 @@ import { getApiBaseUrl } from '../utils/networkUtils';
 const API_BASE_URL = getApiBaseUrl();
 console.log('🌐 API Base URL configured:', API_BASE_URL);
 
+// Simple in-memory GET cache and in-flight request deduplication
+// Cache is intentionally ephemeral; reset on app reloads
+type CachedEntry<T> = { timestamp: number; data: T };
+const getResponseCache: Map<string, CachedEntry<any>> = new Map();
+const inFlightRequests: Map<string, Promise<any>> = new Map();
+const DEFAULT_CACHE_TTL_MS = 60_000; // 60 seconds
+
+function buildCacheKey(url: string): string {
+  return url; // URL already includes query params
+}
+
 // Generic API call function
 async function apiCall<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const url = `${API_BASE_URL}${endpoint}`;
+  const method = (options.method || 'GET').toString().toUpperCase();
+  const isGet = method === 'GET';
+  const cacheKey = buildCacheKey(url);
   
   // Get token from storage for authenticated requests
   const token = await getStoredToken();
@@ -31,8 +45,23 @@ async function apiCall<T>(endpoint: string, options: RequestInit = {}): Promise<
   });
 
   try {
+    // Serve from cache for GET if fresh
+    if (isGet) {
+      const cached = getResponseCache.get(cacheKey) as CachedEntry<T> | undefined;
+      if (cached && Date.now() - cached.timestamp < DEFAULT_CACHE_TTL_MS) {
+        return cached.data;
+      }
+      // Deduplicate same in-flight GET
+      const inflight = inFlightRequests.get(cacheKey) as Promise<T> | undefined;
+      if (inflight) {
+        return inflight;
+      }
+    }
+
     console.log(`⏳ Sending request...`);
-    const response = await fetch(url, defaultOptions);
+    const fetchPromise = fetch(url, defaultOptions);
+    if (isGet) inFlightRequests.set(cacheKey, fetchPromise as unknown as Promise<T>);
+    const response = await fetchPromise;
     
     console.log(`📡 Response status: ${response.status}`);
     console.log(`📡 Response headers:`, Object.fromEntries(response.headers.entries()));
@@ -50,6 +79,9 @@ async function apiCall<T>(endpoint: string, options: RequestInit = {}): Promise<
     
     const data = await response.json();
     console.log(`✅ API Success: ${endpoint}`);
+    if (isGet) {
+      getResponseCache.set(cacheKey, { timestamp: Date.now(), data });
+    }
     return data;
   } catch (error: any) {
     // Only log as error if it's not a 401 (unauthorized) which is expected for unauthenticated users
@@ -58,6 +90,8 @@ async function apiCall<T>(endpoint: string, options: RequestInit = {}): Promise<
       console.error('🔗 URL attempted:', url);
     }
     throw error;
+  } finally {
+    if (isGet) inFlightRequests.delete(cacheKey);
   }
 }
 

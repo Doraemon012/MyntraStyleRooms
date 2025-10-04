@@ -13,6 +13,7 @@ const io = require('socket.io')(server, {
   cors: {
     origin: [
       process.env.SOCKET_CORS_ORIGIN || "http://localhost:3000",
+      "http://10.42.0.17:3000",
       "http://10.10.53.19:3000",
       "http://10.10.53.19:8081",
       "http://172.20.10.2:3000",

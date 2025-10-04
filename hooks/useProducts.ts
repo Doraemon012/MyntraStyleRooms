@@ -1,9 +1,12 @@
 // Custom hooks for easy data fetching and state management
 // These hooks will make it easy to integrate with the backend API
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Product } from '../data/products';
 import { transformAPIProduct } from '../types/api';
+
+// Re-export Product type for convenience
+export { Product };
 
 // Hook for fetching all products
 export const useProducts = (filters?: {
@@ -18,6 +21,15 @@ export const useProducts = (filters?: {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const stableFilters = useMemo(() => filters ? { ...filters } : undefined, [
+    filters?.category,
+    filters?.subcategory,
+    filters?.search,
+    filters?.page,
+    filters?.limit,
+    filters?.sortBy,
+    filters?.sortOrder,
+  ]);
 
   const fetchProducts = useCallback(async () => {
     try {
@@ -25,8 +37,8 @@ export const useProducts = (filters?: {
       setError(null);
       
       // Use actual API call
-      const { productAPI } = await import('../services/api');
-      const data = await productAPI.getAll(filters);
+      const { catalogAPI } = await import('../services/catalogApi');
+      const data = await catalogAPI.getProducts(stableFilters);
       const transformedProducts = data.data.products.map(transformAPIProduct);
       setProducts(transformedProducts);
     } catch (err) {
@@ -39,10 +51,10 @@ export const useProducts = (filters?: {
         
         let filteredProducts = mockProducts;
         
-        if (filters?.search) {
-          filteredProducts = searchProducts(filters.search);
-        } else if (filters?.category) {
-          filteredProducts = getProductsByCategory(filters.category);
+        if (stableFilters?.search) {
+          filteredProducts = searchProducts(stableFilters.search);
+        } else if (stableFilters?.category) {
+          filteredProducts = getProductsByCategory(stableFilters.category);
         }
         
         setProducts(filteredProducts);
@@ -52,7 +64,7 @@ export const useProducts = (filters?: {
     } finally {
       setLoading(false);
     }
-  }, [filters]);
+  }, [stableFilters]);
 
   useEffect(() => {
     fetchProducts();
@@ -73,8 +85,8 @@ export const useProduct = (id: string) => {
       setError(null);
       
       // Use actual API call
-      const { productAPI } = await import('../services/api');
-      const data = await productAPI.getById(id);
+      const { catalogAPI } = await import('../services/catalogApi');
+      const data = await catalogAPI.getProductById(id);
       const transformedProduct = transformAPIProduct(data.data.product);
       setProduct(transformedProduct);
     } catch (err) {
@@ -120,8 +132,8 @@ export const useSimilarProducts = (productId: string, limit: number = 4) => {
       setError(null);
       
       // Use actual API call
-      const { productAPI } = await import('../services/api');
-      const data = await productAPI.getSimilar(productId, limit);
+      const { catalogAPI } = await import('../services/catalogApi');
+      const data = await catalogAPI.getSimilarProducts(productId, limit);
       const transformedProducts = data.data.products.map(transformAPIProduct);
       setProducts(transformedProducts);
     } catch (err) {
@@ -162,8 +174,8 @@ export const useRecommendedProducts = (productId: string, limit: number = 4) => 
       setError(null);
       
       // Use actual API call
-      const { productAPI } = await import('../services/api');
-      const data = await productAPI.getRecommended(productId, limit);
+      const { catalogAPI } = await import('../services/catalogApi');
+      const data = await catalogAPI.getRecommendedProducts(productId, limit);
       const transformedProducts = data.data.products.map(transformAPIProduct);
       setProducts(transformedProducts);
     } catch (err) {
@@ -204,8 +216,8 @@ export const useTrendingProducts = (limit: number = 8) => {
       setError(null);
       
       // Use actual API call
-      const { productAPI } = await import('../services/api');
-      const data = await productAPI.getTrending(limit);
+      const { catalogAPI } = await import('../services/catalogApi');
+      const data = await catalogAPI.getTrendingProducts(limit);
       const transformedProducts = data.data.products.map(transformAPIProduct);
       setProducts(transformedProducts);
     } catch (err) {
@@ -237,6 +249,7 @@ export const useProductSearch = (query: string) => {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const lastQueryRef = useRef<string>('');
 
   const searchProducts = useCallback(async (searchQuery: string) => {
     if (!searchQuery.trim()) {
@@ -244,13 +257,19 @@ export const useProductSearch = (query: string) => {
       return;
     }
 
+    // Avoid duplicate search if query hasn't changed
+    if (lastQueryRef.current === searchQuery) {
+      return;
+    }
+    lastQueryRef.current = searchQuery;
+
     try {
       setLoading(true);
       setError(null);
       
       // Use actual API call
-      const { productAPI } = await import('../services/api');
-      const data = await productAPI.search(searchQuery);
+      const { catalogAPI } = await import('../services/catalogApi');
+      const data = await catalogAPI.searchProducts(searchQuery);
       const transformedProducts = data.data.products.map(transformAPIProduct);
       setProducts(transformedProducts);
     } catch (err) {
@@ -271,9 +290,16 @@ export const useProductSearch = (query: string) => {
   }, []);
 
   useEffect(() => {
+    const trimmed = query.trim();
+    if (!trimmed) {
+      setProducts([]);
+      lastQueryRef.current = '';
+      return;
+    }
+
     const timeoutId = setTimeout(() => {
-      searchProducts(query);
-    }, 300); // Debounce search by 300ms
+      searchProducts(trimmed);
+    }, 400); // Slightly stronger debounce
 
     return () => clearTimeout(timeoutId);
   }, [query, searchProducts]);

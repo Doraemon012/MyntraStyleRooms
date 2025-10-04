@@ -14,13 +14,10 @@ export const useCategories = () => {
       setLoading(true);
       setError(null);
       
-      // For now, use mock data. Replace with actual API call when backend is ready
-      // const data = await categoryAPI.getAll();
-      // setCategories(data.categories);
-      
-      // Mock data implementation
-      const { mockCategories } = await import('../data/categories');
-      setCategories(mockCategories);
+      // Use actual API call
+      const { catalogAPI } = await import('../services/catalogApi');
+      const data = await catalogAPI.getAll();
+      setCategories(data.data.categories);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch categories');
     } finally {
@@ -46,14 +43,10 @@ export const useActiveCategories = () => {
       setLoading(true);
       setError(null);
       
-      // For now, use mock data. Replace with actual API call when backend is ready
-      // const data = await categoryAPI.getActive();
-      // setCategories(data.categories);
-      
-      // Mock data implementation
-      const { getActiveCategories } = await import('../data/categories');
-      const activeCategories = getActiveCategories();
-      setCategories(activeCategories);
+      // Use actual API call
+      const { catalogAPI } = await import('../services/catalogApi');
+      const data = await catalogAPI.getActive();
+      setCategories(data.data.categories);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch active categories');
     } finally {

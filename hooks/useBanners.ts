@@ -3,6 +3,10 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Banner } from '../data/banners';
 
+// Simple in-memory cache to avoid refetching banners repeatedly
+let cachedAllBanners: Banner[] | null = null;
+let cachedActiveBanners: Banner[] | null = null;
+
 // Hook for fetching all banners
 export const useBanners = () => {
   const [banners, setBanners] = useState<Banner[]>([]);
@@ -13,14 +17,10 @@ export const useBanners = () => {
     try {
       setLoading(true);
       setError(null);
-      
-      // For now, use mock data. Replace with actual API call when backend is ready
-      // const data = await bannerAPI.getAll();
-      // setBanners(data.banners);
-      
-      // Mock data implementation
-      const { mockBanners } = await import('../data/banners');
-      setBanners(mockBanners);
+      const { getActiveBanners, mockBanners } = await import('../data/banners');
+      const fallback = mockBanners?.length ? mockBanners : getActiveBanners();
+      cachedAllBanners = fallback;
+      setBanners(fallback);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch banners');
     } finally {
@@ -37,7 +37,7 @@ export const useBanners = () => {
 
 // Hook for fetching active banners only
 export const useActiveBanners = () => {
-  const [banners, setBanners] = useState<Banner[]>([]);
+  const [banners, setBanners] = useState<Banner[]>(cachedActiveBanners || []);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -45,15 +45,16 @@ export const useActiveBanners = () => {
     try {
       setLoading(true);
       setError(null);
-      
-      // For now, use mock data. Replace with actual API call when backend is ready
-      // const data = await bannerAPI.getActive();
-      // setBanners(data.banners);
-      
-      // Mock data implementation
+      // Serve from cache if present
+      if (cachedActiveBanners) {
+        setBanners(cachedActiveBanners);
+        setLoading(false);
+        return;
+      }
       const { getActiveBanners } = await import('../data/banners');
-      const activeBanners = getActiveBanners();
-      setBanners(activeBanners);
+      const fallback = getActiveBanners();
+      cachedActiveBanners = fallback;
+      setBanners(fallback);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch active banners');
     } finally {

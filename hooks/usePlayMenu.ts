@@ -14,15 +14,18 @@ export const usePlayMenuItems = () => {
       setLoading(true);
       setError(null);
       
-      // For now, use mock data. Replace with actual API call when backend is ready
-      // const data = await playMenuAPI.getAll();
-      // setItems(data.items);
-      
-      // Mock data implementation
+      // Always use mock data per requirement
       const { mockPlayMenuItems } = await import('../data/playMenuItems');
       setItems(mockPlayMenuItems);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch play menu items');
+      // Fallback to mock data on error
+      try {
+        const { mockPlayMenuItems } = await import('../data/playMenuItems');
+        setItems(mockPlayMenuItems);
+      } catch (mockError) {
+        console.error('Failed to load mock play menu items:', mockError);
+      }
     } finally {
       setLoading(false);
     }
@@ -46,16 +49,20 @@ export const useActivePlayMenuItems = () => {
       setLoading(true);
       setError(null);
       
-      // For now, use mock data. Replace with actual API call when backend is ready
-      // const data = await playMenuAPI.getActive();
-      // setItems(data.items);
-      
-      // Mock data implementation
+      // Always use mock data per requirement
       const { getActivePlayMenuItems } = await import('../data/playMenuItems');
       const activeItems = getActivePlayMenuItems();
       setItems(activeItems);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch active play menu items');
+      // Fallback to mock data on error
+      try {
+        const { getActivePlayMenuItems } = await import('../data/playMenuItems');
+        const activeItems = getActivePlayMenuItems();
+        setItems(activeItems);
+      } catch (mockError) {
+        console.error('Failed to load mock active play menu items:', mockError);
+      }
     } finally {
       setLoading(false);
     }

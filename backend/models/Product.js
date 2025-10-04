@@ -16,16 +16,15 @@ const productSchema = new mongoose.Schema({
     type: String,
     required: [true, 'Category is required'],
     enum: [
-      'Clothing',
-      'Footwear',
-      'Accessories',
+      'Women',
+      'Men',
+      'Kids',
       'Beauty',
-      'Bags',
-      'Jewelry',
-      'Watches',
+      'Footwear',
+      'Sports',
+      'Accessories',
       'Home & Living',
-      'Electronics',
-      'Sports'
+      'Electronics'
     ]
   },
   subcategory: {
@@ -162,6 +161,19 @@ const productSchema = new mongoose.Schema({
   },
   // Additional fields for better frontend compatibility
   features: [String],
+  isNew: {
+    type: Boolean,
+    default: false
+  },
+  isTrending: {
+    type: Boolean,
+    default: false
+  },
+  isSustainable: {
+    type: Boolean,
+    default: false
+  },
+  sustainability: String,
   delivery: {
     standard: {
       estimatedDays: String,

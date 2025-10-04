@@ -23,6 +23,7 @@ export const getApiBaseUrl = () => {
 // Function to test API connectivity
 export const testApiConnectivity = async (): Promise<string | null> => {
   const possibleUrls = [
+    'http://10.42.0.17:5000/api',
     'http://10.10.53.19:5000/api',
     'http://10.84.92.165:5000/api',
     'http://10.42.0.1:5000/api',

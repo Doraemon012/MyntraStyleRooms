@@ -17,7 +17,7 @@ import {
   View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { getProductById, getSimilarProducts, getYouMayAlsoLike, Product } from '../../data/products';
+import { useProduct, useSimilarProducts, useRecommendedProducts, Product } from '../../hooks/useProducts';
 import WardrobeSelector from '../../components/WardrobeSelector';
 import { useSession } from '../../contexts/session-context';
 import { wardrobeApi } from '../../services/wardrobeApi';
@@ -27,35 +27,18 @@ const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
 export default function ProductDetailScreen() {
   const params = useLocalSearchParams();
-  const id = params.id as string;
+  const id = params.id as string | undefined;
+  const normalizedId = typeof id === 'string' ? id : '';
   const { sessionRoomId, isInSession } = useSession();
   
-  // Add error handling for missing id
-  if (!id) {
-    return (
-      <View style={styles.errorContainer}>
-        <Text style={styles.errorText}>Product ID not found</Text>
-        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-          <Text style={styles.backButtonText}>Go Back</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
-  
-  const product = getProductById(id);
-  
-  if (!product) {
-    return (
-      <View style={styles.errorContainer}>
-        <Text style={styles.errorText}>Product not found</Text>
-        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-          <Text style={styles.backButtonText}>Go Back</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
+  // Always call hooks; guard their effects internally
+  const { product, loading: productLoading } = useProduct(normalizedId);
+  const { products: similarProducts } = useSimilarProducts(normalizedId, 4);
+  const { products: youAlsoLikeProducts } = useRecommendedProducts(normalizedId, 4);
 
-  const [selectedSize, setSelectedSize] = useState(product.selectedSize || '');
+  // From here on, avoid early returns to keep hook order stable.
+
+  const [selectedSize, setSelectedSize] = useState('');
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [showSizeChart, setShowSizeChart] = useState(false);
   const [showReviews, setShowReviews] = useState(false);
@@ -63,6 +46,14 @@ export default function ProductDetailScreen() {
   const [showProductDetails, setShowProductDetails] = useState(false);
   const [isWishlisted, setIsWishlisted] = useState(false);
   const [quantity, setQuantity] = useState(1);
+  
+  // Initialize selected size when product loads
+  React.useEffect(() => {
+    if (product && !selectedSize) {
+      const firstAvailable = product.availableSizes?.[0] || product.sizes?.[0] || '';
+      setSelectedSize(firstAvailable);
+    }
+  }, [product, selectedSize]);
   
   // Wardrobe and Chat functionality
   const [showWardrobeSelector, setShowWardrobeSelector] = useState(false);
@@ -72,8 +63,7 @@ export default function ProductDetailScreen() {
   const scrollViewRef = useRef<ScrollView>(null);
   const imageScrollRef = useRef<ScrollView>(null);
 
-  const similarProducts = getSimilarProducts(id, 4);
-  const youMayAlsoLike = getYouMayAlsoLike(id, 4);
+  const youMayAlsoLike = youAlsoLikeProducts;
 
   const handleImageScroll = (event: any) => {
     const contentOffset = event.nativeEvent.contentOffset.x;
@@ -239,6 +229,37 @@ export default function ProductDetailScreen() {
       <Text style={styles.reviewDate}>{item.date}</Text>
     </View>
   );
+
+  // Render fallbacks when id missing or data not ready, without breaking hook order
+  if (!normalizedId) {
+    return (
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorText}>Product ID not found</Text>
+        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+          <Text style={styles.backButtonText}>Go Back</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  if (productLoading) {
+    return (
+      <View style={styles.errorContainer}>
+        <ActivityIndicator size="small" color="#E91E63" />
+      </View>
+    );
+  }
+
+  if (!product) {
+    return (
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorText}>Product not found</Text>
+        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+          <Text style={styles.backButtonText}>Go Back</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
