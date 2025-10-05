@@ -42,7 +42,7 @@ class SocketService {
   private socket: Socket | null = null;
   private callbacks: SocketServiceCallbacks = {};
   private currentRoomId: string | null = null;
-  private typingTimeout: NodeJS.Timeout | null = null;
+  private typingTimeout: ReturnType<typeof setTimeout> | null = null;
   private isConnected = false;
 
   // Initialize socket connection
@@ -69,7 +69,7 @@ class SocketService {
       
       // Determine server URL based on environment
       const serverUrl = __DEV__ 
-        ? 'http://10.42.0.17:5000'  // Updated to correct local IP
+        ? 'http://192.168.137.1:5000'  // Local backend IP
         : 'https://your-production-url.com';
 
       console.log('🔌 Connecting to Socket.IO server:', serverUrl);

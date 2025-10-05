@@ -46,7 +46,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
       }
 
       // Create new socket connection
-      const newSocket = io('http://10.42.0.17:5000', {
+      const newSocket = io('http://192.168.137.1:5000', {  //here
         auth: {
           token,
           userId: user._id,

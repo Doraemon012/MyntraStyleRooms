@@ -1,39 +1,32 @@
 // Network utilities for detecting the correct API endpoint
-import Constants from 'expo-constants';
+
+// HARD-CODED API BASE URL (set from ipconfig)
+// Update the IP below to match your machine's IPv4 address from `ipconfig`.
+const HARDCODED_API_BASE_URL = 'http://192.168.137.1:5000/api';
 
 export const getApiBaseUrl = () => {
-  // Use environment variable first
-  if (process.env.EXPO_PUBLIC_API_URL) {
-    console.log('🌐 Using API URL from environment:', process.env.EXPO_PUBLIC_API_URL);
-    return process.env.EXPO_PUBLIC_API_URL;
-  }
-  
-  // Use app.json configuration
-  if (Constants.expoConfig?.extra?.apiUrl) {
-    console.log('🌐 Using API URL from app.json:', Constants.expoConfig.extra.apiUrl);
-    return Constants.expoConfig.extra.apiUrl;
-  }
-  
-  // Fallback to network IP
-  const networkUrl = 'http://10.10.53.19:5000/api';
-  console.log('🌐 Using fallback API URL:', networkUrl);
-  return networkUrl;
+  console.log('🌐 Using HARD-CODED API URL:', HARDCODED_API_BASE_URL);
+  return HARDCODED_API_BASE_URL;
 };
 
 // Function to test API connectivity
 export const testApiConnectivity = async (): Promise<string | null> => {
   const possibleUrls = [
-    'http://10.42.0.17:5000/api',
-    'http://10.10.53.19:5000/api',
-    'http://10.84.92.165:5000/api',
-    'http://10.42.0.1:5000/api',
-    'http://10.84.92.218:5000/api',
+    'http://10.10.48.103:5000/api',
+    'http://192.168.137.1:5000/api',
     'http://192.168.56.1:5000/api',
-    'http://172.27.35.178:5000/api',
-    'http://172.20.10.2:5000/api',
-    'http://192.168.1.100:5000/api',
-    'http://10.0.2.2:5000/api',
-    'http://localhost:5000/api',
+    // 'http://10.42.0.17:5000/api',
+    // 'http://10.10.53.19:5000/api',
+    // 'http://10.84.92.165:5000/api',
+    // 'http://10.42.0.1:5000/api',
+    // 'http://10.84.92.218:5000/api',
+    // 'http://192.168.56.1:5000/api',
+    // 'http://192.168.137.1:5000/api',
+    // 'http://172.27.35.178:5000/api',
+    // 'http://172.20.10.2:5000/api',
+    // 'http://192.168.1.100:5000/api',
+    // 'http://10.0.2.2:5000/api',
+    // 'http://localhost:5000/api',
   ];
 
   for (const url of possibleUrls) {
