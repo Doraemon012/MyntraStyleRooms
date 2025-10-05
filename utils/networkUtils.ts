@@ -2,7 +2,7 @@
 
 // HARD-CODED API BASE URL (set from ipconfig)
 // Update the IP below to match your machine's IPv4 address from `ipconfig`.
-const HARDCODED_API_BASE_URL = 'http://192.168.137.1:5000/api';
+const HARDCODED_API_BASE_URL = 'http://10.120.129.165:5000/api';
 
 export const getApiBaseUrl = () => {
   console.log('🌐 Using HARD-CODED API URL:', HARDCODED_API_BASE_URL);

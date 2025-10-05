@@ -462,10 +462,20 @@ export default function ProductDetailScreen() {
                 </View>
                 <View style={styles.deliveryInfo}>
                   <Text style={styles.deliveryType}>STANDARD</Text>
-                  <Text style={styles.deliveryEstimate}>Delivery between {product.delivery.standard.estimatedDays}</Text>
+                  <Text style={styles.deliveryEstimate}>
+                    Delivery between {product.delivery?.standard?.estimatedDays || '3-7 days'}
+                  </Text>
                   <View style={styles.deliveryPrice}>
-                    <Text style={styles.deliveryOriginalPrice}>MRP ₹{product.delivery.standard.originalPrice.toLocaleString()}</Text>
-                    <Text style={styles.deliveryCurrentPrice}>₹{product.delivery.standard.price.toLocaleString()} ({product.delivery.standard.discount}% OFF)</Text>
+                    <Text style={styles.deliveryOriginalPrice}>
+                      {product.delivery?.standard?.originalPrice !== undefined
+                        ? `MRP ₹${product.delivery.standard.originalPrice.toLocaleString()}`
+                        : 'MRP ₹—'}
+                    </Text>
+                    <Text style={styles.deliveryCurrentPrice}>
+                      {product.delivery?.standard?.price !== undefined
+                        ? `₹${product.delivery.standard.price.toLocaleString()} (${product.delivery.standard.discount || 0}% OFF)`
+                        : '₹—'}
+                    </Text>
                   </View>
                 </View>
               </View>
@@ -475,8 +485,14 @@ export default function ProductDetailScreen() {
                   <Ionicons name="card-outline" size={20} color="#4CAF50" />
                 </View>
                 <View style={styles.paymentInfo}>
-                  <Text style={styles.paymentText}>Pay on Delivery is available</Text>
-                  <Text style={styles.paymentFee}>₹{product.paymentOptions.codFee} additional fee applicable</Text>
+                  <Text style={styles.paymentText}>
+                    {product.paymentOptions?.cod ? 'Pay on Delivery is available' : 'Pay on Delivery not available'}
+                  </Text>
+                  <Text style={styles.paymentFee}>
+                    {product.paymentOptions?.codFee !== undefined 
+                      ? `₹${product.paymentOptions.codFee} additional fee applicable`
+                      : '₹—'}
+                  </Text>
                 </View>
               </View>
 

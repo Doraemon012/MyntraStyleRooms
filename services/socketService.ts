@@ -69,7 +69,7 @@ class SocketService {
       
       // Determine server URL based on environment
       const serverUrl = __DEV__ 
-        ? 'http://192.168.137.1:5000'  // Local backend IP
+        ? 'http://10.120.129.165:5000'  // Local backend IP
         : 'https://your-production-url.com';
 
       console.log('🔌 Connecting to Socket.IO server:', serverUrl);

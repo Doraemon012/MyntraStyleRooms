@@ -217,6 +217,30 @@ router.get('/:id', optionalAuth, async (req, res) => {
   }
 });
 
+// @route   GET /api/products/:id/recommended
+// @desc    Get recommended products (fallback to similar products)
+// @access  Public
+router.get('/:id/recommended', async (req, res) => {
+  try {
+    const { limit = 10 } = req.query;
+    // For now, reuse similar products logic as a sensible recommendation fallback
+    const products = await Product.getSimilarProducts(req.params.id, parseInt(limit));
+
+    res.json({
+      status: 'success',
+      data: {
+        products
+      }
+    });
+  } catch (error) {
+    console.error('Get recommended products error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Server error'
+    });
+  }
+});
+
 // @route   GET /api/products/:id/similar
 // @desc    Get similar products
 // @access  Public

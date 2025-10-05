@@ -2,16 +2,16 @@ import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Alert,
+    KeyboardAvoidingView,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import { useAuth } from '../../contexts/auth-context';
 
@@ -42,9 +42,8 @@ export default function LoginScreen() {
       console.log('🔐 Login result:', result);
       
       if (result.success) {
-        Alert.alert('Success', 'Login successful!', [
-          { text: 'OK', onPress: () => router.replace('/catalog') }
-        ]);
+        // Navigate directly without showing a success popup
+        router.replace('/catalog');
       } else {
         Alert.alert('Error', result.message || 'Login failed');
       }
