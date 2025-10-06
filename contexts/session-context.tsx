@@ -28,6 +28,12 @@ interface SessionContextType {
   toggleMute: () => void;
   setPresenter: (name: string) => void;
   setSelectedWardrobe: (wardrobeId: string | null) => void;
+  addParticipant: (participant: SessionParticipant) => void;
+  removeParticipant: (participantId: string) => void;
+  setParticipantProduct: (participantId: string, product: { id: string; name: string; image: string } | null) => void;
+  followingUserId?: string | null;
+  setFollowingUser: (userId: string | null) => void;
+  setParticipants: (participants: SessionParticipant[]) => void;
 }
 
 const SessionContext = createContext<SessionContextType | undefined>(undefined);
@@ -51,12 +57,14 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
   const [isMuted, setIsMuted] = useState(false);
 
   const startSession = (roomId: string, participants: SessionParticipant[], isHostSession?: boolean, wardrobeId?: string) => {
+    console.log('🚀 Starting session in context:', { roomId, participants: participants.length, isHostSession, wardrobeId });
     setIsInSession(true);
     setIsHost(isHostSession || false);
     setSessionRoomId(roomId);
     setSelectedWardrobeId(wardrobeId || null);
     setSessionParticipants(participants);
     setIsInLiveView(false);
+    console.log('✅ Session context updated:', { isInSession: true, isHost: isHostSession, sessionRoomId: roomId });
   };
 
   const enterLiveView = () => {
@@ -90,6 +98,36 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
     setSelectedWardrobeId(wardrobeId);
   };
 
+  const addParticipant = (participant: SessionParticipant) => {
+    setSessionParticipants(prev => {
+      const exists = prev.some(p => p.id === participant.id);
+      if (exists) return prev;
+      return [...prev, participant];
+    });
+  };
+
+  const removeParticipant = (participantId: string) => {
+    setSessionParticipants(prev => prev.filter(p => p.id !== participantId));
+  };
+
+  const setParticipantProduct = (participantId: string, product: { id: string; name: string; image: string } | null) => {
+    console.log('🔄 Setting participant product:', { participantId, product });
+    setSessionParticipants(prev => {
+      const updated = prev.map(p => p.id === participantId ? { ...p, currentProduct: product } : p);
+      console.log('🔄 Updated participants:', updated.map(p => ({ id: p.id, name: p.name, hasProduct: !!p.currentProduct })));
+      return updated;
+    });
+  };
+
+  const [followingUserId, setFollowingUserId] = useState<string | null>(null);
+  const setFollowingUser = (userId: string | null) => setFollowingUserId(userId);
+
+  const setParticipants = (participants: SessionParticipant[]) => {
+    console.log('🔄 Setting participants in context:', participants.map(p => `${p.name} (${p.id})`));
+    console.log('🔄 Participants details:', participants);
+    setSessionParticipants(participants);
+  };
+
   return (
     <SessionContext.Provider
       value={{
@@ -108,6 +146,12 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
         toggleMute,
         setPresenter,
         setSelectedWardrobe,
+        addParticipant,
+        removeParticipant,
+        setParticipantProduct,
+        followingUserId,
+        setFollowingUser,
+        setParticipants,
       }}
     >
       {children}

@@ -1,7 +1,7 @@
 import { DancingScript_400Regular, DancingScript_700Bold, useFonts } from '@expo-google-fonts/dancing-script';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from "expo-linear-gradient";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
     Alert,
@@ -13,8 +13,11 @@ import {
     View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useAuth } from '../contexts/auth-context';
 import { useSession } from '../contexts/session-context';
+import socketService from '../services/socketService';
 import { wardrobeApi } from '../services/wardrobeApi';
+import { showToast } from '../utils/toast';
 
 interface WardrobeCategory {
     id: string;
@@ -134,6 +137,7 @@ const mockParticipants = [
 ];
 
 export default function StartSessionScreen() {
+    const { roomId: roomIdParam } = useLocalSearchParams();
     const [currentStep, setCurrentStep] = useState<SessionStep>("wardrobe");
     const [selectedWardrobe, setSelectedWardrobe] = useState<string | null>(null);
     const [notifyMembers, setNotifyMembers] = useState(true);
@@ -141,6 +145,7 @@ export default function StartSessionScreen() {
     const [realWardrobes, setRealWardrobes] = useState<any[]>([]);
     const [loadingWardrobes, setLoadingWardrobes] = useState(false);
     const { startSession } = useSession();
+    const { user } = useAuth();
 
     let [fontsLoaded] = useFonts({
         DancingScript_400Regular,
@@ -222,13 +227,76 @@ export default function StartSessionScreen() {
         }
     };
 
-    const handleStartSession = () => {
+    const handleStartSession = async () => {
         if (!selectedWardrobe) {
             Alert.alert('Error', 'Please select a wardrobe before starting the session');
             return;
         }
-        // Start the session as host with participants
-        startSession('1', mockParticipants, true, selectedWardrobe);
+        if (!user) {
+            Alert.alert('Error', 'User not authenticated');
+            return;
+        }
+        
+        const hostName = user.name;
+        const hostAvatar = user.profileImage || 'https://ui-avatars.com/api/?name=' + user.name;
+        const roomId = (roomIdParam as string) || '1';
+        
+        console.log(`🚀 Starting session in room ${roomId} by ${hostName}`);
+        
+        // Set up socket callbacks for session events
+        socketService.updateCallbacks({
+            onSessionParticipants: (participants) => {
+                console.log('📥 Received session participants in start-screen:', participants);
+                if (Array.isArray(participants)) {
+                    const normalized = participants.map((p) => ({
+                        id: p.userId,
+                        name: p.userName || p.name,
+                        avatar: p.avatar || 'https://ui-avatars.com/api/?name=U&background=4A90E2&color=FFFFFF&size=150',
+                        isMuted: false,
+                        currentProduct: p.currentProduct ? {
+                            id: p.currentProduct.productId,
+                            name: p.currentProduct.productTitle,
+                            image: p.currentProduct.productImage,
+                        } : null,
+                    }));
+                    console.log('📥 Normalized participants in start-screen:', normalized.map(p => p.name));
+                    // Update session context with participants
+                    startSession(roomId, normalized, true, selectedWardrobe);
+                }
+            },
+            onSessionState: (state) => {
+                console.log('📊 Session state in start-screen:', state);
+                if (state?.active) {
+                    console.log('✅ Session is active, updating context');
+                }
+            }
+        });
+        
+        // First, join the room if not already joined
+        socketService.joinRoom(roomId);
+        
+        // Wait a bit for room join to complete
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        // Then start the session via socket
+        socketService.startSession(roomId, { 
+            wardrobeId: selectedWardrobe, 
+            host: hostName, 
+            hostId: user._id,
+            participants: [] // Will be populated by backend
+        });
+        
+        // Update local context with initial participant
+        const initial = [{ 
+            id: user._id, 
+            name: hostName, 
+            avatar: hostAvatar, 
+            isMuted: false, 
+            currentProduct: null 
+        }];
+        startSession(roomId, initial, true, selectedWardrobe);
+        
+        showToast('You started a session');
         // Navigate to the catalog screen for the session
         router.push("/catalog");
     };

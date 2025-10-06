@@ -17,8 +17,8 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import RoomSelectionModal from '../components/RoomSelectionModal';
-import AttendeeSessionHeader from '../components/session/AttendeeSessionHeader';
 import HostSessionHeader from '../components/session/HostSessionHeader';
+import LiveBrowsePanel from '../components/session/LiveBrowsePanel';
 import SessionBottomControls from '../components/session/SessionBottomControls';
 import { useAuth } from '../contexts/auth-context';
 import { useSession } from '../contexts/session-context';
@@ -42,7 +42,54 @@ const { width: screenWidth } = Dimensions.get('window');
 
 
 export default function CatalogScreen() {
-  const { isInSession, isHost, sessionParticipants, presenterName, isMuted, toggleMute, endSession, sessionRoomId } = useSession();
+  const { isInSession, isHost, sessionParticipants, presenterName, isMuted, toggleMute, endSession, sessionRoomId, setParticipantProduct } = useSession();
+  const { user } = useAuth();
+  
+  // Debug session state
+  console.log('🔍 Catalog screen session state:', { 
+    isInSession, 
+    isHost, 
+    participantsCount: sessionParticipants.length, 
+    sessionRoomId,
+    presenterName 
+  });
+  // Update session context from browse updates to feed LiveBrowsePanel
+  React.useEffect(() => {
+    if (!isInSession || !sessionRoomId || !user) return;
+
+    // Clear browse view when entering catalog (user is not viewing any specific product)
+    console.log('🧹 Clearing browse view - user entered catalog');
+    socketService.sendBrowseClear(sessionRoomId, { userId: user._id, name: user.name });
+    setParticipantProduct(user._id, null);
+
+    socketService.updateCallbacks({
+      onBrowseUpdate: (data) => {
+        if (!data?.userId) return;
+        if (data.productId) {
+          setParticipantProduct(data.userId, { id: data.productId, name: data.productTitle, image: data.productImage });
+        } else {
+          setParticipantProduct(data.userId, null);
+        }
+      },
+      onFollowNavigate: (data) => {
+        // Auto navigate to product if following
+        // We rely on session context followingUserId
+        // Catalog only shows a toast or could navigate to product details
+        if (data?.productId) {
+          // Optionally navigate: router.push(`/product/${data.productId}` as any)
+        }
+      },
+    });
+
+    // Cleanup: clear browse view when component unmounts
+    return () => {
+      if (isInSession && sessionRoomId && user) {
+        console.log('🧹 Clearing browse view - user left catalog');
+        socketService.sendBrowseClear(sessionRoomId, { userId: user._id, name: user.name });
+        setParticipantProduct(user._id, null);
+      }
+    };
+  }, [isInSession, sessionRoomId, user, setParticipantProduct]);
   const { logout } = useAuth();
   const [selectedCategory, setSelectedCategory] = useState('1');
   const [showExploreMenu, setShowExploreMenu] = useState(false);
@@ -305,8 +352,8 @@ export default function CatalogScreen() {
   return (
     <View style={styles.container}>
       <SafeAreaView style={styles.container}>
-        {/* Session Header Components */}
-        {isInSession && isHost && (
+        {/* Session Header Components - unified */}
+        {isInSession && (
           <HostSessionHeader
             participants={sessionParticipants}
             presenterName={presenterName}
@@ -315,14 +362,11 @@ export default function CatalogScreen() {
             onParticipantsPress={() => {}}
           />
         )}
-        
-        {isInSession && !isHost && (
-          <AttendeeSessionHeader
-            participants={sessionParticipants}
-            isMuted={isMuted}
-            onBackToSession={() => router.push(`/room/${sessionRoomId || '1'}`)}
-            onToggleMute={toggleMute}
-            roomId={sessionRoomId || '1'}
+
+        {isInSession && (
+          <LiveBrowsePanel 
+            currentUserId={user?._id} 
+            onFollowUser={(userId) => {}} 
           />
         )}
         
@@ -782,8 +826,8 @@ export default function CatalogScreen() {
           </TouchableOpacity>
         </Modal>
         
-        {/* Session Bottom Controls - Only for Host */}
-        {isInSession && isHost && (
+        {/* Session Bottom Controls - For All Users */}
+        {isInSession && (
           <SessionBottomControls
             onScreenShare={() => {}}
             onToggleMute={toggleMute}

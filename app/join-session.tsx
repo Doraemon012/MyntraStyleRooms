@@ -2,7 +2,10 @@ import { router, useLocalSearchParams } from 'expo-router';
 import React, { useEffect } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useAuth } from '../contexts/auth-context';
 import { useSession } from '../contexts/session-context';
+import socketService from '../services/socketService';
+import { showToast } from '../utils/toast';
 
 const mockSessionParticipants = [
   {
@@ -58,21 +61,77 @@ const mockSessionParticipants = [
 ];
 
 export default function JoinSessionScreen() {
-  const { startSession, endSession, setPresenter } = useSession();
+  const { startSession, endSession, setPresenter, sessionParticipants } = useSession();
+  const { user } = useAuth();
   const { roomId, sessionHost } = useLocalSearchParams();
 
   useEffect(() => {
-    // Start session as attendee (not host)
+    if (!user) {
+      console.warn('User not authenticated, cannot join session.');
+      router.replace('/auth/login');
+      return;
+    }
+
     const roomIdStr = (roomId as string) || '1';
-    const hostName = (sessionHost as string) || 'Jasmine';
+    const hostName = (sessionHost as string) || 'Host';
     
-    startSession(roomIdStr, mockSessionParticipants, false);
+    console.log(`🚀 Joining session in room ${roomIdStr} by ${user.name}`);
+    
+    // Initialize session context immediately with current user
+    const currentUser = {
+      id: user._id,
+      name: user.name,
+      avatar: user.profileImage || 'https://ui-avatars.com/api/?name=' + user.name,
+      isMuted: false,
+      currentProduct: null
+    };
+    
+    // Start session immediately (don't wait for socket events)
+    startSession(roomIdStr, [currentUser], false);
+    
+    // Set presenter name
     setPresenter(hostName);
     
+    // Set up socket callbacks for session events
+    socketService.updateCallbacks({
+      onSessionParticipants: (participants) => {
+        console.log('📥 Received session participants in join-screen:', participants);
+        if (Array.isArray(participants)) {
+          const normalized = participants.map((p) => ({
+            id: p.userId,
+            name: p.userName || p.name, // Use userName from backend
+            avatar: p.avatar || 'https://ui-avatars.com/api/?name=U&background=4A90E2&color=FFFFFF&size=150',
+            isMuted: false,
+            currentProduct: p.currentProduct ? {
+              id: p.currentProduct.productId,
+              name: p.currentProduct.productTitle,
+              image: p.currentProduct.productImage,
+            } : null,
+          }));
+          console.log('📥 Normalized participants in join-screen:', normalized.map(p => p.name));
+          // Update session context with all participants
+          startSession(roomIdStr, normalized, false);
+        }
+      },
+      onSessionState: (state) => {
+        console.log('📊 Session state in join-screen:', state);
+        if (state?.active) {
+          console.log('✅ Session is active, user can join');
+        }
+      }
+    });
+    
+    // Join the room
+    socketService.joinRoom(roomIdStr);
+    
+    // Show toast
+    showToast(`Joined ${hostName}'s session`);
+    
     return () => {
+      socketService.leaveRoom(roomIdStr);
       endSession();
     };
-  }, [startSession, endSession, setPresenter, roomId, sessionHost]);
+  }, [startSession, endSession, setPresenter, roomId, sessionHost, user]);
 
   const handleJoinSession = () => {
     router.push('/catalog');

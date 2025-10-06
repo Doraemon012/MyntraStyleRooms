@@ -20,6 +20,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useProduct, useSimilarProducts, useRecommendedProducts, Product } from '../../hooks/useProducts';
 import WardrobeSelector from '../../components/WardrobeSelector';
 import { useSession } from '../../contexts/session-context';
+import { useAuth } from '../../contexts/auth-context';
+import socketService from '../../services/socketService';
+import LiveBrowsePanel from '../../components/session/LiveBrowsePanel';
 import { wardrobeApi } from '../../services/wardrobeApi';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -29,7 +32,8 @@ export default function ProductDetailScreen() {
   const params = useLocalSearchParams();
   const id = params.id as string | undefined;
   const normalizedId = typeof id === 'string' ? id : '';
-  const { sessionRoomId, isInSession } = useSession();
+  const { sessionRoomId, isInSession, setParticipantProduct } = useSession();
+  const { user } = useAuth();
   
   // Always call hooks; guard their effects internally
   const { product, loading: productLoading } = useProduct(normalizedId);
@@ -54,6 +58,64 @@ export default function ProductDetailScreen() {
       setSelectedSize(firstAvailable);
     }
   }, [product, selectedSize]);
+
+  // Broadcast product view to session participants and update locally
+  React.useEffect(() => {
+    if (!product || !isInSession || !sessionRoomId || !user) {
+      console.log('📤 Browse view skipped:', { 
+        hasProduct: !!product, 
+        isInSession, 
+        sessionRoomId, 
+        hasUser: !!user 
+      });
+      return;
+    }
+    const payload = {
+      userId: user._id,
+      name: user.name,
+      productId: product._id,
+      productTitle: product.name,
+      productImage: product.images?.[0] || product.image,
+    };
+    console.log('📤 Sending browse view:', payload);
+    console.log('📤 Socket connected:', socketService.getConnectionStatus().isConnected);
+    socketService.sendBrowseView(sessionRoomId, payload);
+    // Update own current product locally (we won't receive our own broadcast)
+    setParticipantProduct(payload.userId, { id: payload.productId, name: payload.productTitle, image: payload.productImage });
+  }, [product, isInSession, sessionRoomId, user, setParticipantProduct]);
+
+  // Ensure browse updates update session context while on product screen
+  React.useEffect(() => {
+    socketService.updateCallbacks({
+      onBrowseUpdate: (data) => {
+        if (data?.userId) {
+          if (data.productId) {
+            setParticipantProduct(data.userId, {
+              id: data.productId,
+              name: data.productTitle,
+              image: data.productImage,
+            });
+          } else {
+            // Clear when productId is null
+            setParticipantProduct(data.userId, null);
+          }
+        }
+      },
+      onFollowNavigate: (data) => {
+        if (data?.productId && data?.leaderUserId) {
+          // Navigate to the leader's product if following
+          router.replace(`/product/${data.productId}` as any);
+        }
+      },
+    });
+    return () => {
+      if (isInSession && sessionRoomId && user) {
+        console.log('🧹 Clearing browse view for user:', user.name);
+        socketService.sendBrowseClear(sessionRoomId, { userId: user._id, name: user.name });
+        setParticipantProduct(user._id, null);
+      }
+    };
+  }, [setParticipantProduct]);
   
   // Wardrobe and Chat functionality
   const [showWardrobeSelector, setShowWardrobeSelector] = useState(false);
@@ -264,6 +326,12 @@ export default function ProductDetailScreen() {
   return (
     <View style={styles.container}>
       <SafeAreaView style={styles.container}>
+        {isInSession && (
+          <LiveBrowsePanel 
+            currentUserId={user?._id} 
+            onFollowUser={(userId) => {}} 
+          />
+        )}
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity style={styles.headerButton} onPress={() => router.back()}>
@@ -462,20 +530,14 @@ export default function ProductDetailScreen() {
                 </View>
                 <View style={styles.deliveryInfo}>
                   <Text style={styles.deliveryType}>STANDARD</Text>
-                  <Text style={styles.deliveryEstimate}>
-                    Delivery between {product.delivery?.standard?.estimatedDays || '3-7 days'}
-                  </Text>
+                  <Text style={styles.deliveryEstimate}>Delivery between {product?.delivery?.standard?.estimatedDays ?? '3-7 days'}</Text>
                   <View style={styles.deliveryPrice}>
-                    <Text style={styles.deliveryOriginalPrice}>
-                      {product.delivery?.standard?.originalPrice !== undefined
-                        ? `MRP ₹${product.delivery.standard.originalPrice.toLocaleString()}`
-                        : 'MRP ₹—'}
-                    </Text>
-                    <Text style={styles.deliveryCurrentPrice}>
-                      {product.delivery?.standard?.price !== undefined
-                        ? `₹${product.delivery.standard.price.toLocaleString()} (${product.delivery.standard.discount || 0}% OFF)`
-                        : '₹—'}
-                    </Text>
+                    {product?.delivery?.standard?.originalPrice != null && (
+                      <Text style={styles.deliveryOriginalPrice}>MRP ₹{product.delivery.standard.originalPrice.toLocaleString()}</Text>
+                    )}
+                    {product?.delivery?.standard?.price != null && product?.delivery?.standard?.discount != null && (
+                      <Text style={styles.deliveryCurrentPrice}>₹{product.delivery.standard.price.toLocaleString()} ({product.delivery.standard.discount}% OFF)</Text>
+                    )}
                   </View>
                 </View>
               </View>
@@ -485,14 +547,8 @@ export default function ProductDetailScreen() {
                   <Ionicons name="card-outline" size={20} color="#4CAF50" />
                 </View>
                 <View style={styles.paymentInfo}>
-                  <Text style={styles.paymentText}>
-                    {product.paymentOptions?.cod ? 'Pay on Delivery is available' : 'Pay on Delivery not available'}
-                  </Text>
-                  <Text style={styles.paymentFee}>
-                    {product.paymentOptions?.codFee !== undefined 
-                      ? `₹${product.paymentOptions.codFee} additional fee applicable`
-                      : '₹—'}
-                  </Text>
+                  <Text style={styles.paymentText}>Pay on Delivery is available</Text>
+                  <Text style={styles.paymentFee}>₹{product?.paymentOptions?.codFee ?? 0} additional fee applicable</Text>
                 </View>
               </View>
 
@@ -500,7 +556,7 @@ export default function ProductDetailScreen() {
                 <View style={styles.returnIcon}>
                   <Ionicons name="refresh-outline" size={20} color="#4CAF50" />
                 </View>
-                <Text style={styles.returnText}>{product.returnPolicy}</Text>
+                <Text style={styles.returnText}>{product?.returnPolicy ?? '7 days return policy'}</Text>
               </View>
             </View>
 

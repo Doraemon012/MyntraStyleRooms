@@ -1,6 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
-import { LinearGradient } from 'expo-linear-gradient';
 import React from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
@@ -63,17 +62,6 @@ export default function HostSessionHeader({
         </ScrollView>
       </View>
 
-      {/* Linear Gradient Section - Presenter Info Only */}
-      <LinearGradient
-        colors={['rgba(60, 60, 60, 0.8)', 'rgba(255, 255, 255,1)']}
-        style={styles.presenterSection}
-      >
-        <View style ={{display: 'flex', flexDirection: 'row'}}>
-                <Text style={styles.presenterText2}>{presenterName}</Text>
-
-        <Text style={styles.presenterText}>{' '} is presenting</Text>
-      </View>
-      </LinearGradient>
     </View>
   );
 }
@@ -137,22 +125,5 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '500',
     textAlign: 'center',
-  },
-  presenterSection: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    justifyContent: 'center',
-  },
-  presenterText: {
-    color: '#FFF', // Orange color
-    fontSize: 14,
-    fontWeight: '600',
-    left: 200
-  },
-  presenterText2: {
-    color: '#F13AB1',
-    fontSize: 14,
-    fontWeight: '600',
-    left: 200
   },
 });
