@@ -113,7 +113,7 @@ export default function WardrobeDetailScreen() {
         return (
             <TouchableOpacity 
                 style={styles.itemCard}
-                onPress={() => router.push(`/product/${item.productId._id}`)}
+                onPress={() => router.push(`/product/${item.productId._id}?fromWardrobeId=${id}`)}
             >
                 <View style={styles.itemImageContainer}>
                     <Image 

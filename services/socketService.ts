@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { io, Socket } from 'socket.io-client';
+import { authAPI } from './api';
 
 interface SocketMessage {
   id: string;
@@ -50,16 +51,30 @@ class SocketService {
     this.callbacks = callbacks;
 
     try {
-      // Get user token and info from storage
-      const token = await AsyncStorage.getItem('userToken');
-      const userInfo = await AsyncStorage.getItem('userInfo');
-      
-      // For development, use mock user data if authentication is not available
+      // Get user token and info from storage (use same keys as the rest of the app)
+      let token = (await AsyncStorage.getItem('auth_token')) || (await AsyncStorage.getItem('userToken'));
+      let userInfo = (await AsyncStorage.getItem('userData')) || (await AsyncStorage.getItem('userInfo'));
+
+      // Resolve user if token present but user info missing
+      if (token && !userInfo) {
+        try {
+          const me = await authAPI.getCurrentUser();
+          if (me?.status === 'success' && me.data?.user) {
+            await AsyncStorage.setItem('userData', JSON.stringify(me.data.user));
+            userInfo = JSON.stringify(me.data.user);
+          }
+        } catch (e) {
+          console.warn('⚠️ Failed to fetch current user for socket auth, will fallback if needed');
+        }
+      }
+
+      // Fallback to mock if still missing token or user
       let user;
       if (token && userInfo) {
         user = JSON.parse(userInfo);
       } else {
         console.log('⚠️ No authentication found, using mock user for Socket.IO');
+        token = 'mock-token';
         user = {
           _id: 'mock-user-1',
           name: 'You',

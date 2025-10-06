@@ -19,6 +19,9 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useProduct, useSimilarProducts, useRecommendedProducts, Product } from '../../hooks/useProducts';
 import WardrobeSelector from '../../components/WardrobeSelector';
+import RoomSelectionModal from '../../components/RoomSelectionModal';
+import messageStorage from '../../services/messageStorage';
+import socketService from '../../services/socketService';
 import { useSession } from '../../contexts/session-context';
 import { wardrobeApi } from '../../services/wardrobeApi';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -28,6 +31,7 @@ const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 export default function ProductDetailScreen() {
   const params = useLocalSearchParams();
   const id = params.id as string | undefined;
+  const fromWardrobeId = params.fromWardrobeId as string | undefined;
   const normalizedId = typeof id === 'string' ? id : '';
   const { sessionRoomId, isInSession } = useSession();
   
@@ -57,6 +61,7 @@ export default function ProductDetailScreen() {
   
   // Wardrobe and Chat functionality
   const [showWardrobeSelector, setShowWardrobeSelector] = useState(false);
+  const [selectedRoomIdForWardrobe, setSelectedRoomIdForWardrobe] = useState<string | null>(null);
   const [addingToWardrobe, setAddingToWardrobe] = useState(false);
   const [sendingToChat, setSendingToChat] = useState(false);
   
@@ -73,7 +78,19 @@ export default function ProductDetailScreen() {
 
   // Wardrobe functionality
   const handleAddToWardrobe = () => {
-    setShowWardrobeSelector(true);
+    // If arrived from a wardrobe, preselect that wardrobe's room context
+    if (fromWardrobeId) {
+      setSelectedRoomIdForWardrobe(sessionRoomId || null);
+      setShowWardrobeSelector(true);
+      return;
+    }
+    // If we are already in a room session, use that room; otherwise ask user to pick a room first
+    if (sessionRoomId) {
+      setSelectedRoomIdForWardrobe(sessionRoomId);
+      setShowWardrobeSelector(true);
+    } else {
+      setShowRoomSelectionForWardrobe(true);
+    }
   };
 
   const handleWardrobeSelect = async (wardrobeId: string) => {
@@ -102,6 +119,7 @@ export default function ProductDetailScreen() {
       if (response.status === 'success') {
         Alert.alert('Success', 'Product added to wardrobe!');
         setShowWardrobeSelector(false);
+        setSelectedRoomIdForWardrobe(null);
       } else {
         Alert.alert('Error', response.message || 'Failed to add product to wardrobe');
       }
@@ -113,23 +131,66 @@ export default function ProductDetailScreen() {
     }
   };
 
-  // Chat functionality
-  const handleSendToChat = async () => {
-    if (!isInSession || !sessionRoomId) {
-      Alert.alert('Error', 'You need to be in a live session to send products to chat');
-      return;
-    }
+  // Send to Chat: open room selection like catalog
+  const [showRoomSelection, setShowRoomSelection] = useState(false);
+  const [showRoomSelectionForWardrobe, setShowRoomSelectionForWardrobe] = useState(false);
+  const handleSendToChat = () => {
+    setShowRoomSelection(true);
+  };
 
-    setSendingToChat(true);
+  // After selecting a room for wardrobe add, open the wardrobe selector filtered by that room
+  const handleRoomSelectForWardrobe = (room: any) => {
+    setSelectedRoomIdForWardrobe(room._id);
+    setShowRoomSelectionForWardrobe(false);
+    setShowWardrobeSelector(true);
+  };
+
+  // After selecting a room, send product message then navigate
+  const handleRoomSelect = async (room: any) => {
     try {
-      // Here you would implement the chat API call
-      // For now, we'll simulate it
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      Alert.alert('Success', 'Product sent to chat!');
+      setSendingToChat(true);
+      const productMessage = {
+        id: `product_${product._id}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        text: `Check out this ${product.name}!`,
+        sender: 'user' as 'user' | 'friend' | 'ai' | 'maya',
+        senderName: 'You',
+        senderAvatar: 'https://ui-avatars.com/api/?name=You&background=FF6B9D&color=FFFFFF&size=150',
+        timestamp: new Date().toISOString(),
+        isProduct: true,
+        productData: {
+          name: product.name,
+          price: `₹${product.price.toLocaleString()}`,
+          image: product.image,
+          description: product.description || `${product.brand} ${product.name}`,
+          brand: product.brand,
+          category: product.category,
+          rating: product.rating,
+          discountPercentage: product.discountPercentage,
+          originalPrice: product.originalPrice ? `₹${product.originalPrice.toLocaleString()}` : undefined,
+        },
+        reactions: { thumbsUp: 0, thumbsDown: 0 },
+      };
+
+      await messageStorage.addMessage(room._id, productMessage);
+
+      const connectionStatus = socketService.getConnectionStatus();
+      if (connectionStatus.isConnected) {
+        socketService.sendMessage({
+          text: productMessage.text,
+          sender: 'user',
+          senderName: 'You',
+          senderAvatar: 'https://ui-avatars.com/api/?name=You&background=FF6B9D&color=FFFFFF&size=150',
+          roomId: room._id,
+          messageType: 'product',
+          productData: productMessage.productData,
+          reactions: productMessage.reactions,
+        });
+      }
+
+      setShowRoomSelection(false);
+      router.push(`/room/${room._id}` as any);
     } catch (error) {
-      console.error('Error sending to chat:', error);
-      Alert.alert('Error', 'Failed to send product to chat');
+      console.error('❌ Error sending product to chat:', error);
     } finally {
       setSendingToChat(false);
     }
@@ -422,28 +483,18 @@ export default function ProductDetailScreen() {
                 <Text style={styles.wardrobeButtonText}>Add to Wardrobe</Text>
               </TouchableOpacity>
               
-              {isInSession && sessionRoomId ? (
-                <TouchableOpacity 
-                  style={styles.chatButton}
-                  onPress={handleSendToChat}
-                  disabled={sendingToChat}
-                >
-                  {sendingToChat ? (
-                    <ActivityIndicator size="small" color="#4CAF50" />
-                  ) : (
-                    <Ionicons name="chatbubble-outline" size={20} color="#4CAF50" />
-                  )}
-                  <Text style={styles.chatButtonText}>Send to Chat</Text>
-                </TouchableOpacity>
-              ) : (
-                <TouchableOpacity 
-                  style={styles.chatButtonDisabled}
-                  onPress={() => Alert.alert('Info', 'Join a live session to send products to chat')}
-                >
-                  <Ionicons name="chatbubble-outline" size={20} color="#999" />
-                  <Text style={styles.chatButtonTextDisabled}>Send to Chat</Text>
-                </TouchableOpacity>
-              )}
+              <TouchableOpacity 
+                style={styles.chatButton}
+                onPress={handleSendToChat}
+                disabled={sendingToChat}
+              >
+                {sendingToChat ? (
+                  <ActivityIndicator size="small" color="#4CAF50" />
+                ) : (
+                  <Ionicons name="chatbubble-outline" size={20} color="#4CAF50" />
+                )}
+                <Text style={styles.chatButtonText}>Send to Chat</Text>
+              </TouchableOpacity>
             </View>
 
             {/* Delivery & Services */}
@@ -633,7 +684,23 @@ export default function ProductDetailScreen() {
           productName={product.name}
           productPrice={`₹${product.price.toLocaleString()}`}
           loading={addingToWardrobe}
-          roomId={sessionRoomId || undefined}
+          roomId={(selectedRoomIdForWardrobe || sessionRoomId || undefined) as string | undefined}
+        />
+
+        {/* Room Selection Modal for Send to Chat */}
+        <RoomSelectionModal
+          visible={showRoomSelection}
+          onClose={() => setShowRoomSelection(false)}
+          onRoomSelect={handleRoomSelect}
+          productName={product.name}
+        />
+
+        {/* Room Selection Modal for Add to Wardrobe (ensures room-scoped wardrobes) */}
+        <RoomSelectionModal
+          visible={showRoomSelectionForWardrobe}
+          onClose={() => setShowRoomSelectionForWardrobe(false)}
+          onRoomSelect={handleRoomSelectForWardrobe}
+          productName={product.name}
         />
       </SafeAreaView>
     </View>

@@ -39,9 +39,7 @@ export default function CreateWardrobeScreen() {
   const { sessionRoomId } = useSession();
   const { roomId } = useLocalSearchParams();
   const [wardrobeName, setWardrobeName] = useState('');
-  const [description, setDescription] = useState('');
-  const [occasionType, setOccasionType] = useState('General Collection');
-  const [isPrivate, setIsPrivate] = useState(false);
+  // Privacy setting removed per requirements
   const [members, setMembers] = useState<WardrobeMember[]>([]);
   const [showUserModal, setShowUserModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -52,17 +50,7 @@ export default function CreateWardrobeScreen() {
   // Use roomId from params or sessionRoomId as fallback
   const currentRoomId = (roomId as string) || sessionRoomId;
 
-  const occasionTypes = [
-    'Wedding & Celebrations',
-    'Office & Professional',
-    'Casual & Weekend',
-    'Party & Nightlife',
-    'Travel & Vacation',
-    'Festival & Cultural',
-    'Sports & Fitness',
-    'Date Night',
-    'General Collection'
-  ];
+  // Occasion type removed per requirements
 
   useEffect(() => {
     loadUsers();
@@ -192,9 +180,7 @@ export default function CreateWardrobeScreen() {
       const wardrobeData = {
         name: wardrobeName,
         emoji: '👗', // Default emoji
-        description: description || undefined,
-        occasionType: occasionType,
-        isPrivate,
+        // description and privacy removed
         roomId: currentRoomId,
         members: members.map(member => ({
           userId: member.userId,
@@ -274,62 +260,11 @@ export default function CreateWardrobeScreen() {
                 />
               </View>
 
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>Description (Optional)</Text>
-                <TextInput
-                  style={[styles.textInput, styles.textArea]}
-                  placeholder="What's this wardrobe for? Add details about style preferences, occasions, etc."
-                  value={description}
-                  onChangeText={setDescription}
-                  multiline
-                  numberOfLines={3}
-                  maxLength={200}
-                />
-              </View>
+              {/* Description removed */}
 
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>Occasion Type *</Text>
-                <View style={styles.pickerContainer}>
-                  <Text style={styles.pickerText}>{occasionType}</Text>
-                  <Text style={styles.pickerIcon}>▼</Text>
-                </View>
-                <View style={styles.occasionTypesContainer}>
-                  {occasionTypes.map((type) => (
-                    <TouchableOpacity
-                      key={type}
-                      style={[
-                        styles.occasionTypeOption,
-                        occasionType === type && styles.occasionTypeOptionSelected
-                      ]}
-                      onPress={() => setOccasionType(type)}
-                    >
-                      <Text style={[
-                        styles.occasionTypeText,
-                        occasionType === type && styles.occasionTypeTextSelected
-                      ]}>
-                        {type}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
+              {/* Occasion type removed */}
 
-              <View style={styles.inputGroup}>
-                <View style={styles.privacyToggle}>
-                  <View>
-                    <Text style={styles.label}>Privacy Setting</Text>
-                    <Text style={styles.sublabel}>
-                      {isPrivate ? 'Only invited members can access' : 'Anyone with link can view'}
-                    </Text>
-                  </View>
-                  <TouchableOpacity
-                    style={[styles.toggle, isPrivate && styles.toggleActive]}
-                    onPress={() => setIsPrivate(!isPrivate)}
-                  >
-                    <View style={[styles.toggleThumb, isPrivate && styles.toggleThumbActive]} />
-                  </TouchableOpacity>
-                </View>
-              </View>
+              {/* Privacy setting removed */}
             </View>
 
           <View style={styles.section}>

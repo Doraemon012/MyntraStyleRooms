@@ -110,16 +110,23 @@ export interface APIProduct {
 
 // Transform API product to frontend Product format
 export function transformAPIProduct(apiProduct: APIProduct) {
+  // Ensure all products have discounts
+  const hasDiscount = apiProduct.originalPrice && apiProduct.originalPrice > apiProduct.price;
+  const originalPrice = apiProduct.originalPrice || apiProduct.price;
+  const discountPercentage = apiProduct.discountPercentage || (hasDiscount ? Math.floor(Math.random() * 30 + 10) : Math.floor(Math.random() * 30 + 10));
+  const calculatedOriginalPrice = hasDiscount ? originalPrice : Math.round(apiProduct.price / (1 - discountPercentage / 100));
+  const calculatedPrice = hasDiscount ? apiProduct.price : Math.round(calculatedOriginalPrice * (1 - discountPercentage / 100));
+  
   return {
     _id: apiProduct._id,
     name: apiProduct.name,
     brand: apiProduct.brand,
-    price: apiProduct.price,
-    originalPrice: apiProduct.originalPrice || apiProduct.price,
-    discount: apiProduct.discount,
-    discountPercentage: apiProduct.discountPercentage,
-    rating: apiProduct.rating.average,
-    reviewCount: apiProduct.rating.count,
+    price: calculatedPrice,
+    originalPrice: calculatedOriginalPrice,
+    discount: calculatedOriginalPrice - calculatedPrice,
+    discountPercentage: discountPercentage,
+    rating: apiProduct.rating?.average || (Math.random() * 2 + 3),
+    reviewCount: apiProduct.rating?.count || Math.floor(Math.random() * 200 + 50),
     image: apiProduct.primaryImage,
     images: apiProduct.images.map(img => img.url),
     category: apiProduct.category,

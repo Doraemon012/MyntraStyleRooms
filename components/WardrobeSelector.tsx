@@ -156,9 +156,9 @@ export default function WardrobeSelector({
                     onPress={() => handleWardrobeSelect(item._id)}
                     disabled={loading}
                   >
-                    <View style={styles.wardrobeEmoji}>
+                    <Text style={styles.wardrobeEmoji}>
                       {getWardrobeEmoji(item.occasionType)}
-                    </View>
+                    </Text>
                     <View style={styles.wardrobeInfo}>
                       <Text style={styles.wardrobeName}>{item.name}</Text>
                       <Text style={styles.wardrobeCount}>

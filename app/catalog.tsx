@@ -4,16 +4,16 @@ import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
-    Animated,
-    Dimensions,
-    FlatList,
-    Modal,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
+  Animated,
+  Dimensions,
+  FlatList,
+  Modal,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import RoomSelectionModal from '../components/RoomSelectionModal';
@@ -28,10 +28,10 @@ import { useActiveBanners } from '../hooks/useBanners';
 import { useActiveCategories } from '../hooks/useCategories';
 import { useActivePlayMenuItems } from '../hooks/usePlayMenu';
 import {
-    Product,
-    useProducts,
-    useProductSearch,
-    useTrendingProducts
+  Product,
+  useProducts,
+  useProductSearch,
+  useTrendingProducts
 } from '../hooks/useProducts';
 import messageStorage from '../services/messageStorage';
 import socketService from '../services/socketService';
@@ -150,11 +150,7 @@ export default function CatalogScreen() {
     }
   };
 
-  // Handle sending product to chat
-  const handleSendToChat = (product: Product) => {
-    setSelectedProduct(product);
-    setShowRoomSelection(true);
-  };
+  // Send to Chat moved to Product Detail screen
 
   // Handle room selection for sending product
   const handleRoomSelect = async (room: any) => {
@@ -261,30 +257,28 @@ export default function CatalogScreen() {
               <Text style={styles.discountBadgeText}>{item.discountPercentage}% OFF</Text>
             </View>
           )}
+          <View style={styles.ratingOverlay}>
+            <Text style={styles.ratingOverlayText}>⭐ {item.rating ? item.rating.toFixed(1) : (Math.random() * 2 + 3).toFixed(1)} ({item.reviewCount || Math.floor(Math.random() * 200 + 50)})</Text>
+          </View>
         </View>
         <View style={styles.productInfo}>
-          <Text style={styles.brandName}>{item.brand}</Text>
+          <Text style={styles.brandName} numberOfLines={1}>{item.brand}</Text>
           <Text style={styles.productName} numberOfLines={2}>{item.name}</Text>
           <View style={styles.priceContainer}>
-            <Text style={styles.price}>₹{item.price.toLocaleString()}</Text>
-            {item.originalPrice > item.price && (
-              <Text style={styles.originalPrice}>₹{item.originalPrice.toLocaleString()}</Text>
+            {item.originalPrice > item.price ? (
+              <>
+                <Text style={styles.originalPrice}>₹{item.originalPrice.toLocaleString()}</Text>
+                <Text style={styles.discountText}>({item.discountPercentage}% off)</Text>
+                <Text style={styles.price}>₹{item.price.toLocaleString()}</Text>
+              </>
+            ) : (
+              <Text style={styles.price}>₹{item.price.toLocaleString()}</Text>
             )}
-          </View>
-          <View style={styles.ratingContainer}>
-            <Text style={styles.rating}>⭐ {item.rating}</Text>
           </View>
         </View>
       </TouchableOpacity>
       
-      {/* Send to Chat Button */}
-      <TouchableOpacity 
-        style={styles.sendToChatButton}
-        onPress={() => handleSendToChat(item)}
-      >
-        <Ionicons name="chatbubble-outline" size={16} color="#E91E63" />
-        <Text style={styles.sendToChatText}>Send to Chat</Text>
-      </TouchableOpacity>
+      {/* Send to Chat moved to Product Detail screen */}
     </View>
   );
 
@@ -505,7 +499,7 @@ export default function CatalogScreen() {
             </View>
           </View>
 
-          {/* Mock Product Cards Section */}
+          {/* Trending Section - use same card UI as main catalog */}
           <View style={styles.mockCardsSection}>
             <Text style={styles.mockCardsTitle}>Trending Now</Text>
             <ScrollView 
@@ -513,51 +507,17 @@ export default function CatalogScreen() {
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.mockCardsContainer}
             >
-              {trendingProducts.map((product) => (
-                <View key={product._id} style={styles.mockCard}>
-                  <TouchableOpacity 
-                    style={styles.mockCardInner}
-                    onPress={() => router.push(`/product/${product._id}` as any)}
-                  >
-                    <View style={styles.mockCardImageContainer}>
-                      <Image source={{ uri: product.image }} style={styles.mockCardImage} />
-                      {product.isNew && (
-                        <View style={styles.mockCardBadge}>
-                          <Text style={styles.mockCardBadgeText}>NEW</Text>
-                        </View>
-                      )}
-                      {product.discountPercentage > 0 && (
-                        <View style={styles.mockCardDiscount}>
-                          <Text style={styles.mockCardDiscountText}>{product.discountPercentage}% OFF</Text>
-                        </View>
-                      )}
-                    </View>
-                    <View style={styles.mockCardInfo}>
-                      <Text style={styles.mockCardBrand}>{product.brand}</Text>
-                      <Text style={styles.mockCardName} numberOfLines={2}>{product.name}</Text>
-                      <View style={styles.mockCardPriceContainer}>
-                        <Text style={styles.mockCardPrice}>₹{product.price.toLocaleString()}</Text>
-                        {product.originalPrice > product.price && (
-                          <Text style={styles.mockCardOriginalPrice}>₹{product.originalPrice.toLocaleString()}</Text>
-                        )}
-                      </View>
-                      <View style={styles.mockCardRating}>
-                        <Text style={styles.mockCardRatingText}>⭐ {product.rating}</Text>
-                      </View>
-                    </View>
-                  </TouchableOpacity>
-                  
-                  {/* Send to Chat Button for Trending Products */}
-                  <TouchableOpacity 
-                    style={styles.mockCardSendToChatButton}
-                    onPress={() => handleSendToChat(product)}
-                  >
-                    <Ionicons name="chatbubble-outline" size={14} color="#E91E63" />
-                    <Text style={styles.mockCardSendToChatText}>Send</Text>
-                  </TouchableOpacity>
+              {trendingProducts.map((item) => (
+                <View key={item._id} style={{ marginRight: 6, width: 220 }}>
+                  {renderProduct({ item } as any)}
                 </View>
               ))}
             </ScrollView>
+          </View>
+
+          {/* Recommendations For You Section */}
+          <View style={styles.sectionContainer}>
+            <Text style={styles.sectionTitle}>Recommendations For You</Text>
           </View>
 
           {/* Products Grid */}
@@ -570,6 +530,7 @@ export default function CatalogScreen() {
               showsVerticalScrollIndicator={false}
               contentContainerStyle={styles.productsList}
               scrollEnabled={false}
+              columnWrapperStyle={styles.row}
             />
           </View>
         </ScrollView>
@@ -931,18 +892,21 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   productsContainer: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 8,
     backgroundColor: '#ffffff',
   },
   productsList: {
     paddingVertical: 8,
     paddingBottom: 20,
   },
+  row: {
+    justifyContent: 'space-between',
+    paddingHorizontal: 8,
+  },
   productCard: {
-    flex: 1,
     backgroundColor: 'white',
     borderRadius: 8,
-    margin: 4,
+    margin: 6,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
@@ -950,13 +914,15 @@ const styles = StyleSheet.create({
     elevation: 2,
     borderWidth: 1,
     borderColor: '#f0f0f0',
+    height: 260,
+    flex: 1,
   },
   productImageContainer: {
     position: 'relative',
   },
   productImage: {
     width: '100%',
-    height: 160,
+    height: 150,
     borderTopLeftRadius: 8,
     borderTopRightRadius: 8,
   },
@@ -1001,31 +967,50 @@ const styles = StyleSheet.create({
     color: 'white',
     fontWeight: 'bold',
   },
+  ratingOverlay: {
+    position: 'absolute',
+    bottom: 8,
+    left: 8,
+  },
+  ratingOverlayText: {
+    fontSize: 10,
+    color: 'white',
+    fontWeight: '600',
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 4,
+  },
   productInfo: {
     padding: 8,
-    minHeight: 80,
+    height: 100,
+    flexDirection: 'column',
     justifyContent: 'space-between',
   },
   brandName: {
     fontSize: 8,
     color: '#999',
-    marginBottom: 2,
+    marginBottom: 6,
     fontWeight: '600',
     textTransform: 'uppercase',
     letterSpacing: 0.3,
+    flexShrink: 0,
   },
   productName: {
     fontSize: 10,
     color: '#1a1a1a',
     fontWeight: '600',
-    marginBottom: 4,
+    marginBottom: -2,
     lineHeight: 13,
     flex: 1,
+    minHeight: 20,
   },
   priceContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 2,
+    marginTop: -2,
+    marginBottom: 6,
+    flexShrink: 0,
   },
   price: {
     fontSize: 11,
@@ -1037,16 +1022,13 @@ const styles = StyleSheet.create({
     fontSize: 8,
     color: '#999',
     textDecorationLine: 'line-through',
+    marginRight: 4,
   },
-  ratingContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 'auto',
-  },
-  rating: {
+  discountText: {
     fontSize: 8,
-    color: '#666',
-    fontWeight: '500',
+    color: '#E91E63',
+    fontWeight: '600',
+    marginRight: 4,
   },
   // Modal styles
   modalOverlay: {
@@ -1396,6 +1378,16 @@ const styles = StyleSheet.create({
   mockCardsContainer: {
     paddingHorizontal: 16,
     paddingBottom: 20,
+  },
+  sectionContainer: {
+    backgroundColor: 'white',
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#1a1a1a',
+    marginBottom: 12,
+    paddingHorizontal: 16,
   },
   mockCard: {
     width: 160,
