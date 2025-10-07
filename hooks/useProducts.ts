@@ -39,7 +39,10 @@ export const useProducts = (filters?: {
       // Use actual API call
       const { catalogAPI } = await import('../services/catalogApi');
       const data = await catalogAPI.getProducts(stableFilters);
+      console.log('📦 API Response:', data);
+      console.log('📦 Products count:', data.data.products.length);
       const transformedProducts = data.data.products.map(transformAPIProduct);
+      console.log('📦 Transformed products count:', transformedProducts.length);
       setProducts(transformedProducts);
     } catch (err) {
       console.error('Error fetching products:', err);

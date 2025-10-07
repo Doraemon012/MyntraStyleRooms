@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
+import { authAPI } from '../services/api';
 
 interface SocketContextType {
   socket: Socket | null;
@@ -30,8 +31,21 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
   const connect = async () => {
     try {
       // Get user data from storage
-      const token = await AsyncStorage.getItem('auth_token');
-      const userData = await AsyncStorage.getItem('userData');
+      let token = await AsyncStorage.getItem('auth_token');
+      let userData = await AsyncStorage.getItem('userData');
+
+      // If token exists but userData missing, fetch /auth/me to align socket auth
+      if (token && !userData) {
+        try {
+          const me = await authAPI.getCurrentUser();
+          if (me?.status === 'success' && me.data?.user) {
+            await AsyncStorage.setItem('userData', JSON.stringify(me.data.user));
+            userData = JSON.stringify(me.data.user);
+          }
+        } catch (e) {
+          console.warn('⚠️ Failed to resolve user for socket auth');
+        }
+      }
       
       if (!token || !userData) {
         console.log('🔌 No auth token or user data found, skipping Socket.IO connection');
@@ -47,6 +61,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
 
       // Create new socket connection
       const newSocket = io('http://10.120.129.218:5000', {  //here
+
         auth: {
           token,
           userId: user._id,

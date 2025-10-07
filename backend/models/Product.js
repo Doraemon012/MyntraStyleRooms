@@ -422,6 +422,51 @@ productSchema.statics.getProductsByCategory = function(category, limit = 20) {
     .limit(limit);
 };
 
+// Static method to get recommended products (You May Also Like)
+productSchema.statics.getRecommendedProducts = function(productId, limit = 10) {
+  return this.findById(productId)
+    .then(product => {
+      if (!product) return [];
+
+      // Build query for recommended products based on features, tags, or occasion
+      const query = {
+        _id: { $ne: productId },
+        isAvailable: true,
+        $or: []
+      };
+
+      // Add feature overlap condition if product has features
+      if (product.features && product.features.length > 0) {
+        query.$or.push({ features: { $in: product.features } });
+      }
+
+      // Add tag overlap condition if product has tags
+      if (product.tags && product.tags.length > 0) {
+        query.$or.push({ tags: { $in: product.tags } });
+      }
+
+      // Add occasion overlap condition if product has occasion in specifications
+      if (product.specifications && product.specifications.occasion && product.specifications.occasion.length > 0) {
+        query.$or.push({ 'specifications.occasion': { $in: product.specifications.occasion } });
+      }
+
+      // If no overlap conditions, fallback to category and brand
+      if (query.$or.length === 0) {
+        query.$or = [
+          { category: product.category },
+          { brand: product.brand }
+        ];
+      }
+
+      return this.find(query)
+        .sort({ 
+          purchaseCount: -1, 
+          wishlistCount: -1 
+        })
+        .limit(limit);
+    });
+};
+
 // Static method to get popular brands
 productSchema.statics.getPopularBrands = function(limit = 20) {
   return this.aggregate([

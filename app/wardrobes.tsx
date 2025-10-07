@@ -3,6 +3,7 @@ import { useSession } from "@/contexts/session-context";
 import { roomAPI } from "@/services/api";
 import { WardrobeItem as ApiWardrobeItem, Wardrobe, wardrobeApi } from "@/services/wardrobeApi";
 import { getDefaultImageProps, getProductImageUri } from "@/utils/imageUtils";
+import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from "expo-linear-gradient";
@@ -240,29 +241,40 @@ export default function WardrobesScreen() {
                 start={{ x: 0, y: 0 }}
                 end={{ x: 0, y: 1 }}
             >
-                <View style={styles.roleBadge}>
+                <View style={[
+                    styles.roleBadge,
+                    isEven ? styles.roleBadgePurple : styles.roleBadgePink
+                ]}>
                     <Text style={styles.roleText}>Owner</Text>
                 </View>
                 
                 <View style={styles.categoryHeader}>
                     <View style={styles.categoryInfo}>
-                        <Text style={styles.categoryName}>{item.emoji} {item.name}</Text>
-                        <View style={styles.subtitleContainer}>
-                            <View style={styles.aiIcon} />
-                            <Text style={styles.categorySubtitle}>{item.occasionType}</Text>
-                        </View>
+                        <Text style={styles.categoryName}>{item.name}</Text>
+                        {item.occasionType && item.occasionType !== 'General Collection' && (
+                            <View style={styles.subtitleContainer}>
+                                <View style={styles.aiIcon} />
+                                <Text style={styles.categorySubtitle}>{item.occasionType}</Text>
+                            </View>
+                        )}
                     </View>
                 </View>
 
-                <FlatList
-                    data={wardrobeItemsList}
-                    renderItem={renderWardrobeItem}
-                    keyExtractor={(wardrobeItem) => wardrobeItem._id}
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={styles.itemsList}
-                    style={styles.horizontalList}
-                />
+                {wardrobeItemsList.length === 0 ? (
+                    <View style={styles.emptyItemsRow}>
+                        <Text style={styles.emptyItemsText}>No items yet</Text>
+                    </View>
+                ) : (
+                    <FlatList
+                        data={wardrobeItemsList}
+                        renderItem={renderWardrobeItem}
+                        keyExtractor={(wardrobeItem) => wardrobeItem._id}
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={styles.itemsList}
+                        style={styles.horizontalList}
+                    />
+                )}
 
                 <TouchableOpacity
                     style={styles.viewAllButton}
@@ -325,7 +337,7 @@ export default function WardrobesScreen() {
 
                 <View style={styles.searchContainer}>
                     <View style={styles.searchInputContainer}>
-                        <Text style={styles.searchIcon}>🔍</Text>
+                        <Ionicons name="search" size={16} style={styles.searchIcon} />
                         <TextInput
                             style={styles.searchInput}
                             placeholder="Search wardrobes..."
@@ -434,7 +446,7 @@ const styles = StyleSheet.create({
         fontWeight: '600',
     },
     searchContainer: {
-        paddingHorizontal: 3,
+        paddingHorizontal: 16,
         paddingVertical: 6,
     },
     searchInputContainer: {
@@ -443,45 +455,53 @@ const styles = StyleSheet.create({
         backgroundColor: '#f8f8f8',
         borderRadius: 8,
         paddingHorizontal: 6,
-        paddingVertical: 4,
+        paddingVertical: 2,
     },
     searchIcon: {
         fontSize: 16,
         marginRight: 8,
+        color: '#000',
     },
     searchInput: {
         flex: 1,
         fontSize: 14,
         color: '#333',
+        paddingVertical: 4,
     },
     categoriesList: {
-        paddingHorizontal: 16,
+        paddingHorizontal: 0,
         paddingBottom: 16,
     },
     categoryContainer: {
-        borderRadius: 12,
+        borderRadius: 0,
         marginBottom: 16,
-        padding: 12,
-        backgroundColor: 'white',
-        shadowColor: '#000',
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        backgroundColor: 'transparent',
+        shadowColor: 'transparent',
         shadowOffset: {
             width: 0,
-            height: 1,
+            height: 0,
         },
-        shadowOpacity: 0.05,
-        shadowRadius: 2,
-        elevation: 2,
+        shadowOpacity: 0,
+        shadowRadius: 0,
+        elevation: 0,
     },
     roleBadge: {
         alignSelf: 'flex-start',
-        backgroundColor: '#ff6b6b',
-        paddingHorizontal: 12,
-        paddingVertical: 4,
-        borderRadius: 12,
-        marginBottom: 12,
+        paddingHorizontal: 8,
+        paddingVertical: 2,
+        borderRadius: 10,
+        marginBottom: 10,
+    },
+    roleBadgePurple: {
+        backgroundColor: '#8B5CF6',
+    },
+    roleBadgePink: {
+        backgroundColor: '#E91E63',
     },
     roleText: {
-        fontSize: 12,
+        fontSize: 10,
         fontWeight: '600',
         color: '#fff',
     },
@@ -513,15 +533,17 @@ const styles = StyleSheet.create({
         color: '#666',
     },
     horizontalList: {
-        marginBottom: 16,
+        marginBottom: 12,
+        paddingLeft: 12,
+        paddingRight: 12,
     },
     itemsList: {
-        paddingRight: 20,
+        paddingRight: 12,
     },
     wardrobeItemImage: {
-        width: 80,
-        height: 100,
-        marginRight: 8,
+        width: 96,
+        height: 120,
+        marginRight: 6,
         borderRadius: 8,
         overflow: 'hidden',
         backgroundColor: '#f0f0f0',
@@ -556,6 +578,19 @@ const styles = StyleSheet.create({
         color: '#fff',
         fontSize: 10,
         fontWeight: '600',
+        textAlign: 'center',
+    },
+    emptyItemsRow: {
+        paddingVertical: 8,
+        paddingHorizontal: 16,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 40,
+    },
+    emptyItemsText: {
+        fontSize: 12,
+        color: '#999',
+        fontStyle: 'italic',
         textAlign: 'center',
     },
     viewAllButton: {

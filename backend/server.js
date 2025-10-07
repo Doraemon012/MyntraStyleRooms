@@ -764,14 +764,7 @@ app.use(compression());
 app.use(cors({
   origin: process.env.NODE_ENV === 'production' 
     ? ['https://yourdomain.com'] 
-    : [
-        'http://localhost:3000', 
-        'http://localhost:19006',
-        'http://172.20.10.2:3000',
-        'http://172.20.10.2:19006',
-        'exp://172.20.10.2:19000',
-        'exp://localhost:19000'
-      ],
+    : true, // Allow all origins in development
   credentials: true
 }));
 

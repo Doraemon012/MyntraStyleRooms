@@ -262,8 +262,11 @@ export default function RoomChatScreen() {
       }
       
       const response = await roomAPI.getById(id);
-      
-      if (response.status === 'success') {
+      // Accept flexible response shapes; don't hard-fail on status
+      const apiRoom = response?.data?.room || response?.room;
+      if (apiRoom) {
+        setRoom(apiRoom);
+      } else if (response?.status === 'success') {
         setRoom(response.data.room);
         // DB-backed session flag
         if (typeof response?.data?.room?.isLive === 'boolean') {
@@ -274,11 +277,12 @@ export default function RoomChatScreen() {
           setSessionHost(response.data.room.owner.name);
         }
       } else {
-        console.warn('Room API returned non-success, using fallback data');
+
+        throw new Error(response?.message || 'Failed to fetch room data');
       }
       
     } catch (error) {
-      console.warn('Error fetching room data (fallback to mock):', error);
+      console.warn('Error fetching room data (using fallback):', error);
       // Fallback to mock data for existing rooms, or create new room data
       const roomId = id as string || '1'; // Default to room '1' if id is undefined
       const mockRoomData = mockRooms[roomId];
@@ -593,8 +597,8 @@ export default function RoomChatScreen() {
         router.push(`/join-session?roomId=${id}&sessionHost=${roomData?.sessionHost || 'Host'}`);
         break;
       case 'wardrobe':
-        // Navigate to wardrobe
-        router.push('/wardrobes');
+        // Navigate to room-scoped wardrobes
+        router.push(`/wardrobes?roomId=${id}`);
         break;
       case 'roomSettings':
         // Navigate to room settings

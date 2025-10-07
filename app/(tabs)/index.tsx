@@ -355,6 +355,13 @@ export default function HomeScreen() {
     });
   };
 
+  // Generate a deterministic room image URL so each room has its own photo
+  const getRoomImageUrl = (room: Room): string => {
+    const seed = (room._id || (room as any).id || room.name || 'room').toString().replace(/\s+/g, '-');
+    // picsum provides stable images per seed; size kept small for list thumbnails
+    return `https://picsum.photos/seed/${encodeURIComponent(seed)}/80`;
+  };
+
   // Load rooms on component mount
   useEffect(() => {
     fetchRooms();
@@ -651,10 +658,13 @@ export default function HomeScreen() {
                 <Text style={styles.invitedText}>{item.invitedBy} invited you to:</Text>
               )}
               <View style={styles.roomHeader}>
+                <Image
+                  source={{ uri: getRoomImageUrl(item) }}
+                  style={styles.roomThumbnail}
+                  contentFit="cover"
+                />
                 <View style={styles.roomInfo}>
-                  <Text style={styles.roomName}>
-                    {item.emoji && `${item.emoji} `}{item.name}
-                  </Text>
+                  <Text style={styles.roomName}>{item.name}</Text>
                   <View style={styles.memberSection}>
                     <View style={styles.avatarGroup}>
                       {item.memberAvatars.slice(0, 3).map((avatar, index) => (
@@ -889,6 +899,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
+  },
+  roomThumbnail: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#EEEEEE',
+    marginRight: 10,
+    borderWidth: 1,
+    borderColor: '#F0F0F0',
   },
   roomInfo: {
     flex: 1,

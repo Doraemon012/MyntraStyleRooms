@@ -17,158 +17,6 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { wardrobeApi, WardrobeItem } from '../../services/wardrobeApi';
 
-// Remove the local interface since we're importing from wardrobeApi
-
-// Mock room members data
-const roomMembers = [
-  { id: 'user1', name: 'Priya', avatar: '👩' },
-  { id: 'user2', name: 'Richa', avatar: '👩‍🦱' },
-  { id: 'user3', name: 'Neyati', avatar: '👩‍🦰' },
-  { id: 'user4', name: 'Sneha', avatar: '👩‍💼' },
-  { id: 'user5', name: 'Ananya', avatar: '👩‍🎨' },
-  { id: 'currentUser', name: 'You', avatar: '👤' },
-];
-
-const wardrobeItems: WardrobeItem[] = [
-  {
-    id: '1',
-    name: 'Fur Coat',
-    price: '₹1,999',
-    image: 'https://images.unsplash.com/photo-1594633313593-bab3825d0caf?w=200&h=300&fit=crop',
-    isFavorited: false,
-    category: 'Outerwear',
-    addedBy: 'AI Stylist',
-    purchasedByUsers: ['user1', 'user2', 'user3'],
-    reactions: [
-      { userId: 'user1', type: 'love' },
-      { userId: 'user2', type: 'like' },
-      { userId: 'user3', type: 'love' },
-      { userId: 'user4', type: 'like' },
-      { userId: 'user5', type: 'love' },
-    ],
-  },
-  {
-    id: '2',
-    name: 'Floral Dress',
-    price: '₹1,199',
-    image: 'https://images.unsplash.com/photo-1515372039744-b8f02a3ae446?w=200&h=300&fit=crop',
-    isFavorited: false,
-    category: 'Dresses',
-    addedBy: 'Priya',
-    purchasedByUsers: ['user1', 'user4'],
-    reactions: [
-      { userId: 'user1', type: 'love' },
-      { userId: 'user2', type: 'love' },
-      { userId: 'user3', type: 'like' },
-      { userId: 'user4', type: 'love' },
-      { userId: 'user5', type: 'like' },
-      { userId: 'currentUser', type: 'love' },
-    ],
-  },
-  {
-    id: '3',
-    name: 'Ribbed Top',
-    price: '₹599',
-    image: 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=200&h=300&fit=crop',
-    isFavorited: false,
-    category: 'Tops',
-    addedBy: 'You',
-    purchasedByUsers: ['user2', 'user3', 'user4', 'user5'],
-    reactions: [
-      { userId: 'user1', type: 'like' },
-      { userId: 'user2', type: 'love' },
-      { userId: 'user3', type: 'love' },
-      { userId: 'user4', type: 'love' },
-      { userId: 'user5', type: 'love' },
-      { userId: 'currentUser', type: 'like' },
-    ],
-  },
-  {
-    id: '4',
-    name: 'Cocktail Dress',
-    price: '₹1,799',
-    image: 'https://images.unsplash.com/photo-1586790170083-2f9ceadc732d?w=200&h=300&fit=crop',
-    isFavorited: false,
-    category: 'Dresses',
-    addedBy: 'Richa',
-    purchasedByUsers: ['user1'],
-    reactions: [
-      { userId: 'user1', type: 'love' },
-      { userId: 'user2', type: 'like' },
-      { userId: 'user3', type: 'like' },
-    ],
-  },
-  {
-    id: '5',
-    name: 'Designer Blouse',
-    price: '₹899',
-    image: 'https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?w=200&h=300&fit=crop',
-    isFavorited: false,
-    category: 'Tops',
-    addedBy: 'Neyati',
-    purchasedByUsers: ['user2', 'user3', 'user4', 'user5', 'currentUser'],
-    reactions: [
-      { userId: 'user1', type: 'love' },
-      { userId: 'user2', type: 'love' },
-      { userId: 'user3', type: 'love' },
-      { userId: 'user4', type: 'love' },
-      { userId: 'user5', type: 'love' },
-      { userId: 'currentUser', type: 'love' },
-    ],
-  },
-  {
-    id: '6',
-    name: 'Evening Gown',
-    price: '₹2,499',
-    image: 'https://images.unsplash.com/photo-1594633312681-425c7b97ccd1?w=200&h=300&fit=crop',
-    isFavorited: false,
-    category: 'Dresses',
-    addedBy: 'Sneha',
-    purchasedByUsers: ['user1', 'user2'],
-    reactions: [
-      { userId: 'user1', type: 'love' },
-      { userId: 'user2', type: 'love' },
-      { userId: 'user3', type: 'like' },
-      { userId: 'user4', type: 'love' },
-    ],
-  },
-  {
-    id: '7',
-    name: 'Casual T-Shirt',
-    price: '₹399',
-    image: 'https://images.unsplash.com/photo-1583391733956-6c78276477e2?w=200&h=300&fit=crop',
-    isFavorited: false,
-    category: 'Tops',
-    addedBy: 'Ananya',
-    purchasedByUsers: ['user1', 'user2', 'user3', 'user4', 'user5', 'currentUser'],
-    reactions: [
-      { userId: 'user1', type: 'like' },
-      { userId: 'user2', type: 'like' },
-      { userId: 'user3', type: 'like' },
-      { userId: 'user4', type: 'like' },
-      { userId: 'user5', type: 'like' },
-      { userId: 'currentUser', type: 'like' },
-    ],
-  },
-  {
-    id: '8',
-    name: 'Formal Blazer',
-    price: '₹3,299',
-    image: 'https://images.unsplash.com/photo-1596755094514-f87e34085b2c?w=200&h=300&fit=crop',
-    isFavorited: false,
-    category: 'Outerwear',
-    addedBy: 'AI Stylist',
-    purchasedByUsers: ['user2', 'user4'],
-    reactions: [
-      { userId: 'user1', type: 'love' },
-      { userId: 'user2', type: 'love' },
-      { userId: 'user3', type: 'like' },
-      { userId: 'user4', type: 'love' },
-      { userId: 'user5', type: 'like' },
-    ],
-  },
-];
-
 export default function WardrobeItemsScreen() {
   const { categoryId, categoryName, wardrobeId } = useLocalSearchParams();
   const [items, setItems] = useState<WardrobeItem[]>([]);
@@ -233,12 +81,6 @@ export default function WardrobeItemsScreen() {
       default:
         return items;
     }
-  };
-
-  // Get user name by ID
-  const getUserName = (userId: string) => {
-    const user = roomMembers.find(member => member.id === userId);
-    return user ? user.name : 'Unknown User';
   };
 
   // Use the passed category name or default to "Striped Crop Shirts"
@@ -310,10 +152,10 @@ export default function WardrobeItemsScreen() {
           <TouchableOpacity onPress={() => router.back()}>
             <Text style={styles.backButton}>‹</Text>
           </TouchableOpacity>
-          <View style={styles.headerCenter}>
+        <View style={styles.headerCenter}>
             <Text style={styles.title}>{displayName}</Text>
-            <Text style={styles.itemCount}>121+ Items</Text>
-          </View>
+            <Text style={styles.itemCount}>{items.length} Items</Text>
+        </View>
           <TouchableOpacity 
             style={styles.filterButton}
             onPress={() => router.push(`/wardrobe/ai-outfits?wardrobeId=${categoryId}`)}
