@@ -6,16 +6,17 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    FlatList,
-    Modal,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  ImageBackground,
+  Modal,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -49,6 +50,7 @@ export default function CreateWardrobeScreen() {
 
   // Use roomId from params or sessionRoomId as fallback
   const currentRoomId = (roomId as string) || sessionRoomId;
+  const GIF_URL = 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRB117TJObpmaOBVoe11KfxLevlPmr8pLEhyMtyVWyiRast9lcY9AuZlx61uMG1lh2n4LM&usqp=CAU';
 
   // Occasion type removed per requirements
 
@@ -122,23 +124,7 @@ export default function CreateWardrobeScreen() {
     setSearchQuery('');
   };
 
-  const addAllRoomMembers = () => {
-    if (currentRoomId && users.length > 0) {
-      const newMembers: WardrobeMember[] = users
-        .filter(user => !members.some(member => member.userId === user._id))
-        .map(user => ({
-          userId: user._id,
-          name: user.name,
-          email: user.email,
-          profileImage: user.profileImage,
-          role: 'Editor' as const,
-        }));
-      setMembers([...members, ...newMembers]);
-      // Close the modal after adding all members
-      setShowUserModal(false);
-      setSearchQuery('');
-    }
-  };
+  // Removed All Members bulk add per updated requirements
 
   const removeMember = (userId: string) => {
     setMembers(members.filter(member => member.userId !== userId));
@@ -245,15 +231,14 @@ export default function CreateWardrobeScreen() {
           <View style={styles.placeholder} />
         </View>
 
-        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        <ScrollView style={styles.content} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Wardrobe Details</Text>
               
               <View style={styles.inputGroup}>
-                <Text style={styles.label}>Wardrobe Name *</Text>
+                <Text style={[styles.sectionTitle, styles.sectionTitleMuted]}>Wardrobe Name *</Text>
                 <TextInput
                   style={styles.textInput}
-                  placeholder="e.g., Family Wedding Collection"
+                  placeholder="e.g., Family Outfits"
                   value={wardrobeName}
                   onChangeText={setWardrobeName}
                   maxLength={50}
@@ -268,7 +253,7 @@ export default function CreateWardrobeScreen() {
             </View>
 
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Add Collaborators</Text>
+            <Text style={[styles.sectionTitle, styles.sectionTitleMuted]}>Add Collaborators</Text>
             
             <View style={styles.permissionInfo}>
               <Text style={styles.permissionText}>
@@ -280,23 +265,26 @@ export default function CreateWardrobeScreen() {
               <TouchableOpacity 
                 style={styles.selectUsersButton}
                 onPress={() => setShowUserModal(true)}
+                activeOpacity={0.8}
               >
-                <Text style={styles.selectUsersText}>Select Members to Make Editors</Text>
+                <Text style={[styles.selectUsersText, styles.selectUsersTextMuted]}>Select Members to Make Editors</Text>
                 <Text style={styles.dropdownIcon}>▼</Text>
               </TouchableOpacity>
-              
-              {currentRoomId && users.length > 0 && (
-                <TouchableOpacity 
-                  style={styles.addAllButton}
-                  onPress={addAllRoomMembers}
-                >
-                  <Text style={styles.addAllText}>Add All Room Members</Text>
-                </TouchableOpacity>
-              )}
             </View>
 
-            {/* Members List */}
-            {members.length > 0 ? (
+            {members.length === 0 ? (
+              <View style={styles.flexFill}>
+                <ImageBackground
+                  source={{ uri: GIF_URL }}
+                  style={styles.gifFill}
+                  imageStyle={styles.gifBgImage}
+                >
+                  <View style={styles.centerOverlay}>
+                    <Text style={styles.noMembersTextOnImage}>No editors selected yet</Text>
+                  </View>
+                </ImageBackground>
+              </View>
+            ) : (
               <View style={styles.membersList}>
                 <Text style={styles.membersCount}>{members.length} editor(s) selected</Text>
                 {members.map((member, index) => (
@@ -335,8 +323,6 @@ export default function CreateWardrobeScreen() {
                   </View>
                 ))}
               </View>
-            ) : (
-              <Text style={styles.noMembersText}>No editors selected yet</Text>
             )}
           </View>
 
@@ -461,22 +447,30 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 12,
   },
+  scrollContent: {
+    paddingBottom: 16,
+    flexGrow: 1,
+  },
+  // accent bar removed per latest request
   section: {
     marginBottom: 16,
   },
   sectionTitle: {
     fontSize: 16,
     fontWeight: '500',
-    color: '#1a1a1a',
+    color: '#E91E63',
     marginBottom: 8,
+  },
+  sectionTitleMuted: {
+    color: '#666',
   },
   inputGroup: {
     marginBottom: 12,
   },
   label: {
     fontSize: 14,
-    fontWeight: '400',
-    color: '#1a1a1a',
+    fontWeight: '600',
+    color: '#E91E63',
     marginBottom: 4,
   },
   sublabel: {
@@ -584,19 +578,28 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#e0e0e0',
-    borderRadius: 6,
-    paddingHorizontal: 12,
+    borderColor: '#FFC1D1',
+    borderRadius: 10,
+    paddingHorizontal: 14,
     paddingVertical: 12,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: '#FFF5F7',
+    shadowColor: '#E91E63',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 2,
   },
   selectUsersText: {
     fontSize: 12,
-    color: '#999',
+    color: '#CC3366',
+    fontWeight: '600',
+  },
+  selectUsersTextMuted: {
+    color: '#666',
+    fontWeight: '500',
   },
   dropdownIcon: {
     fontSize: 12,
-    color: '#999',
+    color: '#CC3366',
   },
   roleExplanation: {
     backgroundColor: '#f8f9fa',
@@ -728,25 +731,7 @@ const styles = StyleSheet.create({
   createButtonDisabled: {
     opacity: 0.6,
   },
-  pickerContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-    borderRadius: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    backgroundColor: '#f8f9fa',
-  },
-  pickerText: {
-    fontSize: 12,
-    color: '#1a1a1a',
-  },
-  pickerArrow: {
-    fontSize: 12,
-    color: '#999',
-  },
+  // duplicate picker styles removed
   // Modal styles
   modalOverlay: {
     flex: 1,
@@ -805,6 +790,44 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 8,
     maxHeight: '70%',
+  },
+  gifBg: {
+    height: 220,
+    borderRadius: 10,
+    overflow: 'hidden',
+    marginTop: 10,
+    marginBottom: 4,
+  },
+  flexFill: {
+    flexGrow: 1,
+  },
+  gifFill: {
+    flex: 1,
+    minHeight: 320,
+    borderRadius: 10,
+    overflow: 'hidden',
+    marginTop: 10,
+    marginBottom: 4,
+  },
+  gifBgImage: {
+    resizeMode: 'cover',
+    opacity: 0.12,
+  },
+  centerOverlay: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255, 245, 247, 0.15)',
+  },
+  noMembersTextOnImage: {
+    fontSize: 14,
+    color: '#BBBBBB',
+    fontStyle: 'italic',
+    fontWeight: '400',
+  },
+  gifTint: {
+    flex: 1,
+    backgroundColor: 'transparent',
   },
   emptyState: {
     flex: 1,
@@ -884,18 +907,5 @@ const styles = StyleSheet.create({
     gap: 12,
     marginBottom: 16,
   },
-  addAllButton: {
-    flex: 1,
-    backgroundColor: '#4CAF50',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  addAllText: {
-    color: 'white',
-    fontSize: 14,
-    fontWeight: '600',
-  },
+  // removed All Members related styles
 });

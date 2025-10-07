@@ -9,6 +9,7 @@ import {
     Alert,
     FlatList,
     Image,
+    ImageBackground,
     StyleSheet,
     Text,
     TouchableOpacity,
@@ -16,24 +17,13 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-interface WardrobeItemWithProduct extends WardrobeItem {
-    productId: {
-        _id: string;
-        name: string;
-        price: number;
-        images: Array<{ url: string }>;
-        brand: string;
-        description: string;
-        category: string;
-        subcategory: string;
-    };
-}
+// Use WardrobeItem type from API directly for items
 
 
 export default function WardrobeDetailScreen() {
     const { id } = useLocalSearchParams();
     const [wardrobe, setWardrobe] = useState<Wardrobe | null>(null);
-    const [items, setItems] = useState<WardrobeItemWithProduct[]>([]);
+    const [items, setItems] = useState<WardrobeItem[]>([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -71,7 +61,7 @@ export default function WardrobeDetailScreen() {
     };
 
 
-    const renderWardrobeItem = ({ item }: { item: WardrobeItemWithProduct }) => {
+    const renderWardrobeItem = ({ item }: { item: WardrobeItem }) => {
         // Handle null productId
         if (!item.productId) {
             return (
@@ -183,54 +173,41 @@ export default function WardrobeDetailScreen() {
                 {/* Header */}
                 <View style={styles.header}>
                     <TouchableOpacity onPress={() => router.back()} style={styles.backButtonContainer}>
-                        <Text style={styles.backButton}>‹</Text>
+                        <Text style={styles.backIcon}>‹</Text>
                     </TouchableOpacity>
                     
                     <View style={styles.headerCenter}>
-                        <Text style={styles.headerTitle}>{wardrobe.emoji} {wardrobe.name}</Text>
+                        <Text style={styles.headerTitle}>{wardrobe.name}</Text>
                         <Text style={styles.headerSubtitle}>{wardrobe.occasionType}</Text>
                     </View>
                     
-                    <TouchableOpacity style={styles.menuButton}>
+                    <TouchableOpacity 
+                        style={styles.menuButton}
+                        onPress={() => router.push(`/wardrobe/access?wardrobeId=${id}`)}
+                    >
                         <Text style={styles.menuButtonText}>⋯</Text>
                     </TouchableOpacity>
                 </View>
 
-                {/* Wardrobe Info */}
-                <View style={styles.wardrobeInfo}>
-                    <Text style={styles.wardrobeDescription}>{wardrobe.description}</Text>
-                    <View style={styles.wardrobeStats}>
-                        <View style={styles.statItem}>
-                            <Text style={styles.statNumber}>{items.length}</Text>
-                            <Text style={styles.statLabel}>Items</Text>
-                        </View>
-                        <View style={styles.statItem}>
-                            <Text style={styles.statNumber}>0</Text>
-                            <Text style={styles.statLabel}>Outfits</Text>
-                        </View>
-                        <View style={styles.statItem}>
-                            <Text style={styles.statNumber}>₹{wardrobe.budgetRange?.min || 0}</Text>
-                            <Text style={styles.statLabel}>Min Budget</Text>
-                        </View>
+                {/* Wardrobe Info (trimmed) */}
+                {!!wardrobe.description && (
+                    <View style={styles.wardrobeInfo}>
+                        <Text style={styles.wardrobeDescription}>{wardrobe.description}</Text>
                     </View>
-                </View>
+                )}
 
                 {/* Tabs */}
                 <View style={styles.tabContainer}>
                     <TouchableOpacity 
-                        style={styles.tab}
+                        style={[styles.tab, styles.activeTab]}
                     >
-                        <Text style={styles.tabText}>
-                            Items ({items.length})
-                        </Text>
+                        <Text style={[styles.tabText, styles.activeTabText]}>Items</Text>
                     </TouchableOpacity>
                     <TouchableOpacity 
                         style={styles.tab}
                         onPress={() => router.push(`/wardrobe/ai-outfits?wardrobeId=${id}`)}
                     >
-                        <Text style={styles.tabText}>
-                            AI Outfits
-                        </Text>
+                        <Text style={styles.tabText}>AI Outfits</Text>
                     </TouchableOpacity>
                 </View>
 
@@ -242,6 +219,17 @@ export default function WardrobeDetailScreen() {
                     numColumns={2}
                     contentContainerStyle={styles.itemsGrid}
                     showsVerticalScrollIndicator={false}
+                    ListEmptyComponent={
+                        <ImageBackground
+                            source={{ uri: 'https://cdn.dribbble.com/userupload/20573048/file/original-4f00702d51457e3021f9aa9ac53c92c8.gif' }}
+                            style={styles.emptyStateBg}
+                            imageStyle={styles.emptyStateBgImage}
+                        >
+                            <View style={styles.emptyStateOverlay}>
+                                <Text style={styles.emptyStateText}>No outfits yet</Text>
+                            </View>
+                        </ImageBackground>
+                    }
                 />
             </SafeAreaView>
         </ThemedView>
@@ -292,8 +280,8 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingHorizontal: 20,
-        paddingVertical: 16,
+        paddingHorizontal: 16,
+        paddingVertical: 12,
         backgroundColor: '#fff',
         borderBottomWidth: 1,
         borderBottomColor: '#f0f0f0',
@@ -304,7 +292,7 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
     },
-    backButton: {
+    backIcon: {
         fontSize: 24,
         color: '#333',
         fontWeight: '300',
@@ -314,7 +302,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     headerTitle: {
-        fontSize: 18,
+        fontSize: 16,
         fontWeight: '600',
         color: '#333',
     },
@@ -335,14 +323,14 @@ const styles = StyleSheet.create({
     },
     wardrobeInfo: {
         backgroundColor: '#fff',
-        padding: 20,
-        marginBottom: 1,
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        marginBottom: 8,
     },
     wardrobeDescription: {
-        fontSize: 14,
+        fontSize: 12,
         color: '#666',
-        lineHeight: 20,
-        marginBottom: 16,
+        lineHeight: 18,
     },
     wardrobeStats: {
         flexDirection: 'row',
@@ -364,13 +352,13 @@ const styles = StyleSheet.create({
     tabContainer: {
         flexDirection: 'row',
         backgroundColor: '#fff',
-        paddingHorizontal: 20,
+        paddingHorizontal: 8,
         borderBottomWidth: 1,
         borderBottomColor: '#f0f0f0',
     },
     tab: {
         flex: 1,
-        paddingVertical: 16,
+        paddingVertical: 10,
         alignItems: 'center',
         borderBottomWidth: 2,
         borderBottomColor: 'transparent',
@@ -379,7 +367,7 @@ const styles = StyleSheet.create({
         borderBottomColor: '#ff6b6b',
     },
     tabText: {
-        fontSize: 14,
+        fontSize: 12,
         color: '#666',
         fontWeight: '500',
     },
@@ -388,28 +376,57 @@ const styles = StyleSheet.create({
         fontWeight: '600',
     },
     itemsGrid: {
-        padding: 20,
+        paddingHorizontal: 8,
+        paddingVertical: 8,
+        flexGrow: 1,
+    },
+    emptyStateBg: {
+        width: '100%',
+        flex: 1,
+        minHeight: 300,
+        justifyContent: 'center',
+        alignItems: 'center',
+        overflow: 'hidden',
+        borderRadius: 8,
+    },
+    emptyStateBgImage: {
+        resizeMode: 'cover',
+        opacity: 0.18,
+    },
+    emptyStateOverlay: {
+        flex: 1,
+        width: '100%',
+        height: '100%',
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: 'rgba(255,255,255,0.2)',
+    },
+    emptyStateText: {
+        fontSize: 12,
+        color: '#999',
+        fontStyle: 'italic',
+        textAlign: 'center',
     },
     itemCard: {
         flex: 1,
         backgroundColor: '#fff',
-        borderRadius: 12,
-        margin: 6,
-        padding: 12,
+        borderRadius: 8,
+        margin: 5,
+        padding: 10,
         shadowColor: '#000',
         shadowOffset: {
             width: 0,
-            height: 2,
+            height: 1,
         },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 3,
+        shadowOpacity: 0.06,
+        shadowRadius: 2,
+        elevation: 1,
     },
     itemImageContainer: {
-        height: 120,
+        height: 110,
         borderRadius: 8,
         overflow: 'hidden',
-        marginBottom: 8,
+        marginBottom: 6,
     },
     itemImage: {
         width: '100%',
@@ -431,24 +448,24 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     itemName: {
-        fontSize: 12,
+        fontSize: 11,
         fontWeight: '600',
         color: '#333',
-        marginBottom: 4,
+        marginBottom: 3,
     },
     itemBrand: {
-        fontSize: 10,
+        fontSize: 9,
         color: '#666',
         marginBottom: 2,
     },
     itemPrice: {
-        fontSize: 12,
+        fontSize: 11,
         fontWeight: '600',
         color: '#ff6b6b',
         marginBottom: 2,
     },
     itemCategory: {
-        fontSize: 10,
+        fontSize: 9,
         color: '#999',
     },
     itemActions: {
