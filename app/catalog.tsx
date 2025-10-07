@@ -4,21 +4,22 @@ import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Animated,
-  Dimensions,
-  FlatList,
-  Modal,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View
+    Animated,
+    AppState,
+    Dimensions,
+    FlatList,
+    Modal,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import RoomSelectionModal from '../components/RoomSelectionModal';
-import AttendeeSessionHeader from '../components/session/AttendeeSessionHeader';
 import HostSessionHeader from '../components/session/HostSessionHeader';
+import LiveBrowsePanel from '../components/session/LiveBrowsePanel';
 import SessionBottomControls from '../components/session/SessionBottomControls';
 import { useAuth } from '../contexts/auth-context';
 import { useSession } from '../contexts/session-context';
@@ -42,7 +43,113 @@ const { width: screenWidth } = Dimensions.get('window');
 
 
 export default function CatalogScreen() {
-  const { isInSession, isHost, sessionParticipants, presenterName, isMuted, toggleMute, endSession, sessionRoomId } = useSession();
+  const { isInSession, isHost, sessionParticipants, presenterName, isMuted, toggleMute, endSession, sessionRoomId, setParticipantProduct, setParticipants } = useSession();
+  const { user } = useAuth();
+  
+  // Debug session state
+  console.log('🔍 Catalog screen session state:', { 
+    isInSession, 
+    isHost, 
+    participantsCount: sessionParticipants.length, 
+    sessionRoomId,
+    presenterName 
+  });
+  // Update session context from browse updates to feed LiveBrowsePanel
+  React.useEffect(() => {
+    if (!isInSession || !sessionRoomId || !user) return;
+
+    // Join user room for follow notifications
+    socketService.joinUser(user._id);
+
+    // Don't clear browse view immediately when entering catalog
+    // This allows the LiveBrowsePanel to show the last product the user was viewing
+    console.log('📱 User entered catalog - keeping last viewed product in LiveBrowsePanel');
+
+    socketService.updateCallbacks({
+      onBrowseUpdate: (data) => {
+        if (!data?.userId) return;
+        if (data.productId) {
+          setParticipantProduct(data.userId, { id: data.productId, name: data.productTitle, image: data.productImage });
+        } else {
+          setParticipantProduct(data.userId, null);
+        }
+      },
+      onSessionParticipants: (participants) => {
+        if (!Array.isArray(participants)) return;
+        const normalizedRaw = participants.map((p: any) => {
+          const isCurrent = user && p.userId === user._id;
+          const displayName = isCurrent ? user!.name : (p.userName || p.name);
+          const fallbackAvatarName = displayName && typeof displayName === 'string' ? displayName : 'User';
+          const avatar = isCurrent
+            ? (user!.profileImage || `https://ui-avatars.com/api/?name=${encodeURIComponent(user!.name)}&background=4A90E2&color=FFFFFF&size=150`)
+            : (p.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(fallbackAvatarName)}&background=4A90E2&color=FFFFFF&size=150`);
+          return {
+            id: p.userId,
+            name: displayName,
+            avatar,
+            isMuted: false,
+            currentProduct: p.currentProduct ? {
+              id: p.currentProduct.productId,
+              name: p.currentProduct.productTitle,
+              image: p.currentProduct.productImage,
+            } : null,
+          };
+        });
+        // Dedupe by id
+        const seen = new Set<string>();
+        const normalized = normalizedRaw.filter((p: any) => {
+          if (seen.has(p.id)) return false;
+          seen.add(p.id);
+          return true;
+        });
+        setParticipants(normalized);
+      },
+      onFollowNavigate: (data) => {
+        // Auto navigate to product if following
+        console.log('🧭 Follow navigation triggered:', data);
+        if (data?.productId) {
+          router.push(`/product/${data.productId}` as any);
+        }
+      },
+    });
+
+    // Cleanup: don't clear browse view when component unmounts
+    // This preserves the last viewed product in the LiveBrowsePanel
+    return () => {
+      if (isInSession && sessionRoomId && user) {
+        console.log('📱 User left catalog - keeping last viewed product in LiveBrowsePanel');
+      }
+    };
+  }, [isInSession, sessionRoomId, user, setParticipantProduct]);
+
+  // Leave/cleanup helper
+  const handleEndAndCleanup = React.useCallback(() => {
+    try {
+      if (sessionRoomId && user) {
+        socketService.leaveSession(sessionRoomId, user._id);
+        socketService.leaveRoom(sessionRoomId);
+        if (isHost) {
+          socketService.endSession(sessionRoomId);
+        }
+      }
+    } finally {
+      endSession();
+    }
+  }, [sessionRoomId, user, isHost, endSession]);
+
+  // Note: Do not auto-cleanup on unmount to avoid navigation race loops.
+
+  // Cleanup when app goes to background
+  React.useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'background' && isInSession) {
+        handleEndAndCleanup();
+      }
+    });
+    return () => {
+      subscription.remove();
+    };
+  }, [isInSession, handleEndAndCleanup]);
   const { logout } = useAuth();
   const [selectedCategory, setSelectedCategory] = useState('1');
   const [showExploreMenu, setShowExploreMenu] = useState(false);
@@ -299,8 +406,8 @@ export default function CatalogScreen() {
   return (
     <View style={styles.container}>
       <SafeAreaView style={styles.container}>
-        {/* Session Header Components */}
-        {isInSession && isHost && (
+        {/* Session Header Components - unified */}
+        {isInSession && (
           <HostSessionHeader
             participants={sessionParticipants}
             presenterName={presenterName}
@@ -309,14 +416,11 @@ export default function CatalogScreen() {
             onParticipantsPress={() => {}}
           />
         )}
-        
-        {isInSession && !isHost && (
-          <AttendeeSessionHeader
-            participants={sessionParticipants}
-            isMuted={isMuted}
-            onBackToSession={() => router.push(`/room/${sessionRoomId || '1'}`)}
-            onToggleMute={toggleMute}
-            roomId={sessionRoomId || '1'}
+
+        {isInSession && (
+          <LiveBrowsePanel 
+            currentUserId={user?._id} 
+            onFollowUser={(userId) => {}} 
           />
         )}
         
@@ -743,12 +847,12 @@ export default function CatalogScreen() {
           </TouchableOpacity>
         </Modal>
         
-        {/* Session Bottom Controls - Only for Host */}
-        {isInSession && isHost && (
+        {/* Session Bottom Controls - For All Users */}
+        {isInSession && (
           <SessionBottomControls
             onScreenShare={() => {}}
             onToggleMute={toggleMute}
-            onEndCall={endSession}
+            onEndCall={handleEndAndCleanup}
             isMuted={isMuted}
           />
         )}

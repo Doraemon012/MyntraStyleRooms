@@ -60,7 +60,8 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
       }
 
       // Create new socket connection
-      const newSocket = io('http://10.10.48.103:5000', {  //here
+      const newSocket = io('http://10.120.129.218:5000', {  //here
+
         auth: {
           token,
           userId: user._id,

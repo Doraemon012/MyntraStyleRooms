@@ -37,6 +37,22 @@ interface SocketServiceCallbacks {
   onConnect?: () => void;
   onDisconnect?: () => void;
   onError?: (error: any) => void;
+  onSessionStarted?: (data: any) => void;
+  onSessionEnded?: (data: any) => void;
+  onSessionUserJoined?: (data: any) => void;
+  onSessionUserLeft?: (data: any) => void;
+  onBrowseUpdate?: (data: any) => void;
+  onSessionParticipants?: (data: any[]) => void;
+  onFollowUpdated?: (data: any) => void;
+  onFollowNavigate?: (data: any) => void;
+  // Voice call events
+  onVoiceCallOffer?: (data: any) => void;
+  onVoiceCallAnswer?: (data: any) => void;
+  onVoiceCallIceCandidate?: (data: any) => void;
+  onVoiceCallStarted?: (data: any) => void;
+  onVoiceCallEnded?: (data: any) => void;
+  onUserJoinedVoiceCall?: (data: any) => void;
+  onUserLeftVoiceCall?: (data: any) => void;
 }
 
 class SocketService {
@@ -45,6 +61,8 @@ class SocketService {
   private currentRoomId: string | null = null;
   private typingTimeout: ReturnType<typeof setTimeout> | null = null;
   private isConnected = false;
+  private hasSwitchedToPolling = false;
+  private sessionState: { active: boolean; host?: string; roomId?: string } = { active: false };
 
   // Initialize socket connection
   async initialize(callbacks: SocketServiceCallbacks) {
@@ -84,8 +102,8 @@ class SocketService {
       
       // Determine server URL based on environment
       const serverUrl = __DEV__ 
-        ? 'http://10.120.129.165:5000'  // Local backend IP
-        : 'https://your-production-url.com';
+        ? (process.env.EXPO_PUBLIC_SOCKET_URL || 'http://10.120.129.218:5000')
+        : (process.env.EXPO_PUBLIC_SOCKET_URL || 'https://your-production-url.com');
 
       console.log('🔌 Connecting to Socket.IO server:', serverUrl);
 
@@ -93,11 +111,20 @@ class SocketService {
         auth: {
           token: token || 'mock-token',
           userId: user._id,
-          userName: user.name
+          userName: user.name,
+          userAvatar: user.profileImage || undefined
         },
-        transports: ['websocket', 'polling'],
-        timeout: 10000,
-        forceNew: true
+        transports: ['polling'],
+        timeout: 20000,
+        reconnection: true,
+        reconnectionAttempts: 5,
+        reconnectionDelay: 2000,
+        forceNew: false,
+        withCredentials: false,
+        path: '/socket.io',
+        upgrade: false, // Disable upgrade to websocket
+        rememberUpgrade: false,
+        autoConnect: true
       });
 
       this.setupEventListeners();
@@ -115,6 +142,7 @@ class SocketService {
     this.socket.on('connect', () => {
       console.log('✅ Socket connected:', this.socket?.id);
       this.isConnected = true;
+      this.hasSwitchedToPolling = false;
       this.callbacks.onConnect?.();
     });
 
@@ -125,7 +153,7 @@ class SocketService {
     });
 
     this.socket.on('connect_error', (error) => {
-      console.error('❌ Socket connection error:', error);
+      console.warn('❌ Socket connection error:', error?.message || error);
       this.callbacks.onError?.(error);
     });
 
@@ -174,6 +202,97 @@ class SocketService {
     this.socket.on('message-reaction-updated', (data) => {
       console.log('👍 Reaction updated:', data);
       this.callbacks.onReactionUpdate?.(data);
+    });
+
+    // Session events
+    this.socket.on('session-started', (data) => {
+      console.log('▶️ Session started:', data);
+      this.sessionState = { active: true, host: data?.host, roomId: data?.roomId };
+      this.callbacks.onSessionStarted?.(data);
+    });
+
+    this.socket.on('session-ended', (data) => {
+      console.log('⏹️ Session ended:', data);
+      this.sessionState = { active: false, roomId: data?.roomId };
+      this.callbacks.onSessionEnded?.(data);
+    });
+
+    this.socket.on('session-user-joined', (data) => {
+      console.log('👥 Session user joined:', data);
+      this.callbacks.onSessionUserJoined?.(data);
+    });
+
+    this.socket.on('session-user-left', (data) => {
+      console.log('👥 Session user left:', data);
+      this.callbacks.onSessionUserLeft?.(data);
+    });
+
+    // Browse sync events
+    this.socket.on('browse-update', (data) => {
+      console.log('🧭 Browse update:', data);
+      this.callbacks.onBrowseUpdate?.(data);
+    });
+
+    this.socket.on('session-participants', (list) => {
+      console.log('👥 Session participants list:', list?.length || 0);
+      this.callbacks.onSessionParticipants?.(list);
+    });
+
+    this.socket.on('browse-snapshot', (arr) => {
+      console.log('🧭 Browse snapshot:', Array.isArray(arr) ? arr.length : 0);
+      if (Array.isArray(arr)) {
+        arr.forEach((data) => this.callbacks.onBrowseUpdate?.(data));
+      }
+    });
+    // Follow events
+    this.socket.on('follow-updated', (data) => {
+      console.log('👉 Follow updated:', data);
+      this.callbacks.onFollowUpdated?.(data);
+    });
+    this.socket.on('follow-navigate', (data) => {
+      console.log('🧭 Follow navigate to product:', data);
+      this.callbacks.onFollowNavigate?.(data);
+    });
+    this.socket.on('session-state', (state) => {
+      console.log('ℹ️ Session state snapshot:', state);
+      this.sessionState = { active: !!state?.active, host: state?.host, roomId: state?.roomId };
+      // Do NOT trigger onSessionStarted on snapshot to avoid false start toasts
+    });
+
+    // Voice call events
+    this.socket.on('voice-call-offer', (data) => {
+      console.log('🎤 Voice call offer received:', data);
+      this.callbacks.onVoiceCallOffer?.(data);
+    });
+
+    this.socket.on('voice-call-answer', (data) => {
+      console.log('🎤 Voice call answer received:', data);
+      this.callbacks.onVoiceCallAnswer?.(data);
+    });
+
+    this.socket.on('voice-call-ice-candidate', (data) => {
+      console.log('🎤 Voice call ICE candidate received:', data);
+      this.callbacks.onVoiceCallIceCandidate?.(data);
+    });
+
+    this.socket.on('voice-call-started', (data) => {
+      console.log('🎤 Voice call started:', data);
+      this.callbacks.onVoiceCallStarted?.(data);
+    });
+
+    this.socket.on('voice-call-ended', (data) => {
+      console.log('🎤 Voice call ended:', data);
+      this.callbacks.onVoiceCallEnded?.(data);
+    });
+
+    this.socket.on('user-joined-voice-call', (data) => {
+      console.log('🎤 User joined voice call:', data);
+      this.callbacks.onUserJoinedVoiceCall?.(data);
+    });
+
+    this.socket.on('user-left-voice-call', (data) => {
+      console.log('🎤 User left voice call:', data);
+      this.callbacks.onUserLeftVoiceCall?.(data);
     });
   }
 
@@ -268,6 +387,13 @@ class SocketService {
   disconnect() {
     if (this.socket) {
       console.log('🔌 Disconnecting socket');
+      
+      // Leave current room before disconnecting
+      if (this.currentRoomId) {
+        console.log(`🚪 Leaving room ${this.currentRoomId} before disconnect`);
+        this.socket.emit('leave-room', this.currentRoomId);
+      }
+      
       this.socket.disconnect();
       this.socket = null;
       this.isConnected = false;
@@ -280,12 +406,160 @@ class SocketService {
     }
   }
 
+  // Session controls
+  startSession(roomId: string, payload?: any) {
+    if (!this.socket || !this.isConnected) {
+      console.warn('⚠️ Socket not connected, cannot start session');
+      return;
+    }
+    this.socket.emit('start-session', { roomId, ...payload });
+  }
+
+  endSession(roomId: string) {
+    if (!this.socket || !this.isConnected) {
+      console.warn('⚠️ Socket not connected, cannot end session');
+      return;
+    }
+    this.socket.emit('end-session', { roomId });
+  }
+
+  joinSession(roomId: string, user: { userId: string; userName: string; avatar?: string }) {
+    if (!this.socket || !this.isConnected) {
+      console.warn('⚠️ Socket not connected, cannot join session');
+      return;
+    }
+    this.socket.emit('join-session', { roomId, user });
+  }
+
+  leaveSession(roomId: string, userId: string) {
+    if (!this.socket || !this.isConnected) {
+      console.warn('⚠️ Socket not connected, cannot leave session');
+      return;
+    }
+    this.socket.emit('leave-session', { roomId, userId });
+  }
+
+  // Broadcast product view in session
+  sendBrowseView(roomId: string, payload: { userId: string; name: string; productId: string; productTitle: string; productImage: string; }) {
+    if (!this.socket || !this.isConnected) {
+      console.warn('⚠️ Socket not connected, cannot send browse view');
+      return;
+    }
+    this.socket.emit('browse-view', { roomId, ...payload });
+  }
+
+  // Clear product view in session
+  sendBrowseClear(roomId: string, payload: { userId: string; name?: string }) {
+    if (!this.socket || !this.isConnected) {
+      console.warn('⚠️ Socket not connected, cannot clear browse view');
+      return;
+    }
+    this.socket.emit('browse-clear', { roomId, ...payload });
+  }
+
+  // Follow a user in session
+  followUser(roomId: string, targetUserId: string) {
+    if (!this.socket || !this.isConnected) {
+      console.warn('⚠️ Socket not connected, cannot follow user');
+      return;
+    }
+    this.socket.emit('follow-user', { roomId, targetUserId });
+  }
+
+  // Unfollow a user in session
+  unfollowUser(roomId: string) {
+    if (!this.socket || !this.isConnected) {
+      console.warn('⚠️ Socket not connected, cannot unfollow user');
+      return;
+    }
+    this.socket.emit('unfollow-user', { roomId });
+  }
+
+  // Join user-specific room for follow notifications
+  joinUser(userId: string) {
+    if (!this.socket || !this.isConnected) {
+      console.warn('⚠️ Socket not connected, cannot join user room');
+      return;
+    }
+    this.socket.emit('join-user', userId);
+  }
+
+  // Merge/attach callbacks without re-initializing
+  updateCallbacks(partial: Partial<SocketServiceCallbacks>) {
+    console.log('🔄 Updating socket callbacks:', Object.keys(partial));
+    console.log('🔄 Previous callbacks:', Object.keys(this.callbacks));
+    
+    // Only update callbacks that are actually different
+    const newCallbacks = { ...this.callbacks };
+    Object.keys(partial).forEach(key => {
+      if (partial[key as keyof SocketServiceCallbacks] !== this.callbacks[key as keyof SocketServiceCallbacks]) {
+        newCallbacks[key as keyof SocketServiceCallbacks] = partial[key as keyof SocketServiceCallbacks];
+        console.log(`🔄 Updated callback: ${key}`);
+      } else {
+        console.log(`🔄 Skipped unchanged callback: ${key}`);
+      }
+    });
+    
+    this.callbacks = newCallbacks;
+    console.log('🔄 Final callbacks:', Object.keys(this.callbacks));
+  }
+
+  // Voice call methods
+  startVoiceCall(roomId: string) {
+    if (!this.socket || !this.isConnected) {
+      console.warn('⚠️ Socket not connected, cannot start voice call');
+      return;
+    }
+    this.socket.emit('start-voice-call', { roomId });
+  }
+
+  joinVoiceCall(roomId: string) {
+    if (!this.socket || !this.isConnected) {
+      console.warn('⚠️ Socket not connected, cannot join voice call');
+      return;
+    }
+    this.socket.emit('join-voice-call', { roomId });
+  }
+
+  endVoiceCall(roomId: string) {
+    if (!this.socket || !this.isConnected) {
+      console.warn('⚠️ Socket not connected, cannot end voice call');
+      return;
+    }
+    this.socket.emit('end-voice-call', { roomId });
+  }
+
+  sendVoiceCallOffer(roomId: string, targetUserId: string, offer: any) {
+    if (!this.socket || !this.isConnected) {
+      console.warn('⚠️ Socket not connected, cannot send voice call offer');
+      return;
+    }
+    this.socket.emit('voice-call-offer', { roomId, targetUserId, offer });
+  }
+
+  sendVoiceCallAnswer(roomId: string, targetUserId: string, answer: any) {
+    if (!this.socket || !this.isConnected) {
+      console.warn('⚠️ Socket not connected, cannot send voice call answer');
+      return;
+    }
+    this.socket.emit('voice-call-answer', { roomId, targetUserId, answer });
+  }
+
+  sendVoiceCallIceCandidate(roomId: string, targetUserId: string, candidate: any) {
+    if (!this.socket || !this.isConnected) {
+      console.warn('⚠️ Socket not connected, cannot send voice call ICE candidate');
+      return;
+    }
+    this.socket.emit('voice-call-ice-candidate', { roomId, targetUserId, candidate });
+  }
+
   // Get connection status
   getConnectionStatus() {
     return {
       isConnected: this.isConnected,
       currentRoomId: this.currentRoomId,
-      socketId: this.socket?.id
+      socketId: this.socket?.id,
+      sessionState: this.sessionState,
     };
   }
 }

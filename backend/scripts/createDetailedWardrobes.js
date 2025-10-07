@@ -711,3 +711,7 @@ async function createDetailedWardrobes() {
 // Run the detailed creation function
 createDetailedWardrobes();
 
+
+
+
+

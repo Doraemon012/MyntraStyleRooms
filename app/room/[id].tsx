@@ -1,9 +1,12 @@
 import MayaChat from '@/components/maya-chat';
 import { ThemedView } from '@/components/themed-view';
 import MayaTheme from '@/constants/maya-theme';
+import { useAuth } from '@/contexts/auth-context';
+import { useSession } from '@/contexts/session-context';
 import { roomAPI } from '@/services/api';
 import messageStorage from '@/services/messageStorage';
 import socketService from '@/services/socketService';
+import { showToast } from '@/utils/toast';
 import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -198,6 +201,10 @@ export default function RoomChatScreen() {
   const { id } = useLocalSearchParams();
   const roomId = id as string || '1'; // Default to room '1' if id is undefined
   const roomData = mockRooms[roomId] || mockRooms['1'];
+  const [hasActiveSession, setHasActiveSession] = useState<boolean>(!!roomData?.hasActiveSession);
+  const [sessionHost, setSessionHost] = useState<string>(roomData?.sessionHost || 'Host');
+  const { addParticipant, removeParticipant, setParticipantProduct, setParticipants } = useSession();
+  const { user } = useAuth();
   
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
@@ -261,7 +268,16 @@ export default function RoomChatScreen() {
         setRoom(apiRoom);
       } else if (response?.status === 'success') {
         setRoom(response.data.room);
+        // DB-backed session flag
+        if (typeof response?.data?.room?.isLive === 'boolean') {
+          setHasActiveSession(!!response.data.room.isLive);
+        }
+        // Best-effort host name
+        if (response?.data?.room?.owner?.name) {
+          setSessionHost(response.data.room.owner.name);
+        }
       } else {
+
         throw new Error(response?.message || 'Failed to fetch room data');
       }
       
@@ -374,11 +390,66 @@ export default function RoomChatScreen() {
           },
           onUserJoined: (user) => {
             console.log('👋 User joined:', user.userName);
-            // You can add a system message here if needed
+            showToast(`${user.userName} joined the room`);
           },
           onUserLeft: (user) => {
             console.log('👋 User left:', user.userName);
-            // You can add a system message here if needed
+            showToast(`${user.userName} left the room`);
+          },
+          onSessionParticipants: (list) => {
+            console.log('📥 Received session participants:', list);
+            if (Array.isArray(list)) {
+              const normalized = list.map((p) => ({
+                id: p.userId,
+                name: p.userName || p.name, // Use userName from backend
+                avatar: p.avatar || 'https://ui-avatars.com/api/?name=U&background=4A90E2&color=FFFFFF&size=150',
+                isMuted: false,
+                currentProduct: p.currentProduct ? {
+                  id: p.currentProduct.productId,
+                  name: p.currentProduct.productTitle,
+                  image: p.currentProduct.productImage,
+                } : null,
+              }));
+              console.log('📥 Normalized participants:', normalized.map(p => p.name));
+              setParticipants(normalized);
+            }
+          },
+          onSessionStarted: (data) => {
+            // Only act if this is for our current room
+            if (!data?.roomId || data.roomId !== roomId) return;
+            const hostName = data?.host || 'Someone';
+            setHasActiveSession(true);
+            setSessionHost(hostName);
+            // Intentionally no toast shown to anyone on session start
+          },
+          onSessionEnded: () => {
+            setHasActiveSession(false);
+          },
+          onSessionUserJoined: (data) => {
+            if (data?.user) {
+              addParticipant({
+                id: data.user.userId,
+                name: data.user.userName,
+                avatar: data.user.avatar || 'https://ui-avatars.com/api/?name=U&background=4A90E2&color=FFFFFF&size=150',
+                isMuted: false,
+                currentProduct: null,
+              });
+              showToast(`${data.user.userName} joined the session`);
+            }
+          },
+          onSessionUserLeft: (data) => {
+            if (data?.userId) {
+              removeParticipant(data.userId);
+            }
+          },
+          onBrowseUpdate: (data) => {
+            if (data?.userId && data?.productId) {
+              setParticipantProduct(data.userId, {
+                id: data.productId,
+                name: data.productTitle,
+                image: data.productImage,
+              });
+            }
           },
           onReactionUpdate: (data) => {
             console.log('👍 Reaction updated:', data);
@@ -519,7 +590,7 @@ export default function RoomChatScreen() {
     switch (action) {
       case 'startSession':
         // Start a styling session
-        router.push('/start-session');
+        router.push(`/start-session?roomId=${id}`);
         break;
       case 'joinSession':
         // Join an existing session
@@ -928,7 +999,7 @@ export default function RoomChatScreen() {
           <View style={styles.menuContainer}>
             <TouchableOpacity 
               style={styles.menuItem}
-              onPress={() => handleMenuAction(roomData?.hasActiveSession ? 'joinSession' : 'startSession')}
+              onPress={() => handleMenuAction(hasActiveSession ? 'joinSession' : 'startSession')}
             >
               <View style={styles.menuIconContainer}>
                 <Image 
@@ -938,7 +1009,7 @@ export default function RoomChatScreen() {
                 />
               </View>
               <Text style={styles.menuText}>
-                {roomData?.hasActiveSession ? `Join ${roomData.sessionHost}'s Session` : 'Start Session'}
+                {hasActiveSession ? `Join ${sessionHost}'s Session` : 'Start Session'}
               </Text>
             </TouchableOpacity>
             <TouchableOpacity 

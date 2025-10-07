@@ -1,8 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
-import { LinearGradient } from 'expo-linear-gradient';
 import React from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useAuth } from '../../contexts/auth-context';
 
 interface Participant {
   id: string;
@@ -26,6 +26,24 @@ export default function HostSessionHeader({
   onLikePress,
   onParticipantsPress,
 }: HostSessionHeaderProps) {
+  const { user } = useAuth();
+  const uniqueParticipants = React.useMemo(() => {
+    const byKey = new Map<string, Participant>();
+    const currentUserId = user?._id;
+    const norm = (s?: string) => (s || '').trim().toLowerCase();
+    const currentUserNameNorm = norm(user?.name);
+    for (const p of participants) {
+      const nameNorm = norm(p.name);
+      const isSelfById = currentUserId && p.id === currentUserId;
+      const isSelfByName = !!currentUserNameNorm && nameNorm === currentUserNameNorm;
+      const isYouLiteral = nameNorm === 'you';
+      const key = (currentUserId && (isSelfById || isSelfByName || isYouLiteral)) ? currentUserId : p.id;
+      if (!byKey.has(key)) {
+        byKey.set(key, p);
+      }
+    }
+    return Array.from(byKey.values());
+  }, [participants, user]);
   return (
     <View style={styles.container}>
       {/* Pure White Background - Participants List */}
@@ -36,44 +54,39 @@ export default function HostSessionHeader({
           style={styles.participantsContainer}
           contentContainerStyle={styles.participantsContent}
         >
-          {participants.map((participant) => (
-            <View key={participant.id} style={styles.participantItem}>
-              <View style={styles.avatarContainer}>
-                <View style={styles.avatarCircle}>
-                  <Image 
-                    source={{ uri: participant.avatar }} 
-                    style={styles.avatarImage}
-                    contentFit="cover"
-                  />
+          {uniqueParticipants.map((participant) => {
+            const isCurrentUser = user && participant.id === user._id;
+            const displayName = isCurrentUser
+              ? `${user?.name || participant.name} (you)`
+              : (participant.name === 'You' && user?.name ? user.name : participant.name);
+            return (
+              <View key={participant.id} style={styles.participantItem}>
+                <View style={styles.avatarContainer}>
+                  <View style={styles.avatarCircle}>
+                    <Image 
+                      source={{ uri: participant.avatar }} 
+                      style={styles.avatarImage}
+                      contentFit="cover"
+                    />
+                  </View>
+                  <View style={[
+                    styles.micIcon,
+                    participant.isMuted ? styles.micMuted : styles.micActive
+                  ]}>
+                    <Ionicons 
+                      name={participant.isMuted ? "mic-off" : "mic"} 
+                      size={8} 
+                      color="white" 
+                    />
+                  </View>
                 </View>
-                <View style={[
-                  styles.micIcon,
-                  participant.isMuted ? styles.micMuted : styles.micActive
-                ]}>
-                  <Ionicons 
-                    name={participant.isMuted ? "mic-off" : "mic"} 
-                    size={8} 
-                    color="white" 
-                  />
-                </View>
+                <Text style={styles.participantName}>{displayName}</Text>
               </View>
-              <Text style={styles.participantName}>{participant.name}</Text>
-            </View>
-          ))}
+            );
+          })}
         </ScrollView>
       </View>
 
-      {/* Linear Gradient Section - Presenter Info Only */}
-      <LinearGradient
-        colors={['rgba(60, 60, 60, 0.8)', 'rgba(255, 255, 255,1)']}
-        style={styles.presenterSection}
-      >
-        <View style ={{display: 'flex', flexDirection: 'row'}}>
-                <Text style={styles.presenterText2}>{presenterName}</Text>
-
-        <Text style={styles.presenterText}>{' '} is presenting</Text>
-      </View>
-      </LinearGradient>
     </View>
   );
 }
@@ -137,22 +150,5 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '500',
     textAlign: 'center',
-  },
-  presenterSection: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    justifyContent: 'center',
-  },
-  presenterText: {
-    color: '#FFF', // Orange color
-    fontSize: 14,
-    fontWeight: '600',
-    left: 200
-  },
-  presenterText2: {
-    color: '#F13AB1',
-    fontSize: 14,
-    fontWeight: '600',
-    left: 200
   },
 });
