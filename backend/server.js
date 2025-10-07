@@ -41,6 +41,8 @@ const roomBrowseState = new Map();
 const activeSessions = new Map();
 // In-memory follow state: roomId -> Map(followerUserId -> targetUserId)
 const roomFollowState = new Map();
+// In-memory session participants: roomId -> Set(userId)
+const roomSessionParticipants = new Map();
 
 // Socket.io authentication middleware
 io.use(async (socket, next) => {
@@ -114,33 +116,85 @@ io.on('connection', (socket) => {
     
     if (!room) return [];
     const participants = [];
-    const seenSocketIds = new Set(); // Track unique socket IDs instead of user IDs
+    const seenUserIds = new Set(); // Track unique user IDs instead of socket IDs
+    const sessionSet = roomSessionParticipants.get(roomId);
     
     console.log(`  - Room client IDs:`, Array.from(room));
     
-    for (const clientId of room) {
-      const s = io.sockets.sockets.get(clientId);
-      console.log(`  - Client ${clientId}:`, s ? `${s.userName} (${s.userId})` : 'null');
-      
-      if (s && !seenSocketIds.has(clientId)) {
-        seenSocketIds.add(clientId);
-        const browseMap = roomBrowseState.get(roomId);
-        const current = browseMap ? browseMap.get(clientId) : undefined;
-        participants.push({ 
-          userId: s.userId, 
-          userName: s.userName, // Use userName consistently
-          avatar: s.avatar, 
-          currentProduct: current ? {
-            productId: current.productId,
-            productTitle: current.productTitle,
-            productImage: current.productImage
-          } : null 
-        });
-        console.log(`    ✅ Added participant: ${s.userName} (${s.userId})`);
-      } else if (s && seenSocketIds.has(clientId)) {
-        console.log(`    ⚠️ Skipped duplicate socket: ${s.userName}`);
-      } else {
-        console.log(`    ❌ Invalid socket for client ${clientId}`);
+    if (sessionSet && sessionSet.size > 0) {
+      // Build participants primarily from session membership (userIds) present in room
+      for (const userId of sessionSet) {
+        // Find any socket for this user that is still in room
+        let matchedSocket = null;
+        for (const clientId of room) {
+          const s = io.sockets.sockets.get(clientId);
+          if (s && s.userId === userId) {
+            matchedSocket = s;
+            break;
+          }
+        }
+        if (matchedSocket && !seenUserIds.has(userId)) {
+          seenUserIds.add(userId);
+          const browseMap = roomBrowseState.get(roomId);
+          const current = browseMap ? browseMap.get(userId) : undefined;
+          participants.push({
+            userId: matchedSocket.userId,
+            userName: matchedSocket.userName,
+            avatar: matchedSocket.avatar,
+            currentProduct: current ? {
+              productId: current.productId,
+              productTitle: current.productTitle,
+              productImage: current.productImage
+            } : null
+          });
+          console.log(`    ✅ Added session participant: ${matchedSocket.userName} (${matchedSocket.userId})`);
+        }
+      }
+      // Include any additional users currently in the room who somehow were not in sessionSet
+      for (const clientId of room) {
+        const s = io.sockets.sockets.get(clientId);
+        if (s && !seenUserIds.has(s.userId)) {
+          seenUserIds.add(s.userId);
+          const browseMap = roomBrowseState.get(roomId);
+          const current = browseMap ? browseMap.get(s.userId) : undefined;
+          participants.push({
+            userId: s.userId,
+            userName: s.userName,
+            avatar: s.avatar,
+            currentProduct: current ? {
+              productId: current.productId,
+              productTitle: current.productTitle,
+              productImage: current.productImage
+            } : null
+          });
+          console.log(`    ➕ Added in-room user not in sessionSet: ${s.userName} (${s.userId})`);
+        }
+      }
+    } else {
+      // Fallback: build from room sockets (legacy behavior)
+      for (const clientId of room) {
+        const s = io.sockets.sockets.get(clientId);
+        console.log(`  - Client ${clientId}:`, s ? `${s.userName} (${s.userId})` : 'null');
+        if (s && !seenUserIds.has(s.userId)) {
+          seenUserIds.add(s.userId);
+          const browseMap = roomBrowseState.get(roomId);
+          const current = browseMap ? browseMap.get(s.userId) : undefined;
+          participants.push({ 
+            userId: s.userId, 
+            userName: s.userName,
+            avatar: s.avatar, 
+            currentProduct: current ? {
+              productId: current.productId,
+              productTitle: current.productTitle,
+              productImage: current.productImage
+            } : null 
+          });
+          console.log(`    ✅ Added participant: ${s.userName} (${s.userId})`);
+        } else if (s && seenUserIds.has(s.userId)) {
+          console.log(`    ⚠️ Skipped duplicate user: ${s.userName}`);
+        } else {
+          console.log(`    ❌ Invalid socket for client ${clientId}`);
+        }
       }
     }
     
@@ -219,13 +273,17 @@ io.on('connection', (socket) => {
       // Send browse snapshot if exists
       const browseMap = roomBrowseState.get(roomId);
       if (browseMap) {
-        const snapshot = Array.from(browseMap.entries()).map(([socketId, v]) => ({ 
-          userId: v.userId, 
+        const uniqueByUser = new Map();
+        for (const [, v] of browseMap.entries()) {
+          uniqueByUser.set(v.userId, v);
+        }
+        const snapshot = Array.from(uniqueByUser.values()).map((v) => ({
+          userId: v.userId,
           userName: v.userName,
           productId: v.productId,
           productTitle: v.productTitle,
           productImage: v.productImage,
-          roomId 
+          roomId
         }));
         socket.emit('browse-snapshot', snapshot);
       }
@@ -382,11 +440,11 @@ io.on('connection', (socket) => {
         if (rid.startsWith('user-') || rid.startsWith('call-')) continue;
         const roomId = rid;
         
-        // Clear browse state for this socket
+        // Clear browse state for this user (using userId as key)
         const browseMap = roomBrowseState.get(roomId);
         if (browseMap) {
-          browseMap.delete(socket.id);
-          console.log(`🧹 Cleared browse state for socket ${socket.id} in room ${roomId}`);
+          browseMap.delete(socket.userId);
+          console.log(`🧹 Cleared browse state for user ${socket.userId} in room ${roomId}`);
         }
         
         await cleanupSessionIfEmpty(roomId);
@@ -400,22 +458,24 @@ io.on('connection', (socket) => {
   socket.on('browse-view', (data) => {
     // data: { roomId, userId, name, productId, productTitle, productImage }
     if (!data?.roomId) return;
-    // Persist last viewed product per user in room
+    // Persist last viewed product per user in room using userId as key
     let map = roomBrowseState.get(data.roomId);
     if (!map) {
       map = new Map();
       roomBrowseState.set(data.roomId, map);
     }
-    map.set(socket.id, {
-      userId: data.userId || socket.userId,
+    const userId = data.userId || socket.userId;
+    map.set(userId, {
+      userId: userId,
       userName: data.name || socket.userName,
       productId: data.productId,
       productTitle: data.productTitle,
       productImage: data.productImage,
     });
-    console.log(`🧭 Browse view stored for socket ${socket.id}: ${data.productTitle}`);
-    socket.to(data.roomId).emit('browse-update', {
-      userId: data.userId || socket.userId,
+    console.log(`🧭 Browse view stored for user ${userId}: ${data.productTitle}`);
+    // Broadcast update to everyone in room (including sender) to ensure local state stays in sync
+    io.to(data.roomId).emit('browse-update', {
+      userId: userId,
       name: data.name || socket.userName,
       productId: data.productId,
       productTitle: data.productTitle,
@@ -446,19 +506,154 @@ io.on('connection', (socket) => {
   // Clear last view when user stops viewing a product
   socket.on('browse-clear', (data) => {
     if (!data?.roomId) return;
-    console.log(`🧹 Browse clear from ${socket.userName} (${socket.id})`);
+    const userId = data.userId || socket.userId;
+    console.log(`🧹 Browse clear from ${socket.userName} (${userId})`);
     const map = roomBrowseState.get(data.roomId);
     if (map) {
-      map.delete(socket.id);
+      map.delete(userId);
     }
     socket.to(data.roomId).emit('browse-update', {
-      userId: data.userId || socket.userId,
+      userId: userId,
       name: data.name || socket.userName,
       productId: null,
       productTitle: null,
       productImage: null,
       roomId: data.roomId,
       timestamp: new Date().toISOString()
+    });
+  });
+
+  // Join user-specific room for follow notifications
+  socket.on('join-user', (userId) => {
+    socket.join(`user-${userId}`);
+    console.log(`👤 User ${socket.userId} joined user room ${userId}`);
+  });
+
+  // Follow/Unfollow functionality
+  socket.on('follow-user', (data) => {
+    if (!data?.roomId || !data?.targetUserId) return;
+    console.log(`👥 User ${socket.userId} following ${data.targetUserId} in room ${data.roomId}`);
+    
+    let followMap = roomFollowState.get(data.roomId);
+    if (!followMap) {
+      followMap = new Map();
+      roomFollowState.set(data.roomId, followMap);
+    }
+    followMap.set(socket.userId, data.targetUserId);
+    
+    // Notify the target user that someone is following them
+    socket.to(`user-${data.targetUserId}`).emit('follow-updated', {
+      roomId: data.roomId,
+      followerId: socket.userId,
+      followerName: socket.userName,
+      targetUserId: data.targetUserId
+    });
+
+    // Immediately navigate follower to leader's current product if available
+    const browseMap = roomBrowseState.get(data.roomId);
+    if (browseMap) {
+      const leaderState = browseMap.get(data.targetUserId);
+      if (leaderState && leaderState.productId) {
+        // Send to follower's personal room (if joined)
+        io.to(`user-${socket.userId}`).emit('follow-navigate', {
+          roomId: data.roomId,
+          leaderUserId: data.targetUserId,
+          productId: leaderState.productId,
+          productTitle: leaderState.productTitle,
+          productImage: leaderState.productImage,
+          timestamp: new Date().toISOString()
+        });
+        // Also send directly to this follower's socket for immediate effect
+        socket.emit('follow-navigate', {
+          roomId: data.roomId,
+          leaderUserId: data.targetUserId,
+          productId: leaderState.productId,
+          productTitle: leaderState.productTitle,
+          productImage: leaderState.productImage,
+          timestamp: new Date().toISOString()
+        });
+      }
+    }
+  });
+
+  socket.on('unfollow-user', (data) => {
+    if (!data?.roomId) return;
+    console.log(`👥 User ${socket.userId} unfollowing in room ${data.roomId}`);
+    
+    const followMap = roomFollowState.get(data.roomId);
+    if (followMap) {
+      const targetUserId = followMap.get(socket.userId);
+      followMap.delete(socket.userId);
+      
+      if (targetUserId) {
+        // Notify the target user that someone stopped following them
+        socket.to(`user-${targetUserId}`).emit('follow-updated', {
+          roomId: data.roomId,
+          followerId: socket.userId,
+          followerName: socket.userName,
+          targetUserId: targetUserId,
+          unfollowed: true
+        });
+      }
+      
+      // If followMap is empty, remove it
+      if (followMap.size === 0) {
+        roomFollowState.delete(data.roomId);
+      }
+    }
+  });
+
+  // Session user join/leave
+  socket.on('join-session', async (data) => {
+    if (!data?.roomId || !data?.user) return;
+    console.log(`👥 User ${data.user.userId} joining session in room ${data.roomId}`);
+    // Track in session participants set
+    let set = roomSessionParticipants.get(data.roomId);
+    if (!set) {
+      set = new Set();
+      roomSessionParticipants.set(data.roomId, set);
+    }
+    set.add(data.user.userId);
+    
+    // Get updated participants list
+    const participants = await getRoomParticipants(data.roomId);
+    console.log(`👥 Broadcasting updated participants after join:`, participants.map(p => p.name));
+    
+    // Broadcast updated participants to all users in the room
+    io.to(data.roomId).emit('session-participants', participants);
+    
+    // Notify about user joining
+    io.to(data.roomId).emit('session-user-joined', {
+      roomId: data.roomId,
+      user: data.user,
+      participants: participants
+    });
+  });
+
+  socket.on('leave-session', async (data) => {
+    if (!data?.roomId || !data?.userId) return;
+    console.log(`👥 User ${data.userId} leaving session in room ${data.roomId}`);
+    // Remove from session participants set
+    const set = roomSessionParticipants.get(data.roomId);
+    if (set) {
+      set.delete(data.userId);
+      if (set.size === 0) {
+        roomSessionParticipants.delete(data.roomId);
+      }
+    }
+    
+    // Get updated participants list
+    const participants = await getRoomParticipants(data.roomId);
+    console.log(`👥 Broadcasting updated participants after leave:`, participants.map(p => p.name));
+    
+    // Broadcast updated participants to all users in the room
+    io.to(data.roomId).emit('session-participants', participants);
+    
+    // Notify about user leaving
+    io.to(data.roomId).emit('session-user-left', {
+      roomId: data.roomId,
+      userId: data.userId,
+      participants: participants
     });
   });
 
@@ -469,6 +664,16 @@ io.on('connection', (socket) => {
     console.log(`▶️ Starting session in room ${data.roomId} by ${socket.userName}`);
     
     activeSessions.set(data.roomId, { active: true, host: data.host || socket.userName });
+    
+    // Add host to session participants
+    let sessionSet = roomSessionParticipants.get(data.roomId);
+    if (!sessionSet) {
+      sessionSet = new Set();
+      roomSessionParticipants.set(data.roomId, sessionSet);
+    }
+    sessionSet.add(socket.userId);
+    console.log(`👥 Added host ${socket.userName} to session participants for room ${data.roomId}`);
+    
     try {
       const Room = require('./models/Room');
       await Room.findByIdAndUpdate(data.roomId, { 
@@ -485,8 +690,8 @@ io.on('connection', (socket) => {
     const participants = await getRoomParticipants(data.roomId);
     console.log(`👥 Broadcasting participants for session start:`, participants.map(p => p.name));
     
-    // Notify users already in the room
-    io.to(data.roomId).emit('session-started', { 
+    // Notify users already in the room (exclude host)
+    socket.to(data.roomId).emit('session-started', { 
       roomId: data.roomId, 
       host: data.host || socket.userName,
       hostId: socket.userId 
@@ -503,6 +708,7 @@ io.on('connection', (socket) => {
     activeSessions.set(data.roomId, { active: false, host: null });
     roomBrowseState.delete(data.roomId);
     roomFollowState.delete(data.roomId);
+    roomSessionParticipants.delete(data.roomId);
     
     try {
       const Room = require('./models/Room');
@@ -524,29 +730,6 @@ io.on('connection', (socket) => {
     io.to(data.roomId).emit('session-participants', []);
   });
 
-  // Follow mechanics
-  // Client should have joined their user room via 'join-user' with their userId
-  socket.on('follow-user', (data) => {
-    // data: { roomId, targetUserId }
-    if (!data?.roomId || !data?.targetUserId) return;
-    let map = roomFollowState.get(data.roomId);
-    if (!map) {
-      map = new Map();
-      roomFollowState.set(data.roomId, map);
-    }
-    map.set(socket.userId, data.targetUserId);
-    io.to(data.roomId).emit('follow-updated', { followerUserId: socket.userId, targetUserId: data.targetUserId });
-  });
-
-  socket.on('unfollow-user', (data) => {
-    // data: { roomId }
-    if (!data?.roomId) return;
-    const map = roomFollowState.get(data.roomId);
-    if (map) {
-      map.delete(socket.userId);
-      io.to(data.roomId).emit('follow-updated', { followerUserId: socket.userId, targetUserId: null });
-    }
-  });
 });
 
 // Import routes
@@ -728,6 +911,66 @@ io.on('connection', (socket) => {
   // Control changes
   socket.on('call:control-changed', (data) => {
     socket.to(`call-${data.callId}`).emit('call:control-update', data);
+  });
+
+  // Voice call events
+  socket.on('start-voice-call', (data) => {
+    console.log(`🎤 User ${socket.userName} starting voice call in room: ${data.roomId}`);
+    socket.to(data.roomId).emit('voice-call-started', {
+      roomId: data.roomId,
+      hostId: socket.userId,
+      hostName: socket.userName
+    });
+  });
+
+  socket.on('join-voice-call', (data) => {
+    console.log(`🎤 User ${socket.userName} joining voice call in room: ${data.roomId}`);
+    socket.to(data.roomId).emit('user-joined-voice-call', {
+      roomId: data.roomId,
+      userId: socket.userId,
+      userName: socket.userName
+    });
+  });
+
+  socket.on('end-voice-call', (data) => {
+    console.log(`🎤 User ${socket.userName} ending voice call in room: ${data.roomId}`);
+    socket.to(data.roomId).emit('voice-call-ended', {
+      roomId: data.roomId,
+      userId: socket.userId
+    });
+  });
+
+  socket.on('voice-call-offer', (data) => {
+    console.log(`🎤 Voice call offer from ${socket.userName} to user ${data.targetUserId} in room: ${data.roomId}`);
+    socket.to(data.roomId).emit('voice-call-offer', {
+      fromUserId: socket.userId,
+      fromUserName: socket.userName,
+      targetUserId: data.targetUserId,
+      offer: data.offer,
+      roomId: data.roomId
+    });
+  });
+
+  socket.on('voice-call-answer', (data) => {
+    console.log(`🎤 Voice call answer from ${socket.userName} to user ${data.targetUserId} in room: ${data.roomId}`);
+    socket.to(data.roomId).emit('voice-call-answer', {
+      fromUserId: socket.userId,
+      fromUserName: socket.userName,
+      targetUserId: data.targetUserId,
+      answer: data.answer,
+      roomId: data.roomId
+    });
+  });
+
+  socket.on('voice-call-ice-candidate', (data) => {
+    console.log(`🎤 Voice call ICE candidate from ${socket.userName} to user ${data.targetUserId} in room: ${data.roomId}`);
+    socket.to(data.roomId).emit('voice-call-ice-candidate', {
+      fromUserId: socket.userId,
+      fromUserName: socket.userName,
+      targetUserId: data.targetUserId,
+      candidate: data.candidate,
+      roomId: data.roomId
+    });
   });
 });
 

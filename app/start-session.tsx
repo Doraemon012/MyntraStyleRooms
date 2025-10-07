@@ -17,7 +17,6 @@ import { useAuth } from '../contexts/auth-context';
 import { useSession } from '../contexts/session-context';
 import socketService from '../services/socketService';
 import { wardrobeApi } from '../services/wardrobeApi';
-import { showToast } from '../utils/toast';
 
 interface WardrobeCategory {
     id: string;
@@ -97,44 +96,6 @@ const wardrobeCategories: WardrobeCategory[] = [
 
 type SessionStep = "wardrobe" | "notify" | "start";
 
-// Mock participants for the session
-const mockParticipants = [
-    {
-        id: '1',
-        name: 'You',
-        avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face',
-        isMuted: false,
-        currentProduct: null
-    },
-    {
-        id: '2',
-        name: 'Priya',
-        avatar: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face',
-        isMuted: false,
-        currentProduct: null
-    },
-    {
-        id: '3',
-        name: 'Sneha',
-        avatar: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=150&h=150&fit=crop&crop=face',
-        isMuted: true,
-        currentProduct: null
-    },
-    {
-        id: '4',
-        name: 'Ananya',
-        avatar: 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=150&h=150&fit=crop&crop=face',
-        isMuted: false,
-        currentProduct: null
-    },
-    {
-        id: '5',
-        name: 'Riya',
-        avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150&h=150&fit=crop&crop=face',
-        isMuted: false,
-        currentProduct: null
-    },
-];
 
 export default function StartSessionScreen() {
     const { roomId: roomIdParam } = useLocalSearchParams();
@@ -144,7 +105,7 @@ export default function StartSessionScreen() {
     const [isNotifying, setIsNotifying] = useState(false);
     const [realWardrobes, setRealWardrobes] = useState<any[]>([]);
     const [loadingWardrobes, setLoadingWardrobes] = useState(false);
-    const { startSession } = useSession();
+    const { startSession, setParticipants } = useSession();
     const { user } = useAuth();
 
     let [fontsLoaded] = useFonts({
@@ -248,28 +209,67 @@ export default function StartSessionScreen() {
             onSessionParticipants: (participants) => {
                 console.log('📥 Received session participants in start-screen:', participants);
                 if (Array.isArray(participants)) {
-                    const normalized = participants.map((p) => ({
-                        id: p.userId,
-                        name: p.userName || p.name,
-                        avatar: p.avatar || 'https://ui-avatars.com/api/?name=U&background=4A90E2&color=FFFFFF&size=150',
-                        isMuted: false,
-                        currentProduct: p.currentProduct ? {
-                            id: p.currentProduct.productId,
-                            name: p.currentProduct.productTitle,
-                            image: p.currentProduct.productImage,
-                        } : null,
-                    }));
+                    const normalizedRaw = participants.map((p) => {
+                        const isCurrent = user && p.userId === user._id;
+                        const displayName = isCurrent ? user.name : (p.userName || p.name);
+                        const fallbackAvatarName = displayName && typeof displayName === 'string' ? displayName : 'User';
+                        const avatar = isCurrent
+                          ? (user.profileImage || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&background=4A90E2&color=FFFFFF&size=150`)
+                          : (p.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(fallbackAvatarName)}&background=4A90E2&color=FFFFFF&size=150`);
+                        return {
+                            id: p.userId,
+                            name: displayName,
+                            avatar,
+                            isMuted: false,
+                            currentProduct: p.currentProduct ? {
+                                id: p.currentProduct.productId,
+                                name: p.currentProduct.productTitle,
+                                image: p.currentProduct.productImage,
+                            } : null,
+                        };
+                    });
+                    // Dedupe by id keeping the first occurrence
+                    const seen = new Set<string>();
+                    let normalized = normalizedRaw.filter(p => {
+                        if (seen.has(p.id)) return false;
+                        seen.add(p.id);
+                        return true;
+                    });
+
+                    // Ensure current user is present
+                    const hasCurrent = normalized.some(p => p.id === user._id);
+                    if (!hasCurrent) {
+                        normalized = [
+                            {
+                                id: user._id,
+                                name: user.name,
+                                avatar: user.profileImage || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}`,
+                                isMuted: false,
+                                currentProduct: null,
+                            },
+                            ...normalized,
+                        ];
+                    }
                     console.log('📥 Normalized participants in start-screen:', normalized.map(p => p.name));
-                    // Update session context with participants
-                    startSession(roomId, normalized, true, selectedWardrobe);
+                    
+                    // Ensure current user is included in participants
+                    const currentUserInList = normalized.find(p => p.id === user._id);
+                    if (!currentUserInList) {
+                        console.log('👤 Current user not in participants list, adding them');
+                        normalized.push({
+                            id: user._id,
+                            name: user.name,
+                            avatar: user.profileImage || 'https://ui-avatars.com/api/?name=' + user.name,
+                            isMuted: false,
+                            currentProduct: null
+                        });
+                    }
+                    
+                    // Update session context with participants (this will merge with existing participants)
+                    setParticipants(normalized);
                 }
             },
-            onSessionState: (state) => {
-                console.log('📊 Session state in start-screen:', state);
-                if (state?.active) {
-                    console.log('✅ Session is active, updating context');
-                }
-            }
+            // Removed onSessionState handler to satisfy types and avoid unused handler
         });
         
         // First, join the room if not already joined
@@ -277,6 +277,17 @@ export default function StartSessionScreen() {
         
         // Wait a bit for room join to complete
         await new Promise(resolve => setTimeout(resolve, 100));
+        
+        // Join the session as host
+        const userData = {
+          userId: user._id,
+          userName: user.name,
+          avatar: user.profileImage || 'https://ui-avatars.com/api/?name=' + user.name
+        };
+        socketService.joinSession(roomId, userData);
+        
+        // Join personal room for follow notifications
+        socketService.joinUser(user._id);
         
         // Then start the session via socket
         socketService.startSession(roomId, { 
@@ -286,17 +297,11 @@ export default function StartSessionScreen() {
             participants: [] // Will be populated by backend
         });
         
-        // Update local context with initial participant
-        const initial = [{ 
-            id: user._id, 
-            name: hostName, 
-            avatar: hostAvatar, 
-            isMuted: false, 
-            currentProduct: null 
-        }];
-        startSession(roomId, initial, true, selectedWardrobe);
+        // Initialize session locally without injecting current user; participants will come from server
+        console.log('👤 Initializing session locally without pre-injecting user');
+        startSession(roomId, [], true, selectedWardrobe);
         
-        showToast('You started a session');
+        // Removed toast on session start
         // Navigate to the catalog screen for the session
         router.push("/catalog");
     };

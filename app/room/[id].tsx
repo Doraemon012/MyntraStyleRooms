@@ -1,6 +1,7 @@
 import MayaChat from '@/components/maya-chat';
 import { ThemedView } from '@/components/themed-view';
 import MayaTheme from '@/constants/maya-theme';
+import { useAuth } from '@/contexts/auth-context';
 import { useSession } from '@/contexts/session-context';
 import { roomAPI } from '@/services/api';
 import messageStorage from '@/services/messageStorage';
@@ -203,6 +204,7 @@ export default function RoomChatScreen() {
   const [hasActiveSession, setHasActiveSession] = useState<boolean>(!!roomData?.hasActiveSession);
   const [sessionHost, setSessionHost] = useState<string>(roomData?.sessionHost || 'Host');
   const { addParticipant, removeParticipant, setParticipantProduct, setParticipants } = useSession();
+  const { user } = useAuth();
   
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
@@ -414,9 +416,7 @@ export default function RoomChatScreen() {
             const hostName = data?.host || 'Someone';
             setHasActiveSession(true);
             setSessionHost(hostName);
-            showToast(`${hostName} started a session`, [
-              { text: 'Join', onPress: () => router.push(`/join-session?roomId=${roomId}&sessionHost=${hostName}`) }
-            ]);
+            // Intentionally no toast shown to anyone on session start
           },
           onSessionEnded: () => {
             setHasActiveSession(false);

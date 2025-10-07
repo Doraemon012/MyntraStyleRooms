@@ -32,7 +32,7 @@ export default function ProductDetailScreen() {
   const params = useLocalSearchParams();
   const id = params.id as string | undefined;
   const normalizedId = typeof id === 'string' ? id : '';
-  const { sessionRoomId, isInSession, setParticipantProduct } = useSession();
+  const { sessionRoomId, isInSession, setParticipantProduct, sessionParticipants, addParticipant, setParticipants } = useSession();
   const { user } = useAuth();
   
   // Always call hooks; guard their effects internally
@@ -80,12 +80,30 @@ export default function ProductDetailScreen() {
     console.log('📤 Sending browse view:', payload);
     console.log('📤 Socket connected:', socketService.getConnectionStatus().isConnected);
     socketService.sendBrowseView(sessionRoomId, payload);
-    // Update own current product locally (we won't receive our own broadcast)
+    // Ensure self exists in participants before updating product
+    const selfExists = sessionParticipants.some(p => p.id === user._id);
+    if (!selfExists) {
+      addParticipant({
+        id: user._id,
+        name: user.name,
+        avatar: user.profileImage || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&background=4A90E2&color=FFFFFF&size=150`,
+        isMuted: false,
+        currentProduct: null,
+      } as any);
+    }
+    // Update own current product locally (we won't rely on echo)
+    console.log('📤 Updating participant product for current user:', payload.userId);
     setParticipantProduct(payload.userId, { id: payload.productId, name: payload.productTitle, image: payload.productImage });
+    console.log('📤 Participant product updated for:', payload.userId);
   }, [product, isInSession, sessionRoomId, user, setParticipantProduct]);
 
   // Ensure browse updates update session context while on product screen
   React.useEffect(() => {
+    if (isInSession && user) {
+      // Join user room for follow notifications
+      socketService.joinUser(user._id);
+    }
+
     socketService.updateCallbacks({
       onBrowseUpdate: (data) => {
         if (data?.userId) {
@@ -101,7 +119,37 @@ export default function ProductDetailScreen() {
           }
         }
       },
+      onSessionParticipants: (participants) => {
+        if (!Array.isArray(participants) || !isInSession || !user) return;
+        const normalizedRaw = participants.map((p: any) => {
+          const isCurrent = p.userId === user._id;
+          const displayName = isCurrent ? user.name : (p.userName || p.name);
+          const fallbackAvatarName = displayName && typeof displayName === 'string' ? displayName : 'User';
+          const avatar = isCurrent
+            ? (user.profileImage || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&background=4A90E2&color=FFFFFF&size=150`)
+            : (p.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(fallbackAvatarName)}&background=4A90E2&color=FFFFFF&size=150`);
+          return {
+            id: p.userId,
+            name: displayName,
+            avatar,
+            isMuted: false,
+            currentProduct: p.currentProduct ? {
+              id: p.currentProduct.productId,
+              name: p.currentProduct.productTitle,
+              image: p.currentProduct.productImage,
+            } : null,
+          };
+        });
+        const seen = new Set<string>();
+        const normalized = normalizedRaw.filter((p: any) => {
+          if (seen.has(p.id)) return false;
+          seen.add(p.id);
+          return true;
+        });
+        setParticipants(normalized as any);
+      },
       onFollowNavigate: (data) => {
+        console.log('🧭 Follow navigation triggered on product screen:', data);
         if (data?.productId && data?.leaderUserId) {
           // Navigate to the leader's product if following
           router.replace(`/product/${data.productId}` as any);
@@ -115,7 +163,7 @@ export default function ProductDetailScreen() {
         setParticipantProduct(user._id, null);
       }
     };
-  }, [setParticipantProduct]);
+  }, [setParticipantProduct, isInSession, user]);
   
   // Wardrobe and Chat functionality
   const [showWardrobeSelector, setShowWardrobeSelector] = useState(false);
@@ -433,7 +481,7 @@ export default function ProductDetailScreen() {
             </View>
             <Text style={styles.offerDetails}>With Coupon + Bank Offer</Text>
             <TouchableOpacity style={styles.detailsLink}>
-              <Text style={styles.detailsLinkText}>Details ></Text>
+              <Text style={styles.detailsLinkText}>Details &gt;</Text>
             </TouchableOpacity>
 
             {/* Size Selection */}

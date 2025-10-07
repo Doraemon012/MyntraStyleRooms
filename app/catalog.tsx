@@ -5,6 +5,7 @@ import { router } from 'expo-router';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
     Animated,
+    AppState,
     Dimensions,
     FlatList,
     Modal,
@@ -42,7 +43,7 @@ const { width: screenWidth } = Dimensions.get('window');
 
 
 export default function CatalogScreen() {
-  const { isInSession, isHost, sessionParticipants, presenterName, isMuted, toggleMute, endSession, sessionRoomId, setParticipantProduct } = useSession();
+  const { isInSession, isHost, sessionParticipants, presenterName, isMuted, toggleMute, endSession, sessionRoomId, setParticipantProduct, setParticipants } = useSession();
   const { user } = useAuth();
   
   // Debug session state
@@ -57,10 +58,12 @@ export default function CatalogScreen() {
   React.useEffect(() => {
     if (!isInSession || !sessionRoomId || !user) return;
 
-    // Clear browse view when entering catalog (user is not viewing any specific product)
-    console.log('🧹 Clearing browse view - user entered catalog');
-    socketService.sendBrowseClear(sessionRoomId, { userId: user._id, name: user.name });
-    setParticipantProduct(user._id, null);
+    // Join user room for follow notifications
+    socketService.joinUser(user._id);
+
+    // Don't clear browse view immediately when entering catalog
+    // This allows the LiveBrowsePanel to show the last product the user was viewing
+    console.log('📱 User entered catalog - keeping last viewed product in LiveBrowsePanel');
 
     socketService.updateCallbacks({
       onBrowseUpdate: (data) => {
@@ -71,25 +74,82 @@ export default function CatalogScreen() {
           setParticipantProduct(data.userId, null);
         }
       },
+      onSessionParticipants: (participants) => {
+        if (!Array.isArray(participants)) return;
+        const normalizedRaw = participants.map((p: any) => {
+          const isCurrent = user && p.userId === user._id;
+          const displayName = isCurrent ? user!.name : (p.userName || p.name);
+          const fallbackAvatarName = displayName && typeof displayName === 'string' ? displayName : 'User';
+          const avatar = isCurrent
+            ? (user!.profileImage || `https://ui-avatars.com/api/?name=${encodeURIComponent(user!.name)}&background=4A90E2&color=FFFFFF&size=150`)
+            : (p.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(fallbackAvatarName)}&background=4A90E2&color=FFFFFF&size=150`);
+          return {
+            id: p.userId,
+            name: displayName,
+            avatar,
+            isMuted: false,
+            currentProduct: p.currentProduct ? {
+              id: p.currentProduct.productId,
+              name: p.currentProduct.productTitle,
+              image: p.currentProduct.productImage,
+            } : null,
+          };
+        });
+        // Dedupe by id
+        const seen = new Set<string>();
+        const normalized = normalizedRaw.filter((p: any) => {
+          if (seen.has(p.id)) return false;
+          seen.add(p.id);
+          return true;
+        });
+        setParticipants(normalized);
+      },
       onFollowNavigate: (data) => {
         // Auto navigate to product if following
-        // We rely on session context followingUserId
-        // Catalog only shows a toast or could navigate to product details
+        console.log('🧭 Follow navigation triggered:', data);
         if (data?.productId) {
-          // Optionally navigate: router.push(`/product/${data.productId}` as any)
+          router.push(`/product/${data.productId}` as any);
         }
       },
     });
 
-    // Cleanup: clear browse view when component unmounts
+    // Cleanup: don't clear browse view when component unmounts
+    // This preserves the last viewed product in the LiveBrowsePanel
     return () => {
       if (isInSession && sessionRoomId && user) {
-        console.log('🧹 Clearing browse view - user left catalog');
-        socketService.sendBrowseClear(sessionRoomId, { userId: user._id, name: user.name });
-        setParticipantProduct(user._id, null);
+        console.log('📱 User left catalog - keeping last viewed product in LiveBrowsePanel');
       }
     };
   }, [isInSession, sessionRoomId, user, setParticipantProduct]);
+
+  // Leave/cleanup helper
+  const handleEndAndCleanup = React.useCallback(() => {
+    try {
+      if (sessionRoomId && user) {
+        socketService.leaveSession(sessionRoomId, user._id);
+        socketService.leaveRoom(sessionRoomId);
+        if (isHost) {
+          socketService.endSession(sessionRoomId);
+        }
+      }
+    } finally {
+      endSession();
+    }
+  }, [sessionRoomId, user, isHost, endSession]);
+
+  // Note: Do not auto-cleanup on unmount to avoid navigation race loops.
+
+  // Cleanup when app goes to background
+  React.useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'background' && isInSession) {
+        handleEndAndCleanup();
+      }
+    });
+    return () => {
+      subscription.remove();
+    };
+  }, [isInSession, handleEndAndCleanup]);
   const { logout } = useAuth();
   const [selectedCategory, setSelectedCategory] = useState('1');
   const [showExploreMenu, setShowExploreMenu] = useState(false);
@@ -831,7 +891,7 @@ export default function CatalogScreen() {
           <SessionBottomControls
             onScreenShare={() => {}}
             onToggleMute={toggleMute}
-            onEndCall={endSession}
+            onEndCall={handleEndAndCleanup}
             isMuted={isMuted}
           />
         )}
