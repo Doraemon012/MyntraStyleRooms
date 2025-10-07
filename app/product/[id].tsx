@@ -24,7 +24,6 @@ import messageStorage from '../../services/messageStorage';
 import socketService from '../../services/socketService';
 import { useSession } from '../../contexts/session-context';
 import { useAuth } from '../../contexts/auth-context';
-import socketService from '../../services/socketService';
 import LiveBrowsePanel from '../../components/session/LiveBrowsePanel';
 import { wardrobeApi } from '../../services/wardrobeApi';
 import AsyncStorage from '@react-native-async-storage/async-storage';
